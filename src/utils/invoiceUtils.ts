@@ -1,12 +1,26 @@
 import { Invoice, BillStatus } from '../types';
 
 /**
+ * Safely parses both ISO (YYYY-MM-DD) and Indian (DD-MM-YYYY) date formats
+ */
+export function parseDateSafe(dateStr?: string): Date {
+  if (!dateStr) return new Date();
+  const trimmed = dateStr.trim();
+  if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
+    const [d, m, y] = trimmed.split('-');
+    const parsed = new Date(`${y}-${m}-${d}`);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+/**
  * Formats a sequence number into the official ANIMEX invoice code: ANX-YYMM-XXXX
  * Example: seq = 1 in September 2026 => ANX-2609-0001
  */
 export function formatInvoiceNumber(seq: number, dateStr?: string): string {
-  const dateObj = dateStr ? new Date(dateStr) : new Date();
-  const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
+  const validDate = parseDateSafe(dateStr);
   
   const yy = String(validDate.getFullYear()).slice(-2);
   const mm = String(validDate.getMonth() + 1).padStart(2, '0');

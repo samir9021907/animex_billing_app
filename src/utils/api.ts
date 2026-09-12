@@ -33,12 +33,18 @@ export const syncInvoiceToBackend = async (invoice: any) => {
       is_free: Boolean(item.isFree || item.isScheme),
     }));
 
+    let isoDate = invoice.date;
+    if (invoice.date && /^\d{2}-\d{2}-\d{4}$/.test(invoice.date)) {
+      const [d, m, y] = invoice.date.split('-');
+      isoDate = `${y}-${m}-${d}`;
+    }
+
     await fetch(`${API_BASE}/client/${clientId}/invoices`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
         medical_store_id: invoice.billTo?.id || '',
-        date: invoice.date,
+        date: isoDate,
         discount: invoice.discount || 0,
         received_amount: invoice.receivedAmount || 0,
         payment_type: invoice.paymentType || 'UPI',

@@ -1,5 +1,7 @@
 export function convertNumberToWords(amount: number): string {
-  if (amount === 0) return 'Zero Rupees only';
+  if (amount === undefined || amount === null || isNaN(amount) || amount <= 0) {
+    return 'Zero Rupees only';
+  }
 
   const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 
                  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];

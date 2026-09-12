@@ -46,8 +46,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     msg += `   ANIMEX ANIMAL HEALTH CARE PVT LTD\n`;
     msg += `   BILL / INVOICE NO: ${masterInvoiceNo}\n`;
     msg += `=========================================\n\n`;
-    msg += `Bill To: ${invoice.billTo.firmName}\n`;
-    if (invoice.billTo.contactName) msg += `Prop: ${invoice.billTo.contactName}\n`;
+    msg += `Bill To: ${invoice.billTo?.firmName || 'Valued Customer'}\n`;
+    if (invoice.billTo?.contactName) msg += `Prop: ${invoice.billTo.contactName}\n`;
     msg += `Date: ${invoice.date}\n`;
     msg += `Payment Mode: ${invoice.paymentType || 'UPI'}\n`;
     msg += `Status: ${statusBadge.label}\n\n`;
@@ -73,7 +73,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     msg += `Helpline / Orders: 9307990811 / 8999323908\n`;
 
     const encoded = encodeURIComponent(msg);
-    const targetPhone = invoice.billTo.phone
+    const targetPhone = invoice.billTo?.phone
       ? invoice.billTo.phone.replace(/[^0-9]/g, '')
       : '9307990811';
     window.open(`https://wa.me/91${targetPhone}?text=${encoded}`, '_blank');
@@ -210,19 +210,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     Bill To (Medical Store):
                   </span>
                   <div className="font-black text-xs sm:text-sm text-[#0F4C81] mt-0.5">
-                    {invoice.billTo.firmName}
+                    {invoice.billTo?.firmName || 'Valued Customer'}
                   </div>
-                  {invoice.billTo.contactName && (
+                  {invoice.billTo?.contactName && (
                     <div className="text-[11px] sm:text-xs font-bold text-[#334155] mt-0.5">
                       Proprietor: {invoice.billTo.contactName}
                     </div>
                   )}
-                  {invoice.billTo.address && (
+                  {invoice.billTo?.address && (
                     <div className="text-[10px] sm:text-[11px] font-medium text-[#475569] mt-0.5">
                       📍 {invoice.billTo.address}, {invoice.billTo.district}, {invoice.billTo.state}
                     </div>
                   )}
-                  {invoice.billTo.phone && (
+                  {invoice.billTo?.phone && (
                     <div className="text-[10px] sm:text-[11px] font-bold text-[#F97316] mt-0.5">
                       📞 Ph: +91 {invoice.billTo.phone}
                     </div>

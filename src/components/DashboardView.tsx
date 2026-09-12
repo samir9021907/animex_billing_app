@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Invoice, MedicalStore, Product } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import { parseDateSafe } from '../utils/invoiceUtils';
 
 interface DashboardViewProps {
   invoices: Invoice[];
@@ -325,7 +326,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {storeName}
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {new Date(inv.date).toLocaleDateString('en-IN')} • {inv.paymentType || 'UPI'}
+                        {parseDateSafe(inv.date).toLocaleDateString('en-IN')} • {inv.paymentType || 'UPI'}
                       </p>
                     </div>
                   </div>

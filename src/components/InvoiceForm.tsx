@@ -73,11 +73,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       id: `item-${Date.now()}`,
       productId: products[0]?.id || '',
       itemName: products[0]?.name || '',
-      quantity: 10,
+      quantity: 0,
       unit: products[0]?.defaultUnit || 'Ltr',
       mrp: products[0]?.mrp || 0,
       pricePerUnit: products[0]?.defaultPrice || 300,
-      amount: (products[0]?.defaultPrice || 300) * 10,
+      amount: 0,
       isFree: false,
       isScheme: false
     }
@@ -91,6 +91,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const [isFullPaid, setIsFullPaid] = useState<boolean>(true);
   const [receivedAmount, setReceivedAmount] = useState<number>(0);
   const [termsAndConditions, setTermsAndConditions] = useState<string>('Goods once sold will not be taken back.');
+
+  // Complete form refresh / reset
+  const handleResetForm = () => {
+    if (window.confirm('नवीन बिल तयार करण्यासाठी संपूर्ण फॉर्म रिफ्रेश (Reset) करायचा आहे का?\n(Reset entire form to create a new bill?)')) {
+      setItems(createInitialItems());
+      setDiscount(0);
+      setPaymentType('UPI');
+      setIsFullPaid(true);
+      setReceivedAmount(0);
+      setDate(new Date().toISOString().split('T')[0]);
+      if (stores.length > 0) {
+        setSelectedStoreId(stores[0].id);
+        setInvoiceNo(getStoreNextInvoiceNo(stores[0].id));
+      }
+    }
+  };
 
   // Automatically refresh and reset products & payment details when customer store changes
   const handleStoreChange = (newStoreId: string) => {
@@ -134,11 +150,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       id: `item-${Date.now()}-${Math.random()}`,
       productId: defaultProd?.id || '',
       itemName: defaultProd?.name || '',
-      quantity: 1,
+      quantity: 0,
       unit: defaultProd?.defaultUnit || 'Ltr',
       mrp: defaultProd?.mrp || 0,
       pricePerUnit: defaultProd?.defaultPrice || 0,
-      amount: defaultProd?.defaultPrice || 0,
+      amount: 0,
       isFree: false,
       isScheme: false
     };
@@ -234,6 +250,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const handleSubmitInvoice = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Check if total items quantity is 0
+    const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    if (totalQty <= 0) {
+      alert('कृपया उत्पादनांची संख्या (Quantity) टाका. बिलामध्ये किमान १ नग असणे आवश्यक आहे.\n(Please enter product quantity greater than 0 before generating bill.)');
+      return;
+    }
+
     // Check if any product quantity exceeds available stock
     const overStockItems = items.filter((it) => {
       const p = products.find((prod) => prod.id === it.productId);
@@ -315,10 +338,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           </p>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl py-2 px-5 border border-white/20 text-center min-w-[120px] shadow-sm shrink-0">
-          <div className="text-[11px] font-bold text-slate-200 uppercase tracking-wider">Invoice / Bill No #</div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-300 leading-tight">#{invoiceNo}</div>
-          <div className="text-[9px] font-mono text-slate-300 font-semibold">{invoiceCode}</div>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={handleResetForm}
+            className="bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-black px-3.5 py-2.5 rounded-xl transition-all border border-white/20 shadow flex items-center gap-1.5 cursor-pointer"
+            title="नवीन बिल सुरू करण्यासाठी फॉर्म रिफ्रेश करा (Reset / Refresh Form)"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-amber-300" />
+            <span>रिफ्रेश (New Bill)</span>
+          </button>
+
+          <div className="bg-white/10 backdrop-blur-md rounded-xl py-2 px-5 border border-white/20 text-center min-w-[120px] shadow-sm shrink-0">
+            <div className="text-[11px] font-bold text-slate-200 uppercase tracking-wider">Invoice / Bill No #</div>
+            <div className="text-2xl sm:text-3xl font-black text-amber-300 leading-tight">#{invoiceNo}</div>
+            <div className="text-[9px] font-mono text-slate-300 font-semibold">{invoiceCode}</div>
+          </div>
         </div>
       </div>
 
@@ -425,22 +460,20 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           </h3>
 
           <div className="flex items-center gap-2">
-            {items.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Clear all product lines and start fresh?')) {
-                    setItems(createInitialItems());
-                    setDiscount(0);
-                  }
-                }}
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 transition-all border border-slate-300 dark:border-slate-700 cursor-pointer"
-                title="Reset product items"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Reset</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('सर्व प्रॉडक्ट्स आणि माहिती रिफ्रेश करून सुरुवातीपासून सुरू करायचे का?\n(Clear all lines and start fresh?)')) {
+                  setItems(createInitialItems());
+                  setDiscount(0);
+                }
+              }}
+              className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 transition-all border border-slate-300 dark:border-slate-700 cursor-pointer"
+              title="Reset product items"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>रिफ्रेश (Reset)</span>
+            </button>
 
             <button
               type="button"
@@ -529,9 +562,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Quantity:</label>
                   <input
                     type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
+                    min="0"
+                    placeholder="0"
+                    value={item.quantity === 0 ? '' : item.quantity}
+                    onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-black text-slate-900 dark:text-white"
                   />
                 </div>
@@ -668,9 +702,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   <td className="p-2.5">
                     <input
                       type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
+                      min="0"
+                      placeholder="0"
+                      value={item.quantity === 0 ? '' : item.quantity}
+                      onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-black text-slate-900 dark:text-white"
                     />
                   </td>

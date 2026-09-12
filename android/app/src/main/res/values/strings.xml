@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ANIMEX Billing</string>
+    <string name="title_activity_main">ANIMEX Billing</string>
+    <string name="package_name">com.animex.billing</string>
+    <string name="custom_url_scheme">com.animex.billing</string>
+</resources>

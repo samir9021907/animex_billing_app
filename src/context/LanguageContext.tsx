@@ -1,0 +1,493 @@
+import React, { createContext, useContext, useState } from 'react';
+
+export type Language = 'en' | 'hi' | 'mr';
+
+export interface LanguageContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: string, defaultText?: string) => string;
+}
+
+export const translations: Record<Language, Record<string, string>> = {
+  en: {
+    // Header & Navigation
+    'nav.dashboard': 'Dashboard',
+    'nav.createBill': 'Create Bill',
+    'nav.history': 'Bill History',
+    'nav.stores': 'Medical Stores',
+    'nav.products': 'Products',
+    'nav.productsShort': 'Products',
+    'nav.purchases': 'Purchases',
+    'nav.purchasesFull': 'Purchases & Inward',
+    'nav.settings': 'Settings',
+    'nav.profile': 'Company Profile & Bank',
+    'nav.menu': 'Menu',
+    'nav.logout': 'Logout',
+    'nav.helpline': 'ANIMEX Helpline',
+    'nav.language': 'Language',
+    'brand.subtitle': 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
+
+    // Common Actions
+    'action.save': 'Save',
+    'action.cancel': 'Cancel',
+    'action.delete': 'Delete',
+    'action.edit': 'Edit',
+    'action.search': 'Search...',
+    'action.print': 'Print',
+    'action.close': 'Close',
+    'action.details': 'Details',
+    'action.filter': 'Filter',
+    'action.all': 'All',
+    'action.paid': 'Paid',
+    'action.partial': 'Partial',
+    'action.unpaid': 'Unpaid',
+    'action.confirm': 'Confirm',
+    'action.back': 'Back',
+
+    // Dashboard
+    'dash.overview': 'Overview',
+    'dash.title': 'Dashboard',
+    'dash.subtitle': 'Complete snapshot of your billing operations, medical stores, and revenue collection.',
+    'dash.createBill': 'Create New Bill',
+    'dash.totalInvoices': 'Total Invoices',
+    'dash.invoicesGenerated': 'Bills generated so far',
+    'dash.totalBilled': 'Total Billed',
+    'dash.grossVolume': 'Gross billing volume',
+    'dash.outstanding': 'Outstanding Dues',
+    'dash.pendingCollection': 'Pending collection',
+    'dash.medicalStores': 'Medical Stores',
+    'dash.activeClients': 'Active clients',
+    'dash.quickActions': 'Quick Actions',
+    'dash.purchasesInward': 'Purchases / Inward',
+    'dash.addStore': 'Add Medical Store',
+    'dash.manageProducts': 'Manage Products',
+    'dash.openSettings': 'Open Settings',
+    'dash.godownStock': 'Live Godown Stock',
+    'dash.autoTracking': 'Auto-Tracking',
+    'dash.totalStock': 'Total godown stock',
+    'dash.autoMinusNotice': 'Automatically deducted with each invoice',
+    'dash.manageAllStock': 'Manage all stock & boxes',
+    'dash.boxes': 'Boxes',
+    'dash.loose': 'Loose bottles',
+    'dash.totalUnits': 'Total units',
+    'dash.lowStock': 'Low Stock',
+
+    // Purchases & Inward
+    'pur.badge': 'Manufacturing & Purchases',
+    'pur.subtitleBadge': 'Third-Party Factory Inward Ledger',
+    'pur.title': 'Manufacturing & Purchase Inward History',
+    'pur.subtitle': 'Record purchases from third-party manufacturers, track batch numbers, expiry dates, purchase rates, and automatic godown stock increment.',
+    'pur.checkStock': 'Check Godown Stock',
+    'pur.recordNew': 'Record Purchase Bill (+ Inward)',
+    'pur.totalSpend': 'Total Purchase Spend',
+    'pur.paidAmount': 'Amount Paid to Manufacturers',
+    'pur.balancePending': 'Pending Manufacturer Balance',
+    'pur.totalBatches': 'Total Batches Received',
+    'pur.searchPlaceholder': 'Search by Bill No, Manufacturer, Medicine, or Batch No...',
+    'pur.emptyState': 'No purchase inward bills found.',
+    'pur.billNo': 'Purchase Bill No',
+    'pur.date': 'Bill Date',
+    'pur.manufacturer': 'Manufacturer / Supplier',
+    'pur.totalCost': 'Total Bill Amount',
+    'pur.paymentStatus': 'Payment Status',
+    'pur.actions': 'Actions',
+    'pur.itemsReceived': 'Items Received',
+    'pur.batchNo': 'Batch No',
+    'pur.mfgDate': 'Mfg Date',
+    'pur.expDate': 'Exp Date',
+    'pur.boxesCount': 'Boxes',
+    'pur.unitsPerBox': 'Bottles/Box',
+    'pur.looseUnits': 'Loose Bottles',
+    'pur.unitRate': 'Purchase Cost/Bottle',
+    'pur.stockAudit': 'Stock Audit',
+    'pur.prevStock': 'Prev Stock',
+    'pur.newStock': 'New Stock',
+    'pur.printVoucher': 'Print Inward Voucher',
+    'pur.inwardVoucher': 'Material Inward Voucher (M.I.V.)',
+    'pur.certifiedGoodOrder': 'Certified that the goods have been received in good condition and taken into godown stock.',
+    'pur.receivedBy': 'Received By (Godown In-Charge)',
+    'pur.authorizedSign': 'Authorized Signatory (ANIMEX)',
+    'pur.deleteConfirm': 'Warning! Deleting this purchase bill will automatically reverse and deduct the stock added to the godown. Are you sure?',
+
+    // New Purchase Modal
+    'pur.modalTitle': 'Record Third-Party Manufacturing Inward Bill',
+    'pur.modalSub': 'Enter invoice details received from the third-party pharma manufacturer',
+    'pur.supplierInfo': 'Manufacturer / Supplier Information',
+    'pur.supplierNameLabel': 'Manufacturer Company Name',
+    'pur.supplierNamePlaceholder': 'e.g. Apex Pharma Laboratories Pvt. Ltd.',
+    'pur.phone': 'Phone Number',
+    'pur.city': 'City / Location',
+    'pur.gstin': 'GSTIN (Optional)',
+    'pur.medicineDetails': 'Medicine Details & Packaging',
+    'pur.selectMedicine': 'Select Medicine',
+    'pur.launchNew': '+ Launch New Medicine',
+    'pur.selectExisting': 'Choose Existing Medicine',
+    'pur.newMedName': 'New Medicine Name',
+    'pur.newMedCategory': 'Category',
+    'pur.newMedUnit': 'Unit (e.g. Ml, Bolus, Kg)',
+    'pur.newMedMrp': 'MRP (₹)',
+    'pur.newMedSellingPrice': 'Selling Price (₹)',
+    'pur.unitsCalculated': 'Total Units Calculated',
+    'pur.itemTotalCost': 'Item Purchase Cost',
+    'pur.addItem': '+ Add Another Medicine',
+    'pur.paymentDetails': 'Payment & Summary',
+    'pur.totalBill': 'Total Bill Amount',
+    'pur.paidSoFar': 'Paid Amount',
+    'pur.balanceDue': 'Balance Payable',
+    'pur.notes': 'Notes / Remarks',
+    'pur.saveBill': 'Save Purchase Bill & Increase Stock',
+
+    // Products
+    'prod.title': 'Products & Stock Management',
+    'prod.addStock': 'Inward Stock (+ Boxes)',
+    'prod.newProduct': 'Add New Product',
+    'prod.available': 'In Stock',
+    'prod.bottles': 'Bottles',
+
+    // Settings
+    'set.title': 'Settings',
+    'set.subtitle': 'Manage application preferences, language, appearance, and legal details',
+    'set.language': 'Language',
+    'set.selectLanguage': 'Select Language',
+    'set.darkMode': 'Dark Mode',
+    'set.notifications': 'Notifications',
+    'set.about': 'About ANIMEX Billing',
+    'set.support': 'Support & Helpline',
+  },
+  hi: {
+    // Header & Navigation
+    'nav.dashboard': 'डैशबोर्ड',
+    'nav.createBill': 'बिल बनाएं',
+    'nav.history': 'बिल इतिहास',
+    'nav.stores': 'मेडिकल स्टोर्स',
+    'nav.products': 'दवाइयां (Products)',
+    'nav.productsShort': 'दवाइयां',
+    'nav.purchases': 'खरीददारी',
+    'nav.purchasesFull': 'खरीददारी व माल आवक',
+    'nav.settings': 'सेटिंग्स',
+    'nav.profile': 'कंपनी प्रोफाइल व बैंक',
+    'nav.menu': 'मेनू',
+    'nav.logout': 'लॉगआउट',
+    'nav.helpline': 'एनिमेक्स हेल्पलाइन',
+    'nav.language': 'भाषा',
+    'brand.subtitle': 'एनिमेक्स एनिमल हेल्थ केयर प्राइवेट लिमिटेड',
+
+    // Common Actions
+    'action.save': 'सुरक्षित करें',
+    'action.cancel': 'रद्द करें',
+    'action.delete': 'हटाएं',
+    'action.edit': 'संपादित करें',
+    'action.search': 'खोजें...',
+    'action.print': 'प्रिंट करें',
+    'action.close': 'बंद करें',
+    'action.details': 'विवरण',
+    'action.filter': 'फ़िल्टर',
+    'action.all': 'सभी',
+    'action.paid': 'भुगतान किया (Paid)',
+    'action.partial': 'आंशिक (Partial)',
+    'action.unpaid': 'बाकी (Unpaid)',
+    'action.confirm': 'पुष्टि करें',
+    'action.back': 'वापस',
+
+    // Dashboard
+    'dash.overview': 'अवलोकन',
+    'dash.title': 'डैशबोर्ड',
+    'dash.subtitle': 'बिलिंग संचालन, मेडिकल स्टोर्स और राजस्व संग्रह का संपूर्ण विवरण।',
+    'dash.createBill': 'नया बिल बनाएं',
+    'dash.totalInvoices': 'कुल बिल',
+    'dash.invoicesGenerated': 'अब तक बनाए गए बिल',
+    'dash.totalBilled': 'कुल बिलिंग',
+    'dash.grossVolume': 'सकल बिलिंग राशि',
+    'dash.outstanding': 'बकाया राशि',
+    'dash.pendingCollection': 'वसूली बाकी',
+    'dash.medicalStores': 'मेडिकल स्टोर्स',
+    'dash.activeClients': 'सक्रिय ग्राहक',
+    'dash.quickActions': 'त्वरित क्रियाएं',
+    'dash.purchasesInward': 'खरीद / माल आवक',
+    'dash.addStore': 'मेडिकल स्टोर जोड़ें',
+    'dash.manageProducts': 'दवाइयां प्रबंधित करें',
+    'dash.openSettings': 'सेटिंग्स खोलें',
+    'dash.godownStock': 'गोदाम का शेष स्टॉक',
+    'dash.autoTracking': 'ऑटो-ट्रैकिंग',
+    'dash.totalStock': 'कुल गोदाम स्टॉक',
+    'dash.autoMinusNotice': 'प्रत्येक बिल के साथ अपने आप कम होता है',
+    'dash.manageAllStock': 'सभी स्टॉक व बॉक्स देखें',
+    'dash.boxes': 'बॉक्स (खोके)',
+    'dash.loose': 'खुली बोतलें',
+    'dash.totalUnits': 'कुल बोतलें',
+    'dash.lowStock': 'कम स्टॉक',
+
+    // Purchases & Inward
+    'pur.badge': 'मैन्युफैक्चरिंग व खरीददारी',
+    'pur.subtitleBadge': 'थर्ड-पार्टी फैक्ट्री माल आवक रजिस्टर',
+    'pur.title': 'मैन्युफैक्चरिंग व खरीद बिल इतिहास',
+    'pur.subtitle': 'तीसरी कंपनी से बनवाए गए माल की आवक, बैच नंबर, एक्सपायरी, खरीद दर और स्टॉक बढ़ोतरी का संपूर्ण हिसाब।',
+    'pur.checkStock': 'गोदाम स्टॉक देखें',
+    'pur.recordNew': 'नया खरीद बिल दर्ज करें (+ Inward)',
+    'pur.totalSpend': 'कुल खरीद खर्च',
+    'pur.paidAmount': 'निर्माता को भुगतान राशि',
+    'pur.balancePending': 'निर्माता की बाकी राशि',
+    'pur.totalBatches': 'प्राप्त कुल बैच',
+    'pur.searchPlaceholder': 'बिल नंबर, निर्माता कंपनी, दवाई या बैच नंबर से खोजें...',
+    'pur.emptyState': 'कोई खरीद बिल नहीं मिला।',
+    'pur.billNo': 'खरीद बिल नंबर',
+    'pur.date': 'बिल दिनांक',
+    'pur.manufacturer': 'निर्माता / सप्लायर',
+    'pur.totalCost': 'कुल बिल राशि',
+    'pur.paymentStatus': 'भुगतान स्थिति',
+    'pur.actions': 'कार्रवाई',
+    'pur.itemsReceived': 'प्राप्त दवाइयां',
+    'pur.batchNo': 'बैच नं.',
+    'pur.mfgDate': 'निर्माण तिथि',
+    'pur.expDate': 'समाप्ति तिथि',
+    'pur.boxesCount': 'बॉक्स संख्या',
+    'pur.unitsPerBox': 'प्रति बॉक्स बोतलें',
+    'pur.looseUnits': 'खुली बोतलें',
+    'pur.unitRate': 'खरीद दर/बोतल',
+    'pur.stockAudit': 'स्टॉक ऑडिट',
+    'pur.prevStock': 'पिछला स्टॉक',
+    'pur.newStock': 'नया स्टॉक',
+    'pur.printVoucher': 'इनवर्ड वाउचर प्रिंट करें',
+    'pur.inwardVoucher': 'माल आवक वाउचर (Material Inward Voucher)',
+    'pur.certifiedGoodOrder': 'प्रमाणित किया जाता है कि माल अच्छी स्थिति में प्राप्त हुआ और गोदाम स्टॉक में जमा किया गया।',
+    'pur.receivedBy': 'प्राप्तकर्ता (गोदाम प्रभारी)',
+    'pur.authorizedSign': 'अधिकृत हस्ताक्षरकर्ता (एनिमेक्स)',
+    'pur.deleteConfirm': 'सावधान! यह खरीद बिल हटाने पर गोदाम में जुड़ा हुआ स्टॉक अपने आप कम हो जाएगा। क्या आप सुनिश्चित हैं?',
+
+    // New Purchase Modal
+    'pur.modalTitle': 'थर्ड-पार्टी मैन्युफैक्चरिंग खरीद बिल दर्ज करें',
+    'pur.modalSub': 'थर्ड-पार्टी फार्मा कंपनी से प्राप्त चालान/बिल का विवरण दर्ज करें',
+    'pur.supplierInfo': 'निर्माता / सप्लायर कंपनी विवरण',
+    'pur.supplierNameLabel': 'निर्माता कंपनी का नाम',
+    'pur.supplierNamePlaceholder': 'उदा. एपेक्स फार्मा लेबोरेटरीज प्राइवेट लिमिटेड',
+    'pur.phone': 'फोन नंबर',
+    'pur.city': 'शहर / स्थान',
+    'pur.gstin': 'जीएसटीआईएन (ऐच्छिक)',
+    'pur.medicineDetails': 'दवाई विवरण व पैकेजिंग',
+    'pur.selectMedicine': 'दवाई चुनें',
+    'pur.launchNew': '+ नई दवाई जोड़ें',
+    'pur.selectExisting': 'मौजूदा दवाई चुनें',
+    'pur.newMedName': 'नई दवाई का नाम',
+    'pur.newMedCategory': 'श्रेणी (Category)',
+    'pur.newMedUnit': 'इकाई (Unit - उदा. Ml, Bolus)',
+    'pur.newMedMrp': 'एमआरपी (₹)',
+    'pur.newMedSellingPrice': 'बिक्री मूल्य (₹)',
+    'pur.unitsCalculated': 'कुल बोतलें',
+    'pur.itemTotalCost': 'दवाई खरीद मूल्य',
+    'pur.addItem': '+ और दवाई जोड़ें',
+    'pur.paymentDetails': 'भुगतान व सारांश',
+    'pur.totalBill': 'कुल बिल राशि',
+    'pur.paidSoFar': 'चुकाई गई राशि',
+    'pur.balanceDue': 'बाकी राशि',
+    'pur.notes': 'टिप्पणी / नोट्स',
+    'pur.saveBill': 'खरीद बिल सुरक्षित करें व स्टॉक बढ़ाएं',
+
+    // Products
+    'prod.title': 'उत्पाद व स्टॉक प्रबंधन',
+    'prod.addStock': 'माल जमा करें (+ बॉक्स)',
+    'prod.newProduct': 'नया उत्पाद जोड़ें',
+    'prod.available': 'उपलब्ध स्टॉक',
+    'prod.bottles': 'बोतलें',
+
+    // Settings
+    'set.title': 'सेटिंग्स',
+    'set.subtitle': 'एप्लिकेशन प्राथमिकताएं, भाषा, स्वरूप और कानूनी विवरण प्रबंधित करें',
+    'set.language': 'भाषा (Language)',
+    'set.selectLanguage': 'भाषा चुनें',
+    'set.darkMode': 'डार्क मोड',
+    'set.notifications': 'सूचनाएं (Notifications)',
+    'set.about': 'एनिमेक्स बिलिंग के बारे में',
+    'set.support': 'सहायता व हेल्पलाइन',
+  },
+  mr: {
+    // Header & Navigation
+    'nav.dashboard': 'डॅशबोर्ड',
+    'nav.createBill': 'बिल बनवा',
+    'nav.history': 'बिल इतिहास',
+    'nav.stores': 'मेडिकल स्टोअर्स',
+    'nav.products': 'उत्पादने (औषधे)',
+    'nav.productsShort': 'प्रॉडक्ट्स',
+    'nav.purchases': 'खरेदी',
+    'nav.purchasesFull': 'खरेदी व आवक',
+    'nav.settings': 'सेटिंग्ज',
+    'nav.profile': 'कंपनी प्रोफाईल व बँक',
+    'nav.menu': 'मेनू',
+    'nav.logout': 'लॉगआउट',
+    'nav.helpline': 'ॲनिमेक्स हेल्पलाइन',
+    'nav.language': 'भाषा',
+    'brand.subtitle': 'ॲनिमेक्स ॲनिमल हेल्थ केअर प्रायव्हेट लिमिटेड',
+
+    // Common Actions
+    'action.save': 'सेव्ह करा',
+    'action.cancel': 'रद्द करा',
+    'action.delete': 'डिलीट करा',
+    'action.edit': 'बदल करा',
+    'action.search': 'शोधा...',
+    'action.print': 'प्रिंट करा',
+    'action.close': 'बंद करा',
+    'action.details': 'तपशील',
+    'action.filter': 'फिल्टर',
+    'action.all': 'सर्व',
+    'action.paid': 'पूर्ण जमा (Paid)',
+    'action.partial': 'अंशतः जमा (Partial)',
+    'action.unpaid': 'बाकी (Unpaid)',
+    'action.confirm': 'खात्री करा',
+    'action.back': 'मागे जा',
+
+    // Dashboard
+    'dash.overview': 'आढावा',
+    'dash.title': 'डॅशबोर्ड',
+    'dash.subtitle': 'बिलिंग कामकाज, मेडिकल स्टोअर्स आणि वसुलीचा संपूर्ण आढावा.',
+    'dash.createBill': 'नवीन बिल बनवा',
+    'dash.totalInvoices': 'एकूण बिले',
+    'dash.invoicesGenerated': 'आतापर्यंत बनवलेली बिले',
+    'dash.totalBilled': 'एकूण बिलिंग',
+    'dash.grossVolume': 'एकूण उलाढाल',
+    'dash.outstanding': 'बाकी रक्कम',
+    'dash.pendingCollection': 'थकबाकी वसुली',
+    'dash.medicalStores': 'मेडिकल स्टोअर्स',
+    'dash.activeClients': 'सक्रिय ग्राहक',
+    'dash.quickActions': 'क्विक ॲक्शन्स',
+    'dash.purchasesInward': 'खरेदी / माल आवक',
+    'dash.addStore': 'नवीन मेडिकल जोडा',
+    'dash.manageProducts': 'औषधे व्यवस्थापन',
+    'dash.openSettings': 'सेटिंग्ज उघडा',
+    'dash.godownStock': 'कंपनीचा शिल्लक साठा (Live Godown)',
+    'dash.autoTracking': 'ऑटो-ट्रॅकिंग',
+    'dash.totalStock': 'एकूण शिल्लक साठा',
+    'dash.autoMinusNotice': 'प्रत्येक बिलासोबत आपोआप मायनस होतो',
+    'dash.manageAllStock': 'सर्व स्टॉक व खोके व्यवस्थापन',
+    'dash.boxes': 'खोके',
+    'dash.loose': 'सुट्या बाटल्या',
+    'dash.totalUnits': 'एकूण बाटल्या',
+    'dash.lowStock': 'कमी साठा',
+
+    // Purchases & Inward
+    'pur.badge': 'मॅन्युफॅक्चरिंग व खरेदी',
+    'pur.subtitleBadge': 'थर्ड-पार्टी फॅक्टरी माल आवक लेजर',
+    'pur.title': 'मॅन्युफॅक्चरिंग व खरेदी बिल इतिहास',
+    'pur.subtitle': 'तिसऱ्या कंपनीकडून तयार करून घेतलेल्या मालाची आवक, बॅच नंबर, खरेदी दर आणि स्टॉक वाढीचा संपूर्ण हिशोब.',
+    'pur.checkStock': 'गोडाउन स्टॉक तपासा',
+    'pur.recordNew': 'नवीन खरेदी बिल नोंदवा (+ Inward)',
+    'pur.totalSpend': 'एकूण खरेदी रक्कम',
+    'pur.paidAmount': 'फॅक्टरीला दिलेली रक्कम',
+    'pur.balancePending': 'फॅक्टरीची बाकी रक्कम',
+    'pur.totalBatches': 'एकूण प्राप्त बॅचेस',
+    'pur.searchPlaceholder': 'बिल नं, कंपनी नाव, औषध नाव किंवा बॅच नंबरने शोधा...',
+    'pur.emptyState': 'कोणतेही खरेदी बिल सापडले नाही.',
+    'pur.billNo': 'खरेदी बिल नंबर',
+    'pur.date': 'बिल दिनांक',
+    'pur.manufacturer': 'मॅन्युफॅक्चरर / सप्लायर',
+    'pur.totalCost': 'एकूण खरेदी रक्कम',
+    'pur.paymentStatus': 'पेमेंट स्थिती',
+    'pur.actions': 'कृती',
+    'pur.itemsReceived': 'प्राप्त झालेली औषधे',
+    'pur.batchNo': 'बॅच नं',
+    'pur.mfgDate': 'तयार तारीख',
+    'pur.expDate': 'मुदत संपण्याची तारीख',
+    'pur.boxesCount': 'खोके संख्या',
+    'pur.unitsPerBox': 'खोक्यातील बाटल्या',
+    'pur.looseUnits': 'सुट्या बाटल्या',
+    'pur.unitRate': 'उत्पादन खर्च दर/बाटली',
+    'pur.stockAudit': 'स्टॉक ऑडिट',
+    'pur.prevStock': 'आधीचा साठा',
+    'pur.newStock': 'नवीन साठा',
+    'pur.printVoucher': 'इनवर्ड व्हाऊचर प्रिंट',
+    'pur.inwardVoucher': 'माल आवक पावती (Material Inward Voucher)',
+    'pur.certifiedGoodOrder': 'प्रमाणित करण्यात येते की माल चांगल्या स्थितीत प्राप्त झाला असून गोडाउन साठ्यात जमा केला आहे.',
+    'pur.receivedBy': 'प्राप्तकर्ता (गोडाउन प्रमुख)',
+    'pur.authorizedSign': 'अधिकृत स्वाक्षरी (ॲनिमेक्स)',
+    'pur.deleteConfirm': 'सावधान! हे खरेदी बिल डिलीट केल्यास या बिलातून गोदामात जमा झालेला साठा आपोआप मायनस होईल. तुम्हाला खात्री आहे का?',
+
+    // New Purchase Modal
+    'pur.modalTitle': 'थर्ड-पार्टी मॅन्युफॅक्चरिंग खरेदी बिल नोंदवा',
+    'pur.modalSub': 'बाहेरच्या फार्मा कंपनीकडून तयार करून घेतलेल्या मालाचे बिल नोंदवा',
+    'pur.supplierInfo': 'मॅन्युफॅक्चरर / सप्लायर कंपनीची माहिती',
+    'pur.supplierNameLabel': 'कंपनीचे नाव',
+    'pur.supplierNamePlaceholder': 'उदा. Apex Pharma Laboratories Pvt. Ltd.',
+    'pur.phone': 'फोन नंबर',
+    'pur.city': 'शहर / पत्ता',
+    'pur.gstin': 'जीएसटी नंबर (ऐच्छिक)',
+    'pur.medicineDetails': 'औषध तपशील व पॅकेजिंग',
+    'pur.selectMedicine': 'औषध निवडा',
+    'pur.launchNew': '+ नवीन औषध लाँच करा',
+    'pur.selectExisting': 'विद्यमान औषध निवडा',
+    'pur.newMedName': 'नवीन औषधाचे नाव',
+    'pur.newMedCategory': 'वर्गवारी (Category)',
+    'pur.newMedUnit': 'युनिट (उदा. Ml, Bolus, Kg)',
+    'pur.newMedMrp': 'एमआरपी (₹)',
+    'pur.newMedSellingPrice': 'विक्री दर (₹)',
+    'pur.unitsCalculated': 'एकूण बाटल्या',
+    'pur.itemTotalCost': 'औषध खरेदी खर्च',
+    'pur.addItem': '+ आणखी औषध जोडा',
+    'pur.paymentDetails': 'पेमेंट व हिशोब सारांश',
+    'pur.totalBill': 'एकूण खरेदी रक्कम',
+    'pur.paidSoFar': 'दिलेली रक्कम',
+    'pur.balanceDue': 'बाकी रक्कम',
+    'pur.notes': 'टिप्पणी / शेरा',
+    'pur.saveBill': 'खरेदी बिल सेव्ह करा व स्टॉक वाढवा',
+
+    // Products
+    'prod.title': 'उत्पादने व साठा व्यवस्थापन',
+    'prod.addStock': 'माल जमा करा (+ खोके)',
+    'prod.newProduct': 'नवीन औषध जोडा',
+    'prod.available': 'शिल्लक साठा',
+    'prod.bottles': 'बाटल्या',
+
+    // Settings
+    'set.title': 'सेटिंग्ज',
+    'set.subtitle': 'ॲप्लिकेशन प्राधान्ये, भाषा, रूप आणि कायदेशीर तपशील व्यवस्थापित करा',
+    'set.language': 'भाषा (Language)',
+    'set.selectLanguage': 'भाषा निवडा',
+    'set.darkMode': 'डार्क मोड',
+    'set.notifications': 'सूचना (Notifications)',
+    'set.about': 'ॲनिमेक्स बिलिंग विषयी माहिती',
+    'set.support': 'मदत व संपर्क',
+  },
+};
+
+const LanguageContext = createContext<LanguageContextType>({
+  language: 'en',
+  setLanguage: () => {},
+  t: (key: string, defaultText?: string) => defaultText || key,
+});
+
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguageState] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('animex_language');
+      if (saved === 'en' || saved === 'hi' || saved === 'mr') {
+        return saved;
+      }
+      return 'en'; // English by default
+    } catch {
+      return 'en';
+    }
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    try {
+      localStorage.setItem('animex_language', lang);
+    } catch {}
+  };
+
+  const t = (key: string, defaultText?: string): string => {
+    const langDict = translations[language];
+    if (langDict && langDict[key]) {
+      return langDict[key];
+    }
+    if (translations.en[key]) {
+      return translations.en[key];
+    }
+    return defaultText || key;
+  };
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
+
+export const useLanguage = (): LanguageContextType => useContext(LanguageContext);

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Invoice } from '../types';
-import { Printer, Download, Share2, X, CheckCircle2 } from 'lucide-react';
+import { Printer, Share2, X, CheckCircle2, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
+import html2canvas from 'html2canvas';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -18,6 +19,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const statusBadge = getStatusBadgeConfig(
     invoice.status || (invoice.balanceAmount === 0 ? 'PAID' : invoice.receivedAmount === 0 ? 'PENDING' : 'PARTIALLY PAID')
   );
+
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [generatingMsg, setGeneratingMsg] = useState<string>('');
 
   // Fetch company profile for bank details
   const companyProfile = (() => {
@@ -41,42 +45,122 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     window.print();
   };
 
-  const handleWhatsAppShare = () => {
-    let msg = `=========================================\n`;
-    msg += `   ANIMEX ANIMAL HEALTH CARE PVT LTD\n`;
-    msg += `   BILL / INVOICE NO: ${masterInvoiceNo}\n`;
-    msg += `=========================================\n\n`;
-    msg += `Bill To: ${invoice.billTo?.firmName || 'Valued Customer'}\n`;
-    if (invoice.billTo?.contactName) msg += `Prop: ${invoice.billTo.contactName}\n`;
-    msg += `Date: ${invoice.date}\n`;
-    msg += `Payment Mode: ${invoice.paymentType || 'UPI'}\n`;
-    msg += `Status: ${statusBadge.label}\n\n`;
-    msg += `ITEMS SUMMARY:\n`;
-    invoice.items.forEach((item, index) => {
-      const isFreeItem = item.isFree || item.isScheme;
-      const schemeText = isFreeItem ? ' [Free]' : '';
-      const amtText = isFreeItem ? 'Free' : `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-      msg += `${index + 1}. ${item.itemName}${schemeText} x ${item.quantity} ${item.unit} = ${amtText}\n`;
-    });
-    msg += `\n-----------------------------------------\n`;
-    msg += `SUBTOTAL: ₹${invoice.subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    if (invoice.discount && invoice.discount > 0) {
-      msg += `DISCOUNT: -₹${invoice.discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    }
-    msg += `TOTAL PAYABLE: ₹${invoice.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `AMOUNT IN WORDS: ${invoice.amountInWords}\n`;
-    msg += `RECEIVED: ₹${invoice.receivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `BALANCE DUE: ₹${invoice.balanceAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `\nBank: ${companyProfile.bankName} | A/C: ${companyProfile.accountNo} | IFSC: ${companyProfile.ifscCode}\n`;
-    msg += `Instant UPI ID: ${companyProfile.upiId}\n`;
-    msg += `=========================================\n`;
-    msg += `Helpline / Orders: 9307990811 / 8999323908\n`;
+  // Helper to render the exact high-resolution original color bill into a Canvas
+  const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
+    const billElement = document.getElementById('printable-bill-area');
+    if (!billElement) return null;
 
-    const encoded = encodeURIComponent(msg);
-    const targetPhone = invoice.billTo?.phone
-      ? invoice.billTo.phone.replace(/[^0-9]/g, '')
-      : '9307990811';
-    window.open(`https://wa.me/91${targetPhone}?text=${encoded}`, '_blank');
+    // Ensure all internal images (e.g. logo) are fully loaded
+    const images = Array.from(billElement.getElementsByTagName('img'));
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
+
+    // Wait slightly for layout stabilization
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    return await html2canvas(billElement, {
+      scale: 2.2, // Ultra HD Retina clarity
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 1000,
+    });
+  };
+
+  // Share the REAL COLOR BILL IMAGE directly to WhatsApp!
+  const handleWhatsAppShare = async () => {
+    try {
+      setIsGeneratingImage(true);
+      setGeneratingMsg('मूळ रंगीत बिल तयार होत आहे (Generating Color Bill)...');
+
+      const canvas = await generateBillCanvas();
+      if (!canvas) {
+        throw new Error('Bill area not found.');
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/png', 0.98);
+      });
+
+      if (!blob) {
+        throw new Error('Failed to generate image file.');
+      }
+
+      const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      // If mobile supports sharing files directly (Android Chrome / iOS Safari / Native App)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        setGeneratingMsg('WhatsApp उघडत आहे (Opening WhatsApp)...');
+        await navigator.share({
+          files: [file],
+          title: `ANIMEX Bill #${masterInvoiceNo} - ${invoice.billTo?.firmName || 'Store'}`,
+          text: `ANIMEX ANIMAL HEALTH CARE PVT LTD\nBill No: #${masterInvoiceNo}\nStore: ${invoice.billTo?.firmName}\nNet Total: ₹${invoice.totalAmount}`,
+        });
+      } else {
+        // Fallback for desktop browser without Web Share API:
+        // Automatically save the color bill PNG and open WhatsApp
+        setGeneratingMsg('रंगीत फोटो डाऊनलोड होत आहे (Downloading Photo)...');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        const targetPhone = invoice.billTo?.phone ? invoice.billTo.phone.replace(/[^0-9]/g, '') : '';
+        const msg = `*ANIMEX ANIMAL HEALTH CARE PVT LTD*\n📄 *Bill / Invoice No:* #${masterInvoiceNo}\n🏥 *Customer:* ${invoice.billTo?.firmName}\n💰 *Net Total:* ₹${invoice.totalAmount}\n\n✅ *मूळ रंगीत बिल (Original Color Bill Photo)* डाऊनलोड झाले आहे. कृपया येथे पाठवा.`;
+        window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('WhatsApp share error:', err);
+        alert('WhatsApp शेअर करताना त्रुटी आली: ' + (err.message || 'Please use Save Photo.'));
+      }
+    } finally {
+      setIsGeneratingImage(false);
+      setGeneratingMsg('');
+    }
+  };
+
+  // Download the REAL COLOR BILL as an HD image file to Phone Gallery / PC
+  const handleDownloadPhoto = async () => {
+    try {
+      setIsGeneratingImage(true);
+      setGeneratingMsg('रंगीत फोटो सेव्ह होत आहे (Saving HD Photo)...');
+      const canvas = await generateBillCanvas();
+      if (!canvas) return;
+
+      const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
+
+      const dataUrl = canvas.toDataURL('image/png', 0.98);
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('Download photo error:', err);
+      alert('फोटो सेव्ह करताना त्रुटी आली: ' + (err.message || 'Failed'));
+    } finally {
+      setIsGeneratingImage(false);
+      setGeneratingMsg('');
+    }
   };
 
   return (
@@ -107,32 +191,47 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto">
+          {/* Action Buttons: WhatsApp Color Bill, Save Photo, Print/PDF */}
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
             <button
+              type="button"
+              onClick={handleWhatsAppShare}
+              disabled={isGeneratingImage}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black px-3 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+              title="Send Original Color Bill to WhatsApp"
+            >
+              {isGeneratingImage ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+              <span>WhatsApp (रंगीत बिल)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPhoto}
+              disabled={isGeneratingImage}
+              className="bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-black px-2.5 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+              title="Download Original Color Bill as HD Photo"
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span>Save Photo</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handlePrint}
-              className="bg-animex-blue-600 hover:bg-animex-blue-700 text-white font-black px-2.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs flex items-center justify-center gap-1 transition-all shadow-md cursor-pointer"
+              disabled={isGeneratingImage}
+              className="bg-animex-blue-600 hover:bg-animex-blue-700 disabled:opacity-60 text-white font-black px-2.5 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+              title="Print or Save as PDF"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Bill</span>
+              <span>Print / PDF</span>
             </button>
 
             <button
-              onClick={handlePrint}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-2.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs flex items-center justify-center gap-1 transition-all shadow-md cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Save PDF</span>
-            </button>
-
-            <button
-              onClick={handleWhatsAppShare}
-              className="bg-green-600 hover:bg-green-700 text-white font-black px-2.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs flex items-center justify-center gap-1 transition-all shadow-md cursor-pointer"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>WhatsApp</span>
-            </button>
-
-            <button
+              type="button"
               onClick={onClose}
               className="hidden sm:block bg-slate-600 hover:bg-slate-500 text-white font-bold p-2 rounded-xl text-xs transition-all cursor-pointer"
             >
@@ -141,11 +240,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           </div>
         </div>
 
+        {/* Progress notification banner during image rendering */}
+        {isGeneratingImage && (
+          <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse no-print">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+            <span>{generatingMsg || 'मूळ रंगीत बिल तयार होत आहे...'}</span>
+          </div>
+        )}
+
         {/* PRINTABLE BILL AREA */}
         <div className="overflow-x-auto p-1">
           <div
             id="printable-bill-area"
-            className="bg-white text-[#1e293b] p-3 sm:p-8 font-sans max-w-[850px] w-full mx-auto border-2 border-[#1e293b] shadow-2xl text-xs rounded-lg relative overflow-hidden"
+            className="bg-white text-[#1e293b] p-3 sm:p-8 font-sans max-w-[850px] w-full mx-auto border-2 border-[#1e293b] shadow-2xl text-xs rounded-lg relative overflow-hidden min-w-[700px]"
           >
             {/* Top Brand Accent Bar */}
             <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-r from-[#0F4C81] via-[#F97316] to-[#166534]"></div>

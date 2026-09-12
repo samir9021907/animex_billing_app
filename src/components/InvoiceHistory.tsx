@@ -61,46 +61,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
   const totalBilled = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
   const totalBalance = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
 
-  const handleShareInvoice = (inv: Invoice) => {
-    const masterNo = inv.companyInvoiceNumber || inv.invoiceNo;
-    const status = getResolvedStatus(inv);
 
-    let msg = `=========================================\n`;
-    msg += `   ANIMEX ANIMAL HEALTH CARE PVT LTD\n`;
-    msg += `   BILL / INVOICE NO: ${masterNo}\n`;
-    msg += `=========================================\n\n`;
-    msg += `Bill To: ${inv.billTo?.firmName || 'Valued Customer'}\n`;
-    if (inv.billTo?.contactName) msg += `Prop: ${inv.billTo.contactName}\n`;
-    msg += `Date: ${inv.date}\n`;
-    msg += `Status: ${status}\n`;
-    msg += `Payment Mode: ${inv.paymentType || 'UPI'}\n\n`;
-    msg += `ITEMS SUMMARY:\n`;
-    inv.items.forEach((item, index) => {
-      const isFreeItem = item.isFree || item.isScheme;
-      const tag = isFreeItem ? ' [Free]' : '';
-      const amt = isFreeItem ? 'Free' : `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-      msg += `${index + 1}. ${item.itemName}${tag} x ${item.quantity} ${item.unit} = ${amt}\n`;
-    });
-    msg += `\n-----------------------------------------\n`;
-    msg += `TOTAL AMOUNT: ₹${inv.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `RECEIVED: ₹${inv.receivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `BALANCE DUE: ₹${inv.balanceAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
-    msg += `=========================================\n`;
-    msg += `Helpline: 9307990811 / 8999323908\n`;
-
-    if (navigator.share) {
-      navigator.share({
-        title: `Invoice No: ${masterNo} - Animex`,
-        text: msg,
-      }).catch(() => {
-        const targetPhone = inv.billTo?.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
-        window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
-      });
-    } else {
-      const targetPhone = inv.billTo?.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
-      window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 md:pb-6">
@@ -283,9 +244,9 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 </button>
 
                 <button
-                  onClick={() => handleShareInvoice(inv)}
+                  onClick={() => onSelectInvoice(inv)}
                   className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                  title="Share on WhatsApp"
+                  title="Share Original Color Bill on WhatsApp"
                 >
                   <Share2 className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300" />
                   <span>Share</span>
@@ -412,9 +373,9 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       </button>
 
                       <button
-                        onClick={() => handleShareInvoice(inv)}
+                        onClick={() => onSelectInvoice(inv)}
                         className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
-                        title="Share on WhatsApp"
+                        title="Share Original Color Bill on WhatsApp"
                       >
                         <Share2 className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
                         <span>Share</span>

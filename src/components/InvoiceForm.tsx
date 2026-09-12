@@ -464,31 +464,14 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             </span>
           </h3>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('सर्व प्रॉडक्ट्स आणि माहिती रिफ्रेश करून सुरुवातीपासून सुरू करायचे का?\n(Clear all lines and start fresh?)')) {
-                  setItems(createInitialItems());
-                  setDiscount(0);
-                }
-              }}
-              className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 transition-all border border-slate-300 dark:border-slate-700 cursor-pointer"
-              title="Reset product items"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>रिफ्रेश (Reset)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleAddItemRow}
-              className="bg-animex-blue-600 hover:bg-animex-blue-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Product Row</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleAddItemRow}
+            className="bg-animex-blue-600 hover:bg-animex-blue-700 active:scale-95 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Product Row</span>
+          </button>
         </div>
 
         {/* Mobile Product Cards View (Visible on mobile screens < md) */}

@@ -132,55 +132,81 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredStores.map(st => (
-            <div key={st.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm hover:shadow-md border border-slate-200 dark:border-slate-800 space-y-3 transition-all">
-              
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-xl bg-animex-blue-50 dark:bg-slate-800 text-animex-blue-900 dark:text-sky-300 flex items-center justify-center font-black text-base border border-animex-blue-100 dark:border-slate-700">
-                  {st.firmName.charAt(0)}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleOpenEditModal(st)}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-animex-blue-50 text-slate-600 hover:text-animex-blue-600 transition-colors"
-                    title="Edit Store"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(st)}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors"
-                    title="Delete Store"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-extrabold text-slate-900 dark:text-white text-base">
-                  {st.firmName}
-                </h4>
-                <div className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-0.5">
-                  Prop: {st.contactName}
-                </div>
-              </div>
-
-              <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-1.5 font-bold text-animex-blue-900 dark:text-sky-300">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>+91 {st.phone}</span>
-                </div>
-                <div className="flex items-start gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span>{st.address} ({st.district}, {st.state})</span>
-                </div>
-              </div>
-
+        {filteredStores.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-10 text-center border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="w-16 h-16 bg-orange-100 dark:bg-orange-950/40 text-orange-600 rounded-2xl flex items-center justify-center mx-auto">
+              <Store className="w-8 h-8" />
             </div>
-          ))}
-        </div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              {searchQuery ? 'No stores matching your search' : 'No Medical Stores Registered Yet'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              {searchQuery
+                ? 'Try searching with another keyword or phone number.'
+                : 'Add your first medical store to start generating customized bills & invoices.'}
+            </p>
+            {!searchQuery && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="mt-2 bg-animex-orange-500 hover:bg-animex-orange-600 text-white font-bold px-4 py-2 rounded-xl text-xs inline-flex items-center gap-2 shadow cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Medical Store</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredStores.map(st => (
+              <div key={st.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm hover:shadow-md border border-slate-200 dark:border-slate-800 space-y-3 transition-all">
+                
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-animex-blue-50 dark:bg-slate-800 text-animex-blue-900 dark:text-sky-300 flex items-center justify-center font-black text-base border border-animex-blue-100 dark:border-slate-700">
+                    {st.firmName.charAt(0)}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleOpenEditModal(st)}
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-animex-blue-50 text-slate-600 hover:text-animex-blue-600 transition-colors"
+                      title="Edit Store"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(st)}
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors"
+                      title="Delete Store"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 dark:text-white text-base">
+                    {st.firmName}
+                  </h4>
+                  <div className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-0.5">
+                    Prop: {st.contactName}
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5 font-bold text-animex-blue-900 dark:text-sky-300">
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>+91 {st.phone}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <span>{st.address} ({st.district}, {st.state})</span>
+                  </div>
+                </div>
+
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>
 

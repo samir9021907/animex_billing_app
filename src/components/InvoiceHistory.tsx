@@ -47,8 +47,8 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
       const globalIdStr = (inv.globalBillId || '').toString();
       const numStr = (inv.companyInvoiceNumber || inv.invoiceNo || '').toString();
       const codeStr = (inv.invoiceNumber || formatInvoiceNumber(inv.companyInvoiceNumber || inv.invoiceNo, inv.date)).toLowerCase();
-      const matchFirm = (inv.billTo.firmName || '').toLowerCase().includes(q);
-      const matchContact = (inv.billTo.contactName || '').toLowerCase().includes(q);
+      const matchFirm = (inv.billTo?.firmName || '').toLowerCase().includes(q);
+      const matchContact = (inv.billTo?.contactName || '').toLowerCase().includes(q);
       const matchDate = (inv.date || '').includes(q);
       return globalIdStr.includes(q) || numStr.includes(q) || codeStr.includes(q) || matchFirm || matchContact || matchDate;
     })
@@ -69,8 +69,8 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
     msg += `   ANIMEX ANIMAL HEALTH CARE PVT LTD\n`;
     msg += `   BILL / INVOICE NO: ${masterNo}\n`;
     msg += `=========================================\n\n`;
-    msg += `Bill To: ${inv.billTo.firmName}\n`;
-    if (inv.billTo.contactName) msg += `Prop: ${inv.billTo.contactName}\n`;
+    msg += `Bill To: ${inv.billTo?.firmName || 'Valued Customer'}\n`;
+    if (inv.billTo?.contactName) msg += `Prop: ${inv.billTo.contactName}\n`;
     msg += `Date: ${inv.date}\n`;
     msg += `Status: ${status}\n`;
     msg += `Payment Mode: ${inv.paymentType || 'UPI'}\n\n`;
@@ -93,11 +93,11 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
         title: `Invoice No: ${masterNo} - Animex`,
         text: msg,
       }).catch(() => {
-        const targetPhone = inv.billTo.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
+        const targetPhone = inv.billTo?.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
         window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
       });
     } else {
-      const targetPhone = inv.billTo.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
+      const targetPhone = inv.billTo?.phone ? inv.billTo.phone.replace(/[^0-9]/g, '') : '';
       window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
     }
   };
@@ -245,10 +245,10 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
               <div>
                 <div className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Store className="w-4 h-4 text-animex-orange-500 shrink-0" />
-                  <span>{inv.billTo.firmName}</span>
+                  <span>{inv.billTo?.firmName || 'Store'}</span>
                 </div>
                 <div className="text-xs text-slate-500 font-medium mt-0.5">
-                  📍 {inv.billTo.district}, {inv.billTo.state}
+                  📍 {inv.billTo?.district || '-'}, {inv.billTo?.state || '-'}
                 </div>
               </div>
 
@@ -352,10 +352,10 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       <td className="p-3">
                         <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                           <Store className="w-3.5 h-3.5 text-animex-orange-500 shrink-0" />
-                          <span>{inv.billTo.firmName}</span>
+                          <span>{inv.billTo?.firmName || 'Store'}</span>
                         </div>
                         <div className="text-[11px] text-slate-500 font-normal">
-                          {inv.billTo.district}, {inv.billTo.state}
+                          {inv.billTo?.district || '-'}, {inv.billTo?.state || '-'}
                         </div>
                       </td>
 

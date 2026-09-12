@@ -59,6 +59,15 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     }
   }, [selectedStoreId, invoices]);
 
+  // Sync selectedStoreId when stores list changes or on load
+  useEffect(() => {
+    if (!selectedStoreId && stores.length > 0) {
+      setSelectedStoreId(stores[0].id);
+    } else if (selectedStoreId && !stores.some(s => s.id === selectedStoreId)) {
+      setSelectedStoreId(stores[0]?.id || '');
+    }
+  }, [stores, selectedStoreId]);
+
   const createInitialItems = (): InvoiceItem[] => [
     {
       id: `item-${Date.now()}`,
@@ -246,6 +255,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     }
 
     const selectedStore = stores.find((s) => s.id === selectedStoreId) || stores[0];
+    if (!selectedStore) {
+      alert('Please add a Medical Store in the Medical Stores directory first before creating a bill.');
+      return;
+    }
     const formattedDate = date.split('-').reverse().join('-');
 
     const newInv: Invoice = {
@@ -323,12 +336,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             onChange={(e) => handleStoreChange(e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-animex-orange-500 outline-none"
           >
-            {stores.map(st => (
-              <option key={st.id} value={st.id}>
-                {st.firmName} ({st.district}, {st.state}) - Ph: {st.phone}
-              </option>
-            ))}
+            {stores.length === 0 ? (
+              <option value="">-- No Medical Stores Found! Please add a store first --</option>
+            ) : (
+              stores.map(st => (
+                <option key={st.id} value={st.id}>
+                  {st.firmName} ({st.district}, {st.state}) - Ph: {st.phone}
+                </option>
+              ))
+            )}
           </select>
+
+          {stores.length === 0 && (
+            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200 font-bold">
+              ⚠️ No medical store registered yet. Please add your first medical store from the "Medical Stores" directory to generate a bill.
+            </div>
+          )}
 
           {selectedStoreObj && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs pt-1">

@@ -19,76 +19,25 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
+  // One-time clean-up migration to remove old dummy medical stores and bills
+  // Ensures fresh start without deleting product inventory or purchases
+  const CLEAN_SLATE_KEY = 'animex_clean_slate_v2';
+  try {
+    if (localStorage.getItem(CLEAN_SLATE_KEY) !== 'true') {
+      localStorage.removeItem('animex_invoices');
+      localStorage.removeItem('animex_medical_stores');
+      localStorage.setItem(CLEAN_SLATE_KEY, 'true');
+    }
+  } catch (e) {
+    console.warn('Storage reset warning:', e);
+  }
+
   // Persistent state initialized from seedData / localStorage
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     try {
       const saved = localStorage.getItem('animex_invoices');
       if (saved !== null) {
-        const parsed: Invoice[] = JSON.parse(saved);
-        let hasChanges = false;
-        const updated = parsed.map((inv, idx) => {
-          if (inv.id === 'inv-4-sai-balaji' || (inv.invoiceNo === 4 && inv.billTo?.firmName?.includes('Sai Balaji'))) {
-            hasChanges = true;
-            return {
-              ...inv,
-              id: 'inv-4-sai-balaji',
-              globalBillId: 4,
-              invoiceNo: 2,
-              companyInvoiceNumber: 2,
-              invoiceNumber: 'ANX-2608-0002'
-            };
-          }
-          if (inv.id === 'inv-1-shivba' || (inv.invoiceNo === 1 && inv.billTo?.firmName?.includes('Shivba'))) {
-            return {
-              ...inv,
-              globalBillId: 1,
-              invoiceNo: 1,
-              companyInvoiceNumber: 1,
-            };
-          }
-          if (inv.id === 'inv-5-shivba') {
-            hasChanges = true;
-            return {
-              ...inv,
-              id: 'inv-1-shivba',
-              globalBillId: 1,
-              invoiceNo: 1,
-              companyInvoiceNumber: 1,
-              invoiceNumber: 'ANX-2608-0001'
-            };
-          }
-          if (inv.id === 'inv-2-sai-balaji') {
-            return {
-              ...inv,
-              globalBillId: 2,
-              invoiceNo: 1,
-              companyInvoiceNumber: 1,
-            };
-          }
-          if (inv.id === 'inv-6-shivba' || (inv.invoiceNo === 6 && inv.billTo?.firmName?.includes('Shivba'))) {
-            hasChanges = true;
-            return {
-              ...inv,
-              id: 'inv-3-shivba',
-              globalBillId: 3,
-              invoiceNo: 2,
-              companyInvoiceNumber: 2,
-              invoiceNumber: 'ANX-2608-0002'
-            };
-          }
-          if (!inv.globalBillId) {
-            hasChanges = true;
-            return {
-              ...inv,
-              globalBillId: idx + 1
-            };
-          }
-          return inv;
-        });
-        if (hasChanges) {
-          localStorage.setItem('animex_invoices', JSON.stringify(updated));
-        }
-        return updated;
+        return JSON.parse(saved);
       }
       return INITIAL_INVOICES;
     } catch {

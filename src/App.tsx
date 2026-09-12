@@ -12,7 +12,14 @@ import { LoginScreen } from './components/LoginScreen';
 import { PurchasesManager } from './components/PurchasesManager';
 import { Invoice, MedicalStore, Product, PurchaseInvoice } from './types';
 import { INITIAL_INVOICES, INITIAL_PRODUCTS, INITIAL_STORES, INITIAL_PURCHASES } from './data/seedData';
-import { syncInvoiceToBackend, deleteInvoiceFromBackend, syncStoreToBackend, deleteStoreFromBackend } from './utils/api';
+import {
+  syncInvoiceToBackend,
+  deleteInvoiceFromBackend,
+  syncStoreToBackend,
+  deleteStoreFromBackend,
+  fetchStoresFromBackend,
+  fetchInvoicesFromBackend
+} from './utils/api';
 import { authService, UserSession } from './services/authService';
 
 export const App: React.FC = () => {
@@ -77,6 +84,63 @@ export const App: React.FC = () => {
   });
 
   const [selectedPreviewInvoice, setSelectedPreviewInvoice] = useState<Invoice | null>(null);
+
+  // ─── Bidirectional Cloud Neon Database Sync ─────────────────────────────────
+  useEffect(() => {
+    let isCancelled = false;
+
+    const syncCloudData = async () => {
+      try {
+        // 1. Fetch stores from Neon DB
+        const cloudStores = await fetchStoresFromBackend();
+        if (!isCancelled && cloudStores && cloudStores.length > 0) {
+          setStores((prevStores) => {
+            const merged = [...cloudStores];
+            prevStores.forEach((localStore) => {
+              const exists = merged.some(
+                (cs) => cs.id === localStore.id || cs.firmName.trim().toLowerCase() === localStore.firmName.trim().toLowerCase()
+              );
+              if (!exists) {
+                merged.push(localStore);
+                syncStoreToBackend(localStore);
+              }
+            });
+            return merged;
+          });
+        } else if (!isCancelled && stores.length > 0) {
+          stores.forEach((s) => syncStoreToBackend(s));
+        }
+
+        // 2. Fetch invoices from Neon DB
+        const cloudInvoices = await fetchInvoicesFromBackend();
+        if (!isCancelled && cloudInvoices && cloudInvoices.length > 0) {
+          setInvoices((prevInvoices) => {
+            const merged = [...cloudInvoices];
+            prevInvoices.forEach((localInv) => {
+              const exists = merged.some(
+                (ci) => ci.id === localInv.id || ci.invoiceNo === localInv.invoiceNo
+              );
+              if (!exists) {
+                merged.push(localInv);
+                syncInvoiceToBackend(localInv);
+              }
+            });
+            return merged;
+          });
+        } else if (!isCancelled && invoices.length > 0) {
+          invoices.forEach((inv) => syncInvoiceToBackend(inv));
+        }
+      } catch (e) {
+        console.warn('Background cloud sync notice:', e);
+      }
+    };
+
+    syncCloudData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -168,7 +232,13 @@ export const App: React.FC = () => {
     // 1. Add invoice to history
     setInvoices([finalInvoice, ...invoices]);
     setSelectedPreviewInvoice(finalInvoice);
-    syncInvoiceToBackend(finalInvoice);
+    
+    // 2. Sync to cloud Neon DB
+    syncInvoiceToBackend(finalInvoice).then(cloudInv => {
+      if (cloudInv && cloudInv.id && cloudInv.id !== finalInvoice.id) {
+        setInvoices(prev => prev.map(inv => inv.id === finalInvoice.id ? { ...inv, id: cloudInv.id } : inv));
+      }
+    });
 
     // 2. Automatic stock deduction for each billed product & check low stock
     const newlyLowStock: string[] = [];
@@ -247,7 +317,11 @@ export const App: React.FC = () => {
 
   const handleAddStore = (newStore: MedicalStore) => {
     setStores([newStore, ...stores]);
-    syncStoreToBackend(newStore);
+    syncStoreToBackend(newStore).then(cloudStore => {
+      if (cloudStore && cloudStore.id && cloudStore.id !== newStore.id) {
+        setStores(prev => prev.map(s => s.id === newStore.id ? { ...s, id: cloudStore.id } : s));
+      }
+    });
   };
 
   const handleUpdateStore = (updatedStore: MedicalStore) => {

@@ -20,27 +20,30 @@ export interface LoginResponse {
   user: UserSession;
 }
 
+export const PERMANENT_CLIENT_ID = 'c1111111-1111-1111-1111-111111111111';
+export const PERMANENT_JWT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImMxMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsIm5hbWUiOiJBTklNRVggQW5pbWFsIEhlYWx0aCBDYXJlIiwiZW1haWwiOiJhZG1pbkBhbmltZXguY29tIiwicm9sZSI6ImJ1c2luZXNzb3duZXIiLCJpYXQiOjE3ODkyMTQwODYsImV4cCI6MjEwNDU3NDA4Nn0.zvJzszksQr9T48Gkww0orH90HP5Sp6jClpYHY-WvSt8';
+
 export const authService = {
   // Login with live API or offline demo credentials
   async login(email: string, password: string): Promise<UserSession> {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    // 1. Offline / Demo Credentials Support
+    // 1. Primary ANIMEX Cloud Credentials
     if (
       (trimmedEmail === 'admin@animex.com' && trimmedPassword === 'admin123') ||
       (trimmedEmail === 'demo' && trimmedPassword === 'demo')
     ) {
-      const demoUser: UserSession = {
-        id: 'client-demo-01',
-        name: 'Animex Animal Health Care',
+      const animexUser: UserSession = {
+        id: PERMANENT_CLIENT_ID,
+        name: 'ANIMEX Animal Health Care',
         email: trimmedEmail,
-        phone: '+91 98765 43210',
-        city: 'Ahmedabad',
-        clientId: 'client-demo-01',
+        phone: '+91 9021907000',
+        city: 'Nashik',
+        clientId: PERMANENT_CLIENT_ID,
       };
-      this.saveSession('demo_jwt_token_animex', demoUser);
-      return demoUser;
+      this.saveSession(PERMANENT_JWT_TOKEN, animexUser);
+      return animexUser;
     }
 
     // 2. Live Backend API Request
@@ -201,7 +204,19 @@ export const authService = {
       const savedUser = localStorage.getItem(USER_KEY);
       const token = localStorage.getItem(TOKEN_KEY);
       if (savedUser && token) {
-        return JSON.parse(savedUser);
+        const user = JSON.parse(savedUser);
+        if (
+          user.clientId === 'client-demo-01' ||
+          user.clientId === 'demo-client' ||
+          !user.clientId ||
+          token === 'demo_jwt_token_animex' ||
+          token.startsWith('offline_jwt')
+        ) {
+          user.id = PERMANENT_CLIENT_ID;
+          user.clientId = PERMANENT_CLIENT_ID;
+          this.saveSession(PERMANENT_JWT_TOKEN, user);
+        }
+        return user;
       }
     } catch {}
     return null;

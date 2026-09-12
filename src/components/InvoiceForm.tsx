@@ -68,20 +68,24 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     }
   }, [stores, selectedStoreId]);
 
-  const createInitialItems = (): InvoiceItem[] => [
-    {
-      id: `item-${Date.now()}`,
-      productId: products[0]?.id || '',
-      itemName: products[0]?.name || '',
-      quantity: 0,
-      unit: products[0]?.defaultUnit || 'Ltr',
-      mrp: products[0]?.mrp || 0,
-      pricePerUnit: products[0]?.defaultPrice || 300,
-      amount: 0,
-      isFree: false,
-      isScheme: false
-    }
-  ];
+  const createInitialItems = (): InvoiceItem[] => {
+    const firstProd = products[0];
+    const initialPrice = firstProd?.defaultPrice || 300;
+    return [
+      {
+        id: `item-${Date.now()}`,
+        productId: firstProd?.id || '',
+        itemName: firstProd?.name || '',
+        quantity: 1,
+        unit: firstProd?.defaultUnit || 'Ltr',
+        mrp: firstProd?.mrp || 0,
+        pricePerUnit: initialPrice,
+        amount: initialPrice * 1,
+        isFree: false,
+        isScheme: false
+      }
+    ];
+  };
 
   // Billing line items
   const [items, setItems] = useState<InvoiceItem[]>(createInitialItems);
@@ -146,15 +150,16 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   // Handlers
   const handleAddItemRow = () => {
     const defaultProd = products[0];
+    const price = defaultProd?.defaultPrice || 0;
     const newItem: InvoiceItem = {
       id: `item-${Date.now()}-${Math.random()}`,
       productId: defaultProd?.id || '',
       itemName: defaultProd?.name || '',
-      quantity: 0,
+      quantity: 1,
       unit: defaultProd?.defaultUnit || 'Ltr',
       mrp: defaultProd?.mrp || 0,
-      pricePerUnit: defaultProd?.defaultPrice || 0,
-      amount: 0,
+      pricePerUnit: price,
+      amount: price * 1,
       isFree: false,
       isScheme: false
     };
@@ -562,9 +567,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Quantity:</label>
                   <input
                     type="number"
-                    min="0"
-                    placeholder="0"
+                    min="1"
+                    placeholder="1"
                     value={item.quantity === 0 ? '' : item.quantity}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-black text-slate-900 dark:text-white"
                   />
@@ -702,9 +708,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   <td className="p-2.5">
                     <input
                       type="number"
-                      min="0"
-                      placeholder="0"
+                      min="1"
+                      placeholder="1"
                       value={item.quantity === 0 ? '' : item.quantity}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-black text-slate-900 dark:text-white"
                     />

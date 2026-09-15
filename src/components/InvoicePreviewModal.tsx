@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Invoice } from '../types';
-import { Printer, Share2, X, CheckCircle2, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Printer, Share2, X, CheckCircle2, Image as ImageIcon, Loader2, ExternalLink, Copy, Check } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 
@@ -22,6 +22,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
+  const [showWhatsAppWebModal, setShowWhatsAppWebModal] = useState<boolean>(false);
+  const [whatsAppWebUrl, setWhatsAppWebUrl] = useState<string>('');
+  const [copiedToClipboard, setCopiedToClipboard] = useState<boolean>(false);
+  const [lastGeneratedBlob, setLastGeneratedBlob] = useState<Blob | null>(null);
+
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
 
   // Fetch company profile for bank details
   const companyProfile = (() => {
@@ -77,7 +83,25 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     });
   };
 
-  // Share the REAL COLOR BILL IMAGE directly to WhatsApp!
+  const handleReCopyImage = async () => {
+    if (!lastGeneratedBlob) return;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': lastGeneratedBlob }),
+        ]);
+        setCopiedToClipboard(true);
+        setTimeout(() => setCopiedToClipboard(false), 3000);
+      } else {
+        alert('फोटो Clipboard वर कॉपी करण्यास सपोर्ट नाही. डाऊनलोड झालेला फोटो वापरा.');
+      }
+    } catch (e) {
+      console.warn('Re-copy failed:', e);
+      alert('फोटो कॉपी करण्यात अडचण आली. डाऊनलोड झालेला फोटो वापरा.');
+    }
+  };
+
+  // Share the REAL COLOR BILL IMAGE directly to WhatsApp / WhatsApp Web!
   const handleWhatsAppShare = async () => {
     try {
       setIsGeneratingImage(true);
@@ -96,12 +120,32 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         throw new Error('Failed to generate image file.');
       }
 
+      setLastGeneratedBlob(blob);
+
       const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
       const file = new File([blob], fileName, { type: 'image/png' });
 
+      // Clean customer phone number
+      let cleanPhone = '';
+      if (invoice.billTo?.phone) {
+        let digits = invoice.billTo.phone.replace(/[^0-9]/g, '');
+        if (digits.startsWith('0') && digits.length === 11) {
+          digits = digits.substring(1);
+        }
+        if (digits.length === 10) {
+          cleanPhone = '91' + digits;
+        } else if (digits.length === 12 && digits.startsWith('91')) {
+          cleanPhone = digits;
+        } else if (digits.length >= 10) {
+          cleanPhone = digits;
+        }
+      }
+
+      const msg = `*ANIMEX ANIMAL HEALTH CARE PVT LTD*\n📄 *Bill / Invoice No:* #${masterInvoiceNo}\n🏥 *Customer:* ${invoice.billTo?.firmName || 'Medical Store'}\n💰 *Net Total:* ₹${invoice.totalAmount}\n\n✅ *मूळ रंगीत बिल (Original Color Bill Photo)*`;
+
       // If mobile supports sharing files directly (Android Chrome / iOS Safari / Native App)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
         setGeneratingMsg('WhatsApp उघडत आहे (Opening WhatsApp)...');
         await navigator.share({
           files: [file],
@@ -109,8 +153,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           text: `ANIMEX ANIMAL HEALTH CARE PVT LTD\nBill No: #${masterInvoiceNo}\nStore: ${invoice.billTo?.firmName}\nNet Total: ₹${invoice.totalAmount}`,
         });
       } else {
-        // Fallback for desktop browser without Web Share API:
-        // Automatically save the color bill PNG and open WhatsApp
+        // Desktop Browser (Chrome / Edge on Windows / Mac):
+        // 1. Copy image directly to Clipboard so the user can directly Ctrl+V in WhatsApp Web!
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob }),
+            ]);
+            setCopiedToClipboard(true);
+            setTimeout(() => setCopiedToClipboard(false), 4000);
+          } catch (clipErr) {
+            console.warn('Clipboard image copy failed:', clipErr);
+          }
+        }
+
+        // 2. Download the HD image file to Downloads folder as well
         setGeneratingMsg('रंगीत फोटो डाऊनलोड होत आहे (Downloading Photo)...');
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -121,9 +178,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        const targetPhone = invoice.billTo?.phone ? invoice.billTo.phone.replace(/[^0-9]/g, '') : '';
-        const msg = `*ANIMEX ANIMAL HEALTH CARE PVT LTD*\n📄 *Bill / Invoice No:* #${masterInvoiceNo}\n🏥 *Customer:* ${invoice.billTo?.firmName}\n💰 *Net Total:* ₹${invoice.totalAmount}\n\n✅ *मूळ रंगीत बिल (Original Color Bill Photo)* डाऊनलोड झाले आहे. कृपया येथे पाठवा.`;
-        window.open(`https://wa.me/${targetPhone ? '91' + targetPhone : ''}?text=${encodeURIComponent(msg)}`, '_blank');
+        // 3. For Desktop, open WhatsApp Web directly without any desktop app download prompt!
+        // Direct WhatsApp Web URL: https://web.whatsapp.com/send?...
+        const targetUrl = isMobile
+          ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+          : cleanPhone
+            ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+            : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+
+        window.open(targetUrl, '_blank');
+
+        if (!isMobile) {
+          setWhatsAppWebUrl(targetUrl);
+          setShowWhatsAppWebModal(true);
+        }
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -198,14 +266,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               onClick={handleWhatsAppShare}
               disabled={isGeneratingImage}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black px-3 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
-              title="Send Original Color Bill to WhatsApp"
+              title={isMobile ? 'Send Original Color Bill to WhatsApp' : 'Open WhatsApp Web & Copy Color Bill'}
             >
               {isGeneratingImage ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Share2 className="w-4 h-4" />
               )}
-              <span>WhatsApp (रंगीत बिल)</span>
+              <span>{isMobile ? 'WhatsApp (रंगीत बिल)' : 'WhatsApp Web (रंगीत बिल)'}</span>
             </button>
 
             <button
@@ -524,6 +592,96 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         </div>
 
       </div>
+
+      {/* WhatsApp Web Guidance Modal on Desktop */}
+      {showWhatsAppWebModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-2xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-base text-slate-900 dark:text-white">WhatsApp Web (Chrome)</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">रंगीत बिल शेअरिंग मार्गदर्शन</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppWebModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs sm:text-sm">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 rounded-xl p-3.5 space-y-1.5">
+                <div className="font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>रंगीत बिल आपोआप Copy (कॉपी) झाले आहे!</span>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">
+                  Chrome मधील WhatsApp Web चॅट उघडल्यावर फक्त <span className="font-black bg-emerald-200 dark:bg-emerald-800 text-emerald-950 dark:text-white px-2 py-0.5 rounded text-[11px]">Ctrl + V</span> दाबा (Paste करा) आणि पाठवून द्या!
+                </p>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-600 dark:text-slate-300 space-y-1">
+                <div className="font-bold text-slate-800 dark:text-slate-200">
+                  💡 माहिती:
+                </div>
+                <p>
+                  • तुमच्या कॉम्प्युटरवर डाऊनलोड फोल्डरमध्येही रंगीत फोटो सेव्ह झाला आहे.
+                </p>
+                <p>
+                  • जर WhatsApp Web आपोआप उघडले नसेल तर खालील हिरव्या बटणावर क्लिक करा.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              {whatsAppWebUrl && (
+                <a
+                  href={whatsAppWebUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>WhatsApp Web चॅट उघडा (Open WhatsApp Web)</span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={handleReCopyImage}
+                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-300 dark:border-slate-600"
+              >
+                {copiedToClipboard ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">फोटो पुन्हा क्लिपबोर्डवर कॉपी झाला!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                    <span>रंगीत फोटो पुन्हा Copy करा</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppWebModal(false)}
+                className="w-full text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-bold text-xs py-1.5 text-center transition-colors cursor-pointer"
+              >
+                बंद करा (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

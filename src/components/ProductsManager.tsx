@@ -37,6 +37,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   // Stock Inward Modal State
   const [showInwardModal, setShowInwardModal] = useState(false);
   const [inwardProductId, setInwardProductId] = useState<string>('');
+  const [inwardMode, setInwardMode] = useState<'loose' | 'box'>('box');
   const [inwardBoxes, setInwardBoxes] = useState<number>(15);
   const [inwardUnitsPerBox, setInwardUnitsPerBox] = useState<number>(100);
   const [inwardLooseUnits, setInwardLooseUnits] = useState<number>(0);
@@ -48,6 +49,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [defaultUnit, setDefaultUnit] = useState('Ltr');
   const [mrp, setMrp] = useState<number>(350);
   const [defaultPrice, setDefaultPrice] = useState<number>(300);
+  const [isLoosePackaging, setIsLoosePackaging] = useState<boolean>(false);
   const [boxCapacity, setBoxCapacity] = useState<number>(100);
   const [stockQuantity, setStockQuantity] = useState<number>(1500);
   const [minStockAlert, setMinStockAlert] = useState<number>(50);
@@ -59,7 +61,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setDefaultUnit('Ltr');
     setMrp(350);
     setDefaultPrice(300);
-    setBoxCapacity(100);
+    setIsLoosePackaging(false);
+    setBoxCapacity(50);
     setStockQuantity(500);
     setMinStockAlert(50);
     setShowModal(true);
@@ -72,7 +75,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setDefaultUnit(p.defaultUnit || 'Ltr');
     setMrp(p.mrp || 0);
     setDefaultPrice(p.defaultPrice || 0);
-    setBoxCapacity(p.boxCapacity || 50);
+    const isLoose = (p.boxCapacity || 1) <= 1 || (p.defaultUnit === 'Bucket' && (p.boxCapacity || 1) <= 1);
+    setIsLoosePackaging(isLoose);
+    setBoxCapacity(isLoose ? 1 : (p.boxCapacity || 50));
     setStockQuantity(p.stockQuantity ?? 0);
     setMinStockAlert(p.minStockAlert || 50);
     setShowModal(true);
@@ -82,9 +87,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     const target = p || products[0];
     if (!target) return;
     setInwardProductId(target.id);
-    setInwardBoxes(15);
-    setInwardUnitsPerBox(target.boxCapacity || 100);
-    setInwardLooseUnits(0);
+    const isLoose = (target.boxCapacity || 1) <= 1 || (target.defaultUnit === 'Bucket' && (target.boxCapacity || 1) <= 1);
+    setInwardMode(isLoose ? 'loose' : 'box');
+    setInwardBoxes(isLoose ? 0 : 15);
+    setInwardUnitsPerBox(target.boxCapacity && target.boxCapacity > 1 ? target.boxCapacity : 1);
+    setInwardLooseUnits(isLoose ? 15 : 0);
     setInwardNote('गोदाम आवक (Stock Inward)');
     setShowInwardModal(true);
   };
@@ -106,7 +113,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
           defaultUnit,
           mrp,
           defaultPrice,
-          boxCapacity: Number(boxCapacity) || 50,
+          boxCapacity: isLoosePackaging ? 1 : (Number(boxCapacity) || 50),
           stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
           minStockAlert: Number(minStockAlert) || 50,
         };
@@ -119,7 +126,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
           defaultUnit,
           mrp,
           defaultPrice,
-          boxCapacity: Number(boxCapacity) || 50,
+          boxCapacity: isLoosePackaging ? 1 : (Number(boxCapacity) || 50),
           stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
           minStockAlert: Number(minStockAlert) || 50,
         };
@@ -132,13 +139,26 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const handleConfirmInward = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inwardProductId) return;
+    if (totalInwardAdded <= 0) {
+      alert('कृपया आवक मालाची संख्या टाका (Enter valid stock quantity).');
+      return;
+    }
     if (onInwardStock) {
-      onInwardStock(
-        inwardProductId,
-        Number(inwardBoxes) || 0,
-        Number(inwardUnitsPerBox) || 0,
-        Number(inwardLooseUnits) || 0
-      );
+      if (inwardMode === 'loose') {
+        onInwardStock(
+          inwardProductId,
+          0,
+          1,
+          totalInwardAdded
+        );
+      } else {
+        onInwardStock(
+          inwardProductId,
+          Number(inwardBoxes) || 0,
+          Number(inwardUnitsPerBox) || 0,
+          Number(inwardLooseUnits) || 0
+        );
+      }
     }
     setShowInwardModal(false);
   };
@@ -167,7 +187,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   };
 
   const selectedInwardProduct = products.find((p) => p.id === inwardProductId);
-  const totalInwardAdded = (Number(inwardBoxes) || 0) * (Number(inwardUnitsPerBox) || 0) + (Number(inwardLooseUnits) || 0);
+  const totalInwardAdded = inwardMode === 'loose'
+    ? (Number(inwardLooseUnits) || 0)
+    : (Number(inwardBoxes) || 0) * (Number(inwardUnitsPerBox) || 0) + (Number(inwardLooseUnits) || 0);
   const newProjectedStock = (selectedInwardProduct?.stockQuantity || 0) + totalInwardAdded;
 
   // Inventory Overview Stats
@@ -325,9 +347,15 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 {/* Stock Details Box */}
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 bg-slate-50/70 dark:bg-slate-800/40 p-2.5 rounded-xl">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-bold">पॅकिंग क्षमता (Box Size):</span>
+                    <span className="text-slate-500 font-bold">पॅकिंग प्रकार (Packaging):</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
-                      📦 {capacity} {p.defaultUnit}/खोका
+                      {capacity <= 1 ? (
+                        <span className="text-amber-600 dark:text-amber-400 font-extrabold">
+                          {p.defaultUnit === 'Bucket' ? '🪣 सुटी बकेट (No Box)' : '📦 सुटे नग (No Box)'}
+                        </span>
+                      ) : (
+                        <span>📦 {capacity} {p.defaultUnit}/खोका</span>
+                      )}
                     </span>
                   </div>
 
@@ -390,7 +418,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     गोदामात माल जमा करा (Stock Inward)
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    खोके आणि सुट्या बाटल्यांची आवक नोंदवा.
+                    खोके किंवा सुट्या बकेट्स / नगांची आवक नोंदवा.
                   </p>
                 </div>
               </div>
@@ -414,7 +442,15 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     const sel = products.find((p) => p.id === e.target.value);
                     setInwardProductId(e.target.value);
                     if (sel) {
-                      setInwardUnitsPerBox(sel.boxCapacity || 100);
+                      const isLoose = (sel.boxCapacity || 1) <= 1 || (sel.defaultUnit === 'Bucket' && (sel.boxCapacity || 1) <= 1);
+                      setInwardMode(isLoose ? 'loose' : 'box');
+                      setInwardUnitsPerBox(sel.boxCapacity && sel.boxCapacity > 1 ? sel.boxCapacity : 1);
+                      if (isLoose) {
+                        setInwardBoxes(0);
+                        if (inwardLooseUnits === 0 && inwardBoxes > 0) {
+                          setInwardLooseUnits(inwardBoxes);
+                        }
+                      }
                     }
                   }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-bold"
@@ -441,59 +477,126 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 </div>
               )}
 
-              {/* Inward Inputs: Boxes & Units per Box & Loose */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                    खोके किती आले? (Boxes) *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={inwardBoxes}
-                    onChange={(e) => setInwardBoxes(Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 15 खोके</span>
-                </div>
+              {/* Inward Mode Switcher Tabs */}
+              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInwardMode('loose');
+                    if (inwardLooseUnits === 0 && inwardBoxes > 0) {
+                      setInwardLooseUnits(inwardBoxes);
+                    }
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    inwardMode === 'loose'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>🪣 सुटी आवक / थेट {selectedInwardProduct?.defaultUnit || 'बकेट'}</span>
+                  {((selectedInwardProduct?.boxCapacity || 1) <= 1) && (
+                    <span className="text-[9px] bg-white text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                      शिफारस
+                    </span>
+                  )}
+                </button>
 
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                    १ खोक्यात किती? (Per Box) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={inwardUnitsPerBox}
-                    onChange={(e) => setInwardUnitsPerBox(Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 50, 70, 100</span>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                    सुट्या बाटल्या (Loose)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={inwardLooseUnits}
-                    onChange={(e) => setInwardLooseUnits(Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">सुटी संख्या असल्यास</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setInwardMode('box')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    inwardMode === 'box'
+                      ? 'bg-animex-blue-600 text-white shadow-md'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>📦 खोके पॅकिंगने आवक (By Box)</span>
+                </button>
               </div>
+
+              {/* Inward Inputs: Direct Loose vs Box Packaging */}
+              {inwardMode === 'loose' ? (
+                <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-300 dark:border-emerald-700/80 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-emerald-900 dark:text-emerald-200 text-xs font-black">
+                      किती {selectedInwardProduct?.defaultUnit || 'बकेट'} आले? (Total Inward {selectedInwardProduct?.defaultUnit || 'Bucket'}) *
+                    </label>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-extrabold">
+                      सुटी आवक / No Box
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={inwardLooseUnits || ''}
+                      onChange={(e) => setInwardLooseUnits(Number(e.target.value))}
+                      placeholder="उदा. 15"
+                      className="w-full bg-white dark:bg-slate-900 border-2 border-emerald-400 dark:border-emerald-600 rounded-xl p-3 text-slate-900 dark:text-white font-black text-lg focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm"
+                    />
+                    <span className="text-sm font-black text-emerald-800 dark:text-emerald-200 px-3.5 py-3 bg-emerald-100 dark:bg-emerald-900/60 rounded-xl border border-emerald-300 dark:border-emerald-700 shrink-0">
+                      {selectedInwardProduct?.defaultUnit || 'Bucket'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                    ✨ 25kg च्या मोठ्या बकेट्स खोक्यात येत नाहीत. त्यांची थेट आवक संख्या येथे टाका.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                      खोके किती आले? (Boxes)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={inwardBoxes}
+                      onChange={(e) => setInwardBoxes(Number(e.target.value))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 15 खोके</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                      १ खोक्यात किती? (Per Box)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={inwardUnitsPerBox}
+                      onChange={(e) => setInwardUnitsPerBox(Number(e.target.value))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 20, 50, 100</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                      सुटे {selectedInwardProduct?.defaultUnit || 'नग'} (Loose)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={inwardLooseUnits}
+                      onChange={(e) => setInwardLooseUnits(Number(e.target.value))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">सुटी संख्या असल्यास</span>
+                  </div>
+                </div>
+              )}
 
               {/* Inward Calculation Preview */}
               <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
                   <span>हिशोब:</span>
                   <span className="font-mono font-bold">
-                    ({inwardBoxes} खोके × {inwardUnitsPerBox}) + {inwardLooseUnits} = +{totalInwardAdded} {selectedInwardProduct?.defaultUnit}
+                    {inwardMode === 'loose'
+                      ? `+${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Bucket'} (थेट सुटी आवक)`
+                      : `(${inwardBoxes} खोके × ${inwardUnitsPerBox}) + ${inwardLooseUnits} = +${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Units'}`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-extrabold text-emerald-900 dark:text-emerald-200 pt-1 border-t border-emerald-200/60 dark:border-emerald-800">
@@ -624,27 +727,56 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               </div>
 
               {/* Stock & Box Packaging Settings */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
                 <div className="text-[11px] font-extrabold text-animex-blue-900 dark:text-sky-300">
-                  📦 इन्व्हेंटरी आणि खोके पॅकिंग (Stock Settings)
+                  📦 इन्व्हेंटरी आणि पॅकिंग सेटिंग्ज (Packaging & Stock)
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      खोक्यात प्रमाण (Per Box)
+                      पॅकिंग प्रकार (Packaging Type)
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={boxCapacity}
-                      onChange={(e) => setBoxCapacity(Number(e.target.value))}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white"
-                      placeholder="उदा. 100"
-                    />
+                    <select
+                      value={isLoosePackaging ? 'loose' : 'box'}
+                      onChange={(e) => {
+                        const loose = e.target.value === 'loose';
+                        setIsLoosePackaging(loose);
+                        if (loose) setBoxCapacity(1);
+                        else if (boxCapacity <= 1) setBoxCapacity(50);
+                      }}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
+                    >
+                      <option value="box">📦 खोके पॅकिंग (Box Packaging)</option>
+                      <option value="loose">🪣 सुटे नग / बकेट्स (Loose / No Box)</option>
+                    </select>
                   </div>
+
+                  {!isLoosePackaging ? (
+                    <div>
+                      <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
+                        खोक्यात प्रमाण (Per Box) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={boxCapacity}
+                        onChange={(e) => setBoxCapacity(Number(e.target.value))}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white text-xs"
+                        placeholder="उदा. 20, 50, 100"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center pt-4 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold">
+                      <span>✓ सुटी बकेट (खोके नाहीत)</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      Current Stock (Units)
+                      सध्याचा शिल्लक स्टॉक (Units)
                     </label>
                     <input
                       type="number"

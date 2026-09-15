@@ -600,7 +600,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   return (
                     <div className="flex items-center justify-between mt-1 text-[11px] px-1">
                       <span className={isOver ? 'text-red-600 font-black' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                        📦 In Stock: {stock} {item.unit} ({b} Boxes{l > 0 ? ` + ${l} loose` : ''})
+                        📦 In Stock: {stock} {item.unit}{cap > 1 ? ` (${b} Boxes${l > 0 ? ` + ${l} loose` : ''})` : ''}
                       </span>
                       {isOver && (
                         <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black text-[10px]">
@@ -721,7 +721,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       return (
                         <div className="mt-1 text-[10px] flex items-center justify-between">
                           <span className={isOver ? 'text-red-600 font-extrabold' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                            📦 शिल्लक: {stock} ({b} खोके{l > 0 ? ` + ${l}` : ''})
+                            📦 शिल्लक: {stock} {item.unit}{cap > 1 ? ` (${b} खोके${l > 0 ? ` + ${l}` : ''})` : ''}
                           </span>
                           {isOver && (
                             <span className="bg-red-100 text-red-700 px-1 py-0.2 rounded font-black text-[9px]">

@@ -8,7 +8,7 @@ export const INITIAL_PRODUCTS: Product[] = [
   { id: 'p5', name: 'Rumen mex (300ml)', category: 'Rumen & Gut Health', defaultUnit: 'Ml', mrp: 240.00, defaultPrice: 210.80, boxCapacity: 100, stockQuantity: 1500, minStockAlert: 100 },
   { id: 'p6', name: 'Utrimex (500ml)', category: 'Uterine & Fertility Boosters', defaultUnit: 'Ml', mrp: 165.00, defaultPrice: 142.10, boxCapacity: 70, stockQuantity: 700, minStockAlert: 70 },
   { id: 'p7', name: 'Calcimex Gold (5 lit)', category: 'Calcium Supplements', defaultUnit: 'Can', mrp: 1050.00, defaultPrice: 918.00, boxCapacity: 4, stockQuantity: 60, minStockAlert: 10 },
-  { id: 'p8', name: 'Milkymex DS (25kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 3700.00, defaultPrice: 3264.00, boxCapacity: 2, stockQuantity: 40, minStockAlert: 10 },
+  { id: 'p8', name: 'Milkymex DS (25kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 3700.00, defaultPrice: 3264.00, boxCapacity: 1, stockQuantity: 40, minStockAlert: 10 },
   { id: 'p9', name: 'Milkymex DS (1kg)', category: 'Mineral Mixtures', defaultUnit: 'Pack', mrp: 210.00, defaultPrice: 180.00, boxCapacity: 25, stockQuantity: 500, minStockAlert: 50 },
 ];
 

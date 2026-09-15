@@ -257,7 +257,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <span className="text-[10px] font-black text-slate-500 uppercase">
-                      📦 {cap} {p.defaultUnit}/{perBoxWord}
+                      {cap <= 1 ? (
+                        p.defaultUnit === 'Bucket' ? '🪣 सुटी बकेट (No Box)' : '📦 सुटे नग (No Box)'
+                      ) : (
+                        `📦 ${cap} ${p.defaultUnit}/${perBoxWord}`
+                      )}
                     </span>
                     {isLow && (
                       <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
@@ -273,7 +277,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="pt-2 mt-2 border-t border-slate-200/60 dark:border-slate-700 flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">{stockWord}</span>
                   <span className={`font-black ${isLow ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                    {boxes} {boxWord}{loose > 0 ? ` + ${loose}` : ''} ({stock} {p.defaultUnit})
+                    {cap <= 1
+                      ? `${stock} ${p.defaultUnit}`
+                      : `${boxes} ${boxWord}${loose > 0 ? ` + ${loose}` : ''} (${stock} ${p.defaultUnit})`}
                   </span>
                 </div>
               </div>

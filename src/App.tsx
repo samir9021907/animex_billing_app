@@ -60,10 +60,15 @@ export const App: React.FC = () => {
         // Ensure every product has stockQuantity and boxCapacity from defaults
         return parsed.map(p => {
           const defaultSeed = INITIAL_PRODUCTS.find(sp => sp.id === p.id);
+          let boxCap = p.boxCapacity !== undefined ? p.boxCapacity : (defaultSeed?.boxCapacity ?? 50);
+          // Large 25kg buckets do not come in boxes; they are loose buckets
+          if (p.name.includes('25kg') || (p.defaultUnit === 'Bucket' && (boxCap === 2 || p.id === 'p8'))) {
+            boxCap = 1;
+          }
           return {
             ...p,
             stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : (defaultSeed?.stockQuantity ?? 100),
-            boxCapacity: p.boxCapacity !== undefined ? p.boxCapacity : (defaultSeed?.boxCapacity ?? 50),
+            boxCapacity: boxCap,
             minStockAlert: p.minStockAlert !== undefined ? p.minStockAlert : (defaultSeed?.minStockAlert ?? 50),
           };
         });
@@ -309,7 +314,7 @@ export const App: React.FC = () => {
         return {
           ...prod,
           stockQuantity: currentStock + totalAdded,
-          boxCapacity: unitsPerBox > 0 ? unitsPerBox : (prod.boxCapacity || 50),
+          boxCapacity: unitsPerBox > 1 ? unitsPerBox : (prod.boxCapacity || 1),
         };
       });
     });

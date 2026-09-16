@@ -107,101 +107,89 @@ export const App: React.FC = () => {
       // 1. Fetch stores from Neon DB (Cloud is master source of truth)
       const cloudStores = await fetchStoresFromBackend();
       if (cloudStores && Array.isArray(cloudStores)) {
-        if (cloudStores.length > 0) {
-          // Push any local stores created offline (temporary ID without UUID)
-          const currentStores = storesRef.current;
-          const unsyncedStores = currentStores.filter(
-            (ls) => !uuidRegex.test(ls.id) &&
-                    !cloudStores.some((cs) => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
-          );
+        const currentStores = storesRef.current;
+        // Only push genuinely new local offline stores (no UUID)
+        const unsyncedStores = currentStores.filter(
+          (ls) => !uuidRegex.test(ls.id) &&
+                  !cloudStores.some((cs) => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
+        );
 
-          for (const unsynced of unsyncedStores) {
-            const created = await syncStoreToBackend(unsynced);
-            if (created && created.id) {
-              cloudStores.push({
-                id: created.id,
-                firmName: created.firm_name,
-                contactName: created.contact_person_name || '',
-                phone: created.phone_number || '',
-                district: created.district || 'Maharashtra',
-                address: created.address || '',
-                state: 'Maharashtra',
-              });
-            }
-          }
-
-          setStores(cloudStores);
-        } else if (storesRef.current.length > 0) {
-          for (const s of storesRef.current) {
-            await syncStoreToBackend(s);
+        for (const unsynced of unsyncedStores) {
+          const created = await syncStoreToBackend(unsynced);
+          if (created && created.id) {
+            cloudStores.push({
+              id: created.id,
+              firmName: created.firm_name,
+              contactName: created.contact_person_name || '',
+              phone: created.phone_number || '',
+              district: created.district || 'Maharashtra',
+              address: created.address || '',
+              state: 'Maharashtra',
+            });
           }
         }
+
+        setStores(cloudStores);
       }
 
       // 2. Fetch invoices from Neon DB (Cloud is master source of truth)
       const cloudInvoices = await fetchInvoicesFromBackend();
       if (cloudInvoices && Array.isArray(cloudInvoices)) {
-        if (cloudInvoices.length > 0) {
-          // Push any local bills created offline (temporary ID without UUID)
-          const currentInvoices = invoicesRef.current;
-          const unsyncedInvoices = currentInvoices.filter(
-            (li) => !uuidRegex.test(li.id) &&
-                    !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
-          );
+        const currentInvoices = invoicesRef.current;
+        // Only push genuinely new local offline bills (no UUID)
+        const unsyncedInvoices = currentInvoices.filter(
+          (li) => !uuidRegex.test(li.id) &&
+                  !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
+        );
 
-          for (const unsynced of unsyncedInvoices) {
-            const created = await syncInvoiceToBackend(unsynced);
-            if (created && created.id) {
-              const rawItems = Array.isArray(created.items) ? created.items : [];
-              const items = rawItems.map((it: any, idx: number) => ({
-                id: `item-${idx}-${Date.now()}`,
-                productId: it.productId || `p-${idx}`,
-                itemName: it.product_title || it.itemName || 'Product',
-                quantity: Number(it.quantity || 1),
-                unit: it.unit || 'Ltr',
-                mrp: Number(it.mrp || 0),
-                pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
-                amount: Number(it.amount || 0),
-                isFree: Boolean(it.is_free),
-                isScheme: Boolean(it.is_free),
-              }));
-              const storeData = created.medical_store || unsynced.billTo || {};
-              cloudInvoices.unshift({
-                id: created.id,
-                invoiceNo: created.company_invoice_number || unsynced.invoiceNo,
-                invoiceNumber: created.invoice_number || unsynced.invoiceNumber,
-                globalBillId: created.global_bill_id ? Number(created.global_bill_id) : unsynced.globalBillId,
-                date: created.date ? created.date.split('T')[0] : unsynced.date,
-                billTo: {
-                  id: storeData.id || created.medical_store_id,
-                  firmName: storeData.firm_name || storeData.firmName || 'Medical Store',
-                  contactName: storeData.contact_person_name || storeData.contactName || '',
-                  phone: storeData.phone_number || storeData.phone || '',
-                  district: storeData.district || '',
-                  address: storeData.address || '',
-                  state: 'Maharashtra',
-                },
-                items,
-                subTotal: Number(created.subtotal || 0),
-                discount: Number(created.discount || 0),
-                totalAmount: Number(created.grand_total || 0),
-                paymentType: created.payment_type || 'UPI',
-                receivedAmount: Number(created.received_amount || 0),
-                balanceAmount: Number(created.balance_due || 0),
-                status: created.status?.toUpperCase() || 'PENDING',
-                notes: created.notes || '',
-                termsAndConditions: created.notes || 'Goods once sold will not be taken back.',
-                createdAt: created.created_at || new Date().toISOString(),
-              });
-            }
-          }
-
-          setInvoices(cloudInvoices);
-        } else if (invoicesRef.current.length > 0) {
-          for (const inv of invoicesRef.current) {
-            await syncInvoiceToBackend(inv);
+        for (const unsynced of unsyncedInvoices) {
+          const created = await syncInvoiceToBackend(unsynced);
+          if (created && created.id) {
+            const rawItems = Array.isArray(created.items) ? created.items : [];
+            const items = rawItems.map((it: any, idx: number) => ({
+              id: `item-${idx}-${Date.now()}`,
+              productId: it.productId || `p-${idx}`,
+              itemName: it.product_title || it.itemName || 'Product',
+              quantity: Number(it.quantity || 1),
+              unit: it.unit || 'Ltr',
+              mrp: Number(it.mrp || 0),
+              pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
+              amount: Number(it.amount || 0),
+              isFree: Boolean(it.is_free),
+              isScheme: Boolean(it.is_free),
+            }));
+            const storeData = created.medical_store || unsynced.billTo || {};
+            cloudInvoices.unshift({
+              id: created.id,
+              invoiceNo: created.company_invoice_number || unsynced.invoiceNo,
+              invoiceNumber: created.invoice_number || unsynced.invoiceNumber,
+              globalBillId: created.global_bill_id ? Number(created.global_bill_id) : unsynced.globalBillId,
+              date: created.date ? created.date.split('T')[0] : unsynced.date,
+              billTo: {
+                id: storeData.id || created.medical_store_id,
+                firmName: storeData.firm_name || storeData.firmName || 'Medical Store',
+                contactName: storeData.contact_person_name || storeData.contactName || '',
+                phone: storeData.phone_number || storeData.phone || '',
+                district: storeData.district || '',
+                address: storeData.address || '',
+                state: 'Maharashtra',
+              },
+              items,
+              subTotal: Number(created.subtotal || 0),
+              discount: Number(created.discount || 0),
+              totalAmount: Number(created.grand_total || 0),
+              paymentType: created.payment_type || 'UPI',
+              receivedAmount: Number(created.received_amount || 0),
+              balanceAmount: Number(created.balance_due || 0),
+              status: created.status?.toUpperCase() || 'PENDING',
+              notes: created.notes || '',
+              termsAndConditions: created.notes || 'Goods once sold will not be taken back.',
+              createdAt: created.created_at || new Date().toISOString(),
+            });
           }
         }
+
+        setInvoices(cloudInvoices);
       }
 
       setLastSyncTime(new Date());

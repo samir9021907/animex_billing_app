@@ -18,6 +18,7 @@ import {
   Bell,
   AlertTriangle,
   ArrowDownToLine,
+  RefreshCw,
 } from 'lucide-react';
 import { UserSession } from '../services/authService';
 import { useLanguage } from '../context/LanguageContext';
@@ -30,6 +31,9 @@ interface HeaderProps {
   products?: Product[];
   user?: UserSession | null;
   onLogout?: () => void;
+  isSyncingCloud?: boolean;
+  onSyncCloud?: () => void;
+  lastSyncTime?: Date | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,6 +43,9 @@ export const Header: React.FC<HeaderProps> = ({
   products = [],
   user,
   onLogout,
+  isSyncingCloud = false,
+  onSyncCloud,
+  lastSyncTime,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
@@ -179,8 +186,23 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Right Header Actions: Low Stock Notification Bell */}
+          {/* Right Header Actions: Cloud Sync & Low Stock Notification Bell */}
           <div className="flex items-center gap-2">
+            {onSyncCloud && (
+              <button
+                onClick={onSyncCloud}
+                disabled={isSyncingCloud}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer border border-white/15 shadow-sm text-xs font-bold"
+                title={lastSyncTime ? `Neon Cloud Live Sync (शेवटचे सिंक: ${lastSyncTime.toLocaleTimeString()})` : 'Neon Cloud PostgreSQL Live Sync (क्लाउड सिंक करा)'}
+                aria-label="Neon Cloud PostgreSQL Live Sync"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 ${isSyncingCloud ? 'animate-spin text-amber-300' : ''}`} />
+                <span className="hidden sm:inline text-[11px] font-extrabold text-emerald-300">
+                  {isSyncingCloud ? 'सिंक होत आहे...' : 'Cloud Synced'}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 sm:p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer flex items-center justify-center border border-white/15 shadow-sm"
@@ -409,6 +431,37 @@ export const Header: React.FC<HeaderProps> = ({
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                  </div>
+                )}
+
+                {/* Cloud Neon DB Sync Status in Drawer */}
+                {onSyncCloud && (
+                  <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${isSyncingCloud ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`} />
+                      <div>
+                        <span className="text-[11px] font-bold text-emerald-300 block leading-tight">
+                          {isSyncingCloud ? 'क्लाउड सिंक होत आहे...' : 'Cloud Connected'}
+                        </span>
+                        {lastSyncTime && (
+                          <span className="text-[9px] text-slate-400 font-normal block leading-tight">
+                            सिंक वेळ: {lastSyncTime.toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSyncCloud();
+                      }}
+                      disabled={isSyncingCloud}
+                      className="px-2.5 py-1 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[10px] font-extrabold rounded-lg transition-all border border-white/20 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 text-amber-300 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingCloud ? 'सिंक...' : 'सिंक करा'}</span>
+                    </button>
                   </div>
                 )}
               </div>

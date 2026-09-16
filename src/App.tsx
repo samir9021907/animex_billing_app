@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { InvoiceForm } from './components/InvoiceForm';
@@ -90,62 +90,158 @@ export const App: React.FC = () => {
 
   const [selectedPreviewInvoice, setSelectedPreviewInvoice] = useState<Invoice | null>(null);
 
+  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+
+  const storesRef = useRef(stores);
+  storesRef.current = stores;
+  const invoicesRef = useRef(invoices);
+  invoicesRef.current = invoices;
+
   // ─── Bidirectional Cloud Neon Database Sync ─────────────────────────────────
-  useEffect(() => {
-    let isCancelled = false;
+  const syncCloudData = useCallback(async () => {
+    setIsSyncingCloud(true);
+    try {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    const syncCloudData = async () => {
-      try {
-        // 1. Fetch stores from Neon DB
-        const cloudStores = await fetchStoresFromBackend();
-        if (!isCancelled && cloudStores && cloudStores.length > 0) {
-          setStores((prevStores) => {
-            const merged = [...cloudStores];
-            prevStores.forEach((localStore) => {
-              const exists = merged.some(
-                (cs) => cs.id === localStore.id || cs.firmName.trim().toLowerCase() === localStore.firmName.trim().toLowerCase()
-              );
-              if (!exists) {
-                merged.push(localStore);
-                syncStoreToBackend(localStore);
-              }
-            });
-            return merged;
-          });
-        } else if (!isCancelled && stores.length > 0) {
-          stores.forEach((s) => syncStoreToBackend(s));
-        }
+      // 1. Fetch stores from Neon DB (Cloud is master source of truth)
+      const cloudStores = await fetchStoresFromBackend();
+      if (cloudStores && Array.isArray(cloudStores)) {
+        if (cloudStores.length > 0) {
+          // Push any local stores created offline (temporary ID without UUID)
+          const currentStores = storesRef.current;
+          const unsyncedStores = currentStores.filter(
+            (ls) => !uuidRegex.test(ls.id) &&
+                    !cloudStores.some((cs) => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
+          );
 
-        // 2. Fetch invoices from Neon DB
-        const cloudInvoices = await fetchInvoicesFromBackend();
-        if (!isCancelled && cloudInvoices && cloudInvoices.length > 0) {
-          setInvoices((prevInvoices) => {
-            const merged = [...cloudInvoices];
-            prevInvoices.forEach((localInv) => {
-              const exists = merged.some(
-                (ci) => ci.id === localInv.id || ci.invoiceNo === localInv.invoiceNo
-              );
-              if (!exists) {
-                merged.push(localInv);
-                syncInvoiceToBackend(localInv);
-              }
-            });
-            return merged;
-          });
-        } else if (!isCancelled && invoices.length > 0) {
-          invoices.forEach((inv) => syncInvoiceToBackend(inv));
+          for (const unsynced of unsyncedStores) {
+            const created = await syncStoreToBackend(unsynced);
+            if (created && created.id) {
+              cloudStores.push({
+                id: created.id,
+                firmName: created.firm_name,
+                contactName: created.contact_person_name || '',
+                phone: created.phone_number || '',
+                district: created.district || 'Maharashtra',
+                address: created.address || '',
+                state: 'Maharashtra',
+              });
+            }
+          }
+
+          setStores(cloudStores);
+        } else if (storesRef.current.length > 0) {
+          for (const s of storesRef.current) {
+            await syncStoreToBackend(s);
+          }
         }
-      } catch (e) {
-        console.warn('Background cloud sync notice:', e);
       }
-    };
 
+      // 2. Fetch invoices from Neon DB (Cloud is master source of truth)
+      const cloudInvoices = await fetchInvoicesFromBackend();
+      if (cloudInvoices && Array.isArray(cloudInvoices)) {
+        if (cloudInvoices.length > 0) {
+          // Push any local bills created offline (temporary ID without UUID)
+          const currentInvoices = invoicesRef.current;
+          const unsyncedInvoices = currentInvoices.filter(
+            (li) => !uuidRegex.test(li.id) &&
+                    !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
+          );
+
+          for (const unsynced of unsyncedInvoices) {
+            const created = await syncInvoiceToBackend(unsynced);
+            if (created && created.id) {
+              const rawItems = Array.isArray(created.items) ? created.items : [];
+              const items = rawItems.map((it: any, idx: number) => ({
+                id: `item-${idx}-${Date.now()}`,
+                productId: it.productId || `p-${idx}`,
+                itemName: it.product_title || it.itemName || 'Product',
+                quantity: Number(it.quantity || 1),
+                unit: it.unit || 'Ltr',
+                mrp: Number(it.mrp || 0),
+                pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
+                amount: Number(it.amount || 0),
+                isFree: Boolean(it.is_free),
+                isScheme: Boolean(it.is_free),
+              }));
+              const storeData = created.medical_store || unsynced.billTo || {};
+              cloudInvoices.unshift({
+                id: created.id,
+                invoiceNo: created.company_invoice_number || unsynced.invoiceNo,
+                invoiceNumber: created.invoice_number || unsynced.invoiceNumber,
+                globalBillId: created.global_bill_id ? Number(created.global_bill_id) : unsynced.globalBillId,
+                date: created.date ? created.date.split('T')[0] : unsynced.date,
+                billTo: {
+                  id: storeData.id || created.medical_store_id,
+                  firmName: storeData.firm_name || storeData.firmName || 'Medical Store',
+                  contactName: storeData.contact_person_name || storeData.contactName || '',
+                  phone: storeData.phone_number || storeData.phone || '',
+                  district: storeData.district || '',
+                  address: storeData.address || '',
+                  state: 'Maharashtra',
+                },
+                items,
+                subTotal: Number(created.subtotal || 0),
+                discount: Number(created.discount || 0),
+                totalAmount: Number(created.grand_total || 0),
+                paymentType: created.payment_type || 'UPI',
+                receivedAmount: Number(created.received_amount || 0),
+                balanceAmount: Number(created.balance_due || 0),
+                status: created.status?.toUpperCase() || 'PENDING',
+                notes: created.notes || '',
+                termsAndConditions: created.notes || 'Goods once sold will not be taken back.',
+                createdAt: created.created_at || new Date().toISOString(),
+              });
+            }
+          }
+
+          setInvoices(cloudInvoices);
+        } else if (invoicesRef.current.length > 0) {
+          for (const inv of invoicesRef.current) {
+            await syncInvoiceToBackend(inv);
+          }
+        }
+      }
+
+      setLastSyncTime(new Date());
+    } catch (e) {
+      console.warn('Background cloud sync notice:', e);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  }, []);
+
+  // Set up listeners for real-time multi-device sync
+  useEffect(() => {
+    // 1. Initial mount sync
     syncCloudData();
 
-    return () => {
-      isCancelled = true;
+    // 2. Tab / Window focus (switching back to app on laptop or phone)
+    const handleFocus = () => {
+      syncCloudData();
     };
-  }, []);
+    window.addEventListener('focus', handleFocus);
+
+    // 3. Screen visibility change (un-minimizing app on phone or laptop)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncCloudData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 4. Background auto-sync interval every 15 seconds
+    const intervalId = setInterval(() => {
+      syncCloudData();
+    }, 15000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [syncCloudData]);
 
   // Sync to localStorage
   useEffect(() => {
@@ -240,8 +336,14 @@ export const App: React.FC = () => {
     
     // 2. Sync to cloud Neon DB
     syncInvoiceToBackend(finalInvoice).then(cloudInv => {
-      if (cloudInv && cloudInv.id && cloudInv.id !== finalInvoice.id) {
-        setInvoices(prev => prev.map(inv => inv.id === finalInvoice.id ? { ...inv, id: cloudInv.id } : inv));
+      if (cloudInv && cloudInv.id) {
+        setInvoices(prev => prev.map(inv => inv.id === finalInvoice.id ? {
+          ...inv,
+          id: cloudInv.id,
+          globalBillId: cloudInv.global_bill_id ? Number(cloudInv.global_bill_id) : inv.globalBillId,
+          companyInvoiceNumber: cloudInv.company_invoice_number || inv.companyInvoiceNumber,
+          invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
+        } : inv));
       }
     });
 
@@ -377,6 +479,9 @@ export const App: React.FC = () => {
         products={products}
         user={currentUser}
         onLogout={handleLogout}
+        isSyncingCloud={isSyncingCloud}
+        onSyncCloud={syncCloudData}
+        lastSyncTime={lastSyncTime}
       />
 
       {/* Main View Router */}

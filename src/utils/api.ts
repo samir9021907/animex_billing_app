@@ -119,8 +119,15 @@ export const fetchInvoicesFromBackend = async (): Promise<any[]> => {
 export const syncStoreToBackend = async (store: any): Promise<any> => {
   try {
     const clientId = getClientId();
-    const res = await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores`, {
-      method: 'POST',
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isExistingUuid = Boolean(store.id && uuidRegex.test(store.id));
+    const url = isExistingUuid
+      ? `${API_BASE}/medical-store/client/${clientId}/medical-stores/${store.id}`
+      : `${API_BASE}/medical-store/client/${clientId}/medical-stores`;
+    const method = isExistingUuid ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
       headers: getAuthHeaders(),
       body: JSON.stringify({
         firm_name: store.firmName,
@@ -158,6 +165,8 @@ export const deleteStoreFromBackend = async (id: string) => {
 export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
   try {
     const clientId = getClientId();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     const itemsPayload = (invoice.items || []).map((item: any) => ({
       product_title: item.itemName || item.name,
       quantity: Number(item.quantity || 1),
@@ -175,7 +184,6 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
 
     // Ensure medical_store_id is a valid UUID
     let storeId = invoice.billTo?.id;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!storeId || !uuidRegex.test(storeId)) {
       if (invoice.billTo) {
         const createdStore = await syncStoreToBackend(invoice.billTo);
@@ -190,12 +198,21 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
       return null;
     }
 
-    const res = await fetch(`${API_BASE}/client/${clientId}/invoices`, {
-      method: 'POST',
+    const isExistingUuid = Boolean(invoice.id && uuidRegex.test(invoice.id));
+    const url = isExistingUuid
+      ? `${API_BASE}/client/${clientId}/invoices/${invoice.id}`
+      : `${API_BASE}/client/${clientId}/invoices`;
+    const method = isExistingUuid ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
       headers: getAuthHeaders(),
       body: JSON.stringify({
         medical_store_id: storeId,
         date: isoDate,
+        invoice_number: invoice.invoiceNumber || undefined,
+        company_invoice_number: invoice.companyInvoiceNumber || invoice.invoiceNo || undefined,
+        global_bill_id: invoice.globalBillId || undefined,
         discount: invoice.discount || 0,
         received_amount: invoice.receivedAmount || 0,
         payment_type: invoice.paymentType || 'UPI',

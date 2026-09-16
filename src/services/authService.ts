@@ -29,27 +29,10 @@ export const authService = {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    // 1. Primary ANIMEX Cloud Credentials
-    if (
-      (trimmedEmail === 'admin@animex.com' && trimmedPassword === 'admin123') ||
-      (trimmedEmail === 'demo' && trimmedPassword === 'demo')
-    ) {
-      const animexUser: UserSession = {
-        id: PERMANENT_CLIENT_ID,
-        name: 'ANIMEX Animal Health Care',
-        email: trimmedEmail,
-        phone: '+91 9021907000',
-        city: 'Nashik',
-        clientId: PERMANENT_CLIENT_ID,
-      };
-      this.saveSession(PERMANENT_JWT_TOKEN, animexUser);
-      return animexUser;
-    }
-
-    // 2. Live Backend API Request
+    // 1. Live Backend API Request (returns token directly from Neon DB)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -67,31 +50,45 @@ export const authService = {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Invalid credentials or server error.');
+      if (response.ok && data.token) {
+        const token = data.token;
+        const clientMap = data.user || data.client || {};
+
+        const user: UserSession = {
+          id: clientMap.id || PERMANENT_CLIENT_ID,
+          name: clientMap.name || 'ANIMEX Animal Health Care',
+          email: clientMap.email || trimmedEmail,
+          phone: clientMap.phone || '+91 9021907000',
+          address: clientMap.address || '',
+          city: clientMap.city || 'Nashik',
+          clientId: clientMap.id || PERMANENT_CLIENT_ID,
+        };
+
+        this.saveSession(token, user);
+        return user;
       }
-
-      const token = data.token || '';
-      const clientMap = data.client || data.user || {};
-
-      const user: UserSession = {
-        id: clientMap.id || clientMap.client_id || 'user-1',
-        name: clientMap.name || 'Animex User',
-        email: clientMap.email || trimmedEmail,
-        phone: clientMap.phone || '',
-        address: clientMap.address || '',
-        city: clientMap.city || '',
-        clientId: clientMap.client_id || clientMap.id || '',
-      };
-
-      this.saveSession(token, user);
-      return user;
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error('Server connection timed out. Please check your internet connection.');
-      }
-      throw new Error(error.message || 'Login failed. Please verify your credentials.');
+      console.warn('Backend live login warning, checking fallback:', error);
     }
+
+    // 2. Primary ANIMEX Cloud Credentials Fallback
+    if (
+      (trimmedEmail === 'admin@animex.com' && trimmedPassword === 'admin123') ||
+      (trimmedEmail === 'demo' && trimmedPassword === 'demo')
+    ) {
+      const animexUser: UserSession = {
+        id: PERMANENT_CLIENT_ID,
+        name: 'ANIMEX Animal Health Care',
+        email: trimmedEmail,
+        phone: '+91 9021907000',
+        city: 'Nashik',
+        clientId: PERMANENT_CLIENT_ID,
+      };
+      this.saveSession(PERMANENT_JWT_TOKEN, animexUser);
+      return animexUser;
+    }
+
+    throw new Error('Invalid email or password. Please try again.');
   },
 
   // Client Registration / Sign Up

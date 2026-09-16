@@ -212,8 +212,10 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Set up listeners for real-time multi-device sync
+  // Set up listeners for real-time multi-device sync (only when user is logged in)
   useEffect(() => {
+    if (!currentUser) return;
+
     // 1. Initial mount sync
     syncCloudData();
 
@@ -241,7 +243,7 @@ export const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(intervalId);
     };
-  }, [syncCloudData]);
+  }, [currentUser, syncCloudData]);
 
   // Sync to localStorage
   useEffect(() => {

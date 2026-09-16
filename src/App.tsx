@@ -82,7 +82,18 @@ export const App: React.FC = () => {
   const [stores, setStores] = useState<MedicalStore[]>(() => {
     try {
       const saved = localStorage.getItem('animex_medical_stores');
-      return saved !== null ? JSON.parse(saved) : INITIAL_STORES;
+      const list = saved !== null ? JSON.parse(saved) : INITIAL_STORES;
+      if (Array.isArray(list)) {
+        const uniqueMap = new Map<string, MedicalStore>();
+        for (const s of list) {
+          const key = s.firmName?.trim().toLowerCase();
+          if (key && !uniqueMap.has(key)) {
+            uniqueMap.set(key, s);
+          }
+        }
+        return Array.from(uniqueMap.values());
+      }
+      return INITIAL_STORES;
     } catch {
       return INITIAL_STORES;
     }
@@ -107,17 +118,25 @@ export const App: React.FC = () => {
       // 1. Fetch stores from Neon DB (Cloud is master source of truth)
       const cloudStores = await fetchStoresFromBackend();
       if (cloudStores && Array.isArray(cloudStores)) {
+        const storeMap = new Map<string, MedicalStore>();
+        for (const s of cloudStores) {
+          const key = s.firmName?.trim().toLowerCase();
+          if (key && !storeMap.has(key)) {
+            storeMap.set(key, s);
+          }
+        }
+
         const currentStores = storesRef.current;
         // Only push genuinely new local offline stores (no UUID)
         const unsyncedStores = currentStores.filter(
           (ls) => !uuidRegex.test(ls.id) &&
-                  !cloudStores.some((cs) => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
+                  !storeMap.has(ls.firmName.trim().toLowerCase())
         );
 
         for (const unsynced of unsyncedStores) {
           const created = await syncStoreToBackend(unsynced);
           if (created && created.id) {
-            cloudStores.push({
+            const syncedStore: MedicalStore = {
               id: created.id,
               firmName: created.firm_name,
               contactName: created.contact_person_name || '',
@@ -125,11 +144,12 @@ export const App: React.FC = () => {
               district: created.district || 'Maharashtra',
               address: created.address || '',
               state: 'Maharashtra',
-            });
+            };
+            storeMap.set(syncedStore.firmName.trim().toLowerCase(), syncedStore);
           }
         }
 
-        setStores(cloudStores);
+        setStores(Array.from(storeMap.values()));
       }
 
       // 2. Fetch invoices from Neon DB (Cloud is master source of truth)
@@ -412,13 +432,47 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleAddStore = (newStore: MedicalStore) => {
-    setStores([newStore, ...stores]);
-    syncStoreToBackend(newStore).then(cloudStore => {
-      if (cloudStore && cloudStore.id && cloudStore.id !== newStore.id) {
-        setStores(prev => prev.map(s => s.id === newStore.id ? { ...s, id: cloudStore.id } : s));
+  const handleAddStore = async (newStore: MedicalStore) => {
+    const cleanName = newStore.firmName.trim().toLowerCase();
+    setStores(prev => {
+      if (prev.some(s => s.firmName.trim().toLowerCase() === cleanName)) {
+        return prev;
       }
+      return [newStore, ...prev];
     });
+
+    try {
+      const cloudStore = await syncStoreToBackend(newStore);
+      if (cloudStore && cloudStore.id) {
+        setStores(prev => {
+          const seen = new Set<string>();
+          const updatedList: MedicalStore[] = [];
+
+          for (const s of prev) {
+            const isMatch = s.id === newStore.id || s.firmName.trim().toLowerCase() === cleanName;
+            const item: MedicalStore = isMatch ? {
+              ...s,
+              id: cloudStore.id,
+              firmName: cloudStore.firm_name || s.firmName,
+              contactName: cloudStore.contact_person_name || s.contactName,
+              phone: cloudStore.phone_number || s.phone,
+              district: cloudStore.district || s.district,
+              address: cloudStore.address || s.address,
+              state: 'Maharashtra',
+            } : s;
+
+            const key = item.firmName.trim().toLowerCase();
+            if (!seen.has(key)) {
+              seen.add(key);
+              updatedList.push(item);
+            }
+          }
+          return updatedList;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync store to backend:', e);
+    }
   };
 
   const handleUpdateStore = (updatedStore: MedicalStore) => {

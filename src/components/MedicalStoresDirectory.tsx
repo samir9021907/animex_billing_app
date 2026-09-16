@@ -18,6 +18,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [editingStore, setEditingStore] = useState<MedicalStore | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
   const [firmName, setFirmName] = useState('');
@@ -36,6 +37,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setEmail('');
     setDistrict('Ahmednagar');
     setAddress('');
+    setIsSubmitting(false);
     setShowModal(true);
   };
 
@@ -56,35 +58,41 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     return s.firmName.toLowerCase().includes(q) || s.district.toLowerCase().includes(q) || s.phone.includes(q);
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (firmName && phone) {
-      if (editingStore) {
-        const updated: MedicalStore = {
-          ...editingStore,
-          firmName,
-          contactName,
-          phone,
-          email,
-          district,
-          state,
-          address
-        };
-        onUpdateStore(updated);
-      } else {
-        const created: MedicalStore = {
-          id: `store-${Date.now()}`,
-          firmName,
-          contactName,
-          phone,
-          email,
-          district,
-          state,
-          address
-        };
-        onAddStore(created);
+    if (isSubmitting) return;
+    if (firmName.trim() && phone.trim()) {
+      setIsSubmitting(true);
+      try {
+        if (editingStore) {
+          const updated: MedicalStore = {
+            ...editingStore,
+            firmName: firmName.trim(),
+            contactName: contactName.trim(),
+            phone: phone.trim(),
+            email: email.trim(),
+            district,
+            state,
+            address: address.trim()
+          };
+          await onUpdateStore(updated);
+        } else {
+          const created: MedicalStore = {
+            id: `store-${Date.now()}`,
+            firmName: firmName.trim(),
+            contactName: contactName.trim(),
+            phone: phone.trim(),
+            email: email.trim(),
+            district,
+            state,
+            address: address.trim()
+          };
+          await onAddStore(created);
+        }
+        setShowModal(false);
+      } finally {
+        setIsSubmitting(false);
       }
-      setShowModal(false);
     }
   };
 
@@ -290,9 +298,10 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="bg-animex-orange-500 hover:bg-animex-orange-600 text-white font-black px-5 py-2 rounded-xl text-xs shadow-md"
+                  disabled={isSubmitting}
+                  className="bg-animex-orange-500 hover:bg-animex-orange-600 disabled:opacity-50 text-white font-black px-5 py-2 rounded-xl text-xs shadow-md"
                 >
-                  {editingStore ? 'Save Store Changes' : 'Save Medical Store'}
+                  {isSubmitting ? 'Saving...' : (editingStore ? 'Save Store Changes' : 'Save Medical Store')}
                 </button>
               </div>
             </form>

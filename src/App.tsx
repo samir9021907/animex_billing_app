@@ -224,27 +224,38 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
 
+    let lastAutoSync = Date.now();
+
     // 1. Initial mount sync
     syncCloudData();
 
-    // 2. Tab / Window focus (switching back to app on laptop or phone)
+    // 2. Tab / Window focus (with 45-second cooldown to prevent repeated calls on DevTools/tab clicks)
     const handleFocus = () => {
-      syncCloudData();
+      const now = Date.now();
+      if (now - lastAutoSync > 45000) {
+        lastAutoSync = now;
+        syncCloudData();
+      }
     };
     window.addEventListener('focus', handleFocus);
 
     // 3. Screen visibility change (un-minimizing app on phone or laptop)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        syncCloudData();
+        const now = Date.now();
+        if (now - lastAutoSync > 45000) {
+          lastAutoSync = now;
+          syncCloudData();
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 4. Background auto-sync interval every 15 seconds
+    // 4. Gentle background auto-sync interval every 60 seconds (1 minute)
     const intervalId = setInterval(() => {
+      lastAutoSync = Date.now();
       syncCloudData();
-    }, 15000);
+    }, 60000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);

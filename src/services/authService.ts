@@ -190,6 +190,7 @@ export const authService = {
   // Save session to localStorage
   saveSession(token: string, user: UserSession) {
     try {
+      localStorage.removeItem('animex_explicit_logout');
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
     } catch {}
@@ -198,6 +199,9 @@ export const authService = {
   // Retrieve current logged in user
   getCurrentUser(): UserSession | null {
     try {
+      if (localStorage.getItem('animex_explicit_logout') === 'true') {
+        return null;
+      }
       const savedUser = localStorage.getItem(USER_KEY);
       const token = localStorage.getItem(TOKEN_KEY);
       if (savedUser && token) {
@@ -215,18 +219,31 @@ export const authService = {
         }
         return user;
       }
+
+      // Default auto-login for Animex billing app so new install immediately opens Dashboard!
+      const defaultUser: UserSession = {
+        id: PERMANENT_CLIENT_ID,
+        name: 'ANIMEX Animal Health Care',
+        email: 'admin@animex.com',
+        phone: '+91 9021907000',
+        city: 'Nashik',
+        clientId: PERMANENT_CLIENT_ID,
+      };
+      this.saveSession(PERMANENT_JWT_TOKEN, defaultUser);
+      return defaultUser;
     } catch {}
     return null;
   },
 
   // Retrieve current auth token
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY) || PERMANENT_JWT_TOKEN;
   },
 
   // Logout and clear session
   logout() {
     try {
+      localStorage.setItem('animex_explicit_logout', 'true');
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
     } catch {}

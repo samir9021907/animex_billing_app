@@ -18,7 +18,10 @@ import {
   syncStoreToBackend,
   deleteStoreFromBackend,
   fetchStoresFromBackend,
-  fetchInvoicesFromBackend
+  fetchInvoicesFromBackend,
+  fetchProductsFromBackend,
+  syncProductToBackend,
+  deleteProductFromBackend
 } from './utils/api';
 import { authService, UserSession } from './services/authService';
 
@@ -108,6 +111,8 @@ export const App: React.FC = () => {
   storesRef.current = stores;
   const invoicesRef = useRef(invoices);
   invoicesRef.current = invoices;
+  const productsRef = useRef(products);
+  productsRef.current = products;
 
   // ─── Bidirectional Cloud Neon Database Sync ─────────────────────────────────
   const syncCloudData = useCallback(async () => {
@@ -210,6 +215,45 @@ export const App: React.FC = () => {
         }
 
         setInvoices(cloudInvoices);
+      }
+
+      // 3. Fetch products from Neon DB (Cloud is master source of truth)
+      const cloudProducts = await fetchProductsFromBackend();
+      if (cloudProducts && Array.isArray(cloudProducts) && cloudProducts.length > 0) {
+        const prodMap = new Map<string, Product>();
+        for (const p of cloudProducts) {
+          const key = p.name?.trim().toLowerCase();
+          if (key && !prodMap.has(key)) {
+            prodMap.set(key, p);
+          }
+        }
+
+        const currentProducts = productsRef.current;
+        // Only push genuinely new local offline products (no UUID and not in cloud by name)
+        const unsyncedProducts = currentProducts.filter(
+          (lp) => !uuidRegex.test(lp.id) &&
+                  !prodMap.has(lp.name.trim().toLowerCase())
+        );
+
+        for (const unsynced of unsyncedProducts) {
+          const created = await syncProductToBackend(unsynced);
+          if (created && created.id) {
+            const syncedProduct: Product = {
+              id: created.id,
+              name: created.product_title || unsynced.name,
+              category: created.category?.category_name || unsynced.category || 'General',
+              defaultUnit: created.unit || unsynced.defaultUnit || 'Ltr',
+              defaultPrice: Number(created.selling_price ?? unsynced.defaultPrice ?? 0),
+              mrp: Number(created.mrp ?? unsynced.mrp ?? 0),
+              stockQuantity: Number(created.quantity ?? unsynced.stockQuantity ?? 100),
+              boxCapacity: Number(created.box_capacity ?? unsynced.boxCapacity ?? 50),
+              minStockAlert: Number(created.min_stock_alert ?? unsynced.minStockAlert ?? 50),
+            };
+            prodMap.set(syncedProduct.name.trim().toLowerCase(), syncedProduct);
+          }
+        }
+
+        setProducts(Array.from(prodMap.values()));
       }
 
       setLastSyncTime(new Date());
@@ -434,11 +478,13 @@ export const App: React.FC = () => {
       return prevProducts.map(prod => {
         if (prod.id !== productId) return prod;
         const currentStock = prod.stockQuantity ?? 0;
-        return {
+        const updated = {
           ...prod,
           stockQuantity: currentStock + totalAdded,
           boxCapacity: unitsPerBox > 1 ? unitsPerBox : (prod.boxCapacity || 1),
         };
+        syncProductToBackend(updated);
+        return updated;
       });
     });
   };
@@ -496,16 +542,59 @@ export const App: React.FC = () => {
     deleteStoreFromBackend(storeId);
   };
 
-  const handleAddProduct = (newProduct: Product) => {
-    setProducts([newProduct, ...products]);
+  const handleAddProduct = async (newProduct: Product) => {
+    const cleanName = newProduct.name.trim().toLowerCase();
+    setProducts(prev => {
+      if (prev.some(p => p.name.trim().toLowerCase() === cleanName)) {
+        return prev;
+      }
+      return [newProduct, ...prev];
+    });
+
+    try {
+      const cloudProd = await syncProductToBackend(newProduct);
+      if (cloudProd && cloudProd.id) {
+        setProducts(prev => {
+          const seen = new Set<string>();
+          const updatedList: Product[] = [];
+
+          for (const p of prev) {
+            const isMatch = p.id === newProduct.id || p.name.trim().toLowerCase() === cleanName;
+            const item: Product = isMatch ? {
+              ...p,
+              id: cloudProd.id,
+              name: cloudProd.product_title || p.name,
+              category: cloudProd.category?.category_name || p.category || 'General',
+              defaultUnit: cloudProd.unit || p.defaultUnit,
+              defaultPrice: Number(cloudProd.selling_price ?? p.defaultPrice),
+              mrp: Number(cloudProd.mrp ?? p.mrp ?? 0),
+              stockQuantity: Number(cloudProd.quantity ?? p.stockQuantity ?? 0),
+              boxCapacity: Number(cloudProd.box_capacity ?? p.boxCapacity ?? 50),
+              minStockAlert: Number(cloudProd.min_stock_alert ?? p.minStockAlert ?? 50),
+            } : p;
+
+            const key = item.name.trim().toLowerCase();
+            if (!seen.has(key)) {
+              seen.add(key);
+              updatedList.push(item);
+            }
+          }
+          return updatedList;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync product to backend:', e);
+    }
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
     setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    syncProductToBackend(updatedProduct);
   };
 
   const handleDeleteProduct = (productId: string) => {
     setProducts(products.filter(p => p.id !== productId));
+    deleteProductFromBackend(productId);
   };
 
   const handleLogout = () => {

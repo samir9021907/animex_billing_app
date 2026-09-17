@@ -240,3 +240,80 @@ export const deleteInvoiceFromBackend = async (id: string) => {
     console.warn('Backend delete failed, saved locally:', e);
   }
 };
+
+// ─── Fetch All Medical Products from Neon DB ──────────────────────────────────
+export const fetchProductsFromBackend = async (): Promise<any[]> => {
+  try {
+    const clientId = getClientId();
+    const res = await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products`, {
+      headers: getAuthHeaders(),
+    });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      return json.data.map((p: any) => ({
+        id: p.id,
+        name: p.product_title,
+        category: p.category?.category_name || 'General',
+        defaultUnit: p.unit || 'Ltr',
+        defaultPrice: Number(p.selling_price || 0),
+        mrp: Number(p.mrp || 0),
+        stockQuantity: Number(p.quantity ?? 100),
+        boxCapacity: Number(p.box_capacity ?? (p.product_title?.includes('25kg') ? 1 : 50)),
+        minStockAlert: Number(p.min_stock_alert ?? 50),
+      }));
+    }
+  } catch (e) {
+    console.warn('Failed to fetch products from cloud backend:', e);
+  }
+  return [];
+};
+
+// ─── Save / Sync Medical Product to Neon DB ───────────────────────────────────
+export const syncProductToBackend = async (product: any): Promise<any> => {
+  try {
+    const clientId = getClientId();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isExistingUuid = Boolean(product.id && uuidRegex.test(product.id));
+    const url = isExistingUuid
+      ? `${API_BASE}/medical-product/client/${clientId}/medical-products/${product.id}`
+      : `${API_BASE}/medical-product/client/${clientId}/medical-products`;
+    const method = isExistingUuid ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        product_title: product.name,
+        category_name: product.category || 'General',
+        unit: product.defaultUnit || 'Ltr',
+        selling_price: Number(product.defaultPrice || 0),
+        mrp: Number(product.mrp || 0),
+        quantity: Number(product.stockQuantity ?? 0),
+        box_capacity: Number(product.boxCapacity ?? 50),
+        min_stock_alert: Number(product.minStockAlert ?? 50),
+        status: true,
+      }),
+    });
+    const json = await res.json();
+    if (json.success && json.data) {
+      return json.data;
+    }
+  } catch (e) {
+    console.warn('Product sync failed, saved locally:', e);
+  }
+  return null;
+};
+
+// ─── Delete Medical Product from Neon DB ──────────────────────────────────────
+export const deleteProductFromBackend = async (id: string) => {
+  try {
+    const clientId = getClientId();
+    await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+  } catch (e) {
+    console.warn('Product delete failed, saved locally:', e);
+  }
+};
+

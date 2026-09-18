@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   Clock,
   Boxes,
+  AlertCircle,
 } from 'lucide-react';
 import { Product, PurchaseInvoice, PurchaseItem } from '../types';
 import { useLanguage } from '../context/LanguageContext';
+import { cleanPhoneNumber, validatePhone, validateName } from '../utils/validators';
 
 interface PurchasesManagerProps {
   purchases: PurchaseInvoice[];
@@ -37,6 +39,7 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
   // New Purchase Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [previewPurchase, setPreviewPurchase] = useState<PurchaseInvoice | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states
   const [billNo, setBillNo] = useState(`MFG-${Math.floor(100 + Math.random() * 900)}`);
@@ -191,14 +194,48 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!supplierName.trim()) {
-      alert('कृपया मॅन्युफॅक्चरर / सप्लायर कंपनीचे नाव टाका.');
+    // 1. Validate Supplier Name
+    const suppErr = validateName(supplierName, 'सप्लायर / कंपनीचे नाव (Supplier Name)', 2);
+    if (suppErr) {
+      setFormError(suppErr);
       return;
     }
-    if (!billNo.trim()) {
-      alert('कृपया खरेदी बिल नंबर टाका.');
+
+    // 2. Validate Bill No
+    const billErr = validateName(billNo, 'खरेदी बिल नंबर (Bill No)', 2);
+    if (billErr) {
+      setFormError(billErr);
       return;
     }
+
+    // 3. Validate Supplier Phone if entered (must be 10 digits starting with 6-9)
+    if (supplierPhone && supplierPhone.trim()) {
+      const phoneErr = validatePhone(supplierPhone, 'सप्लायर फोन नंबर (Phone)', false);
+      if (phoneErr) {
+        setFormError(phoneErr);
+        return;
+      }
+    }
+
+    // 4. Validate items
+    if (!items || items.length === 0) {
+      setFormError('किमान एक औषध (Medicine Item) जोडणे आवश्यक आहे.');
+      return;
+    }
+
+    for (const it of items) {
+      const totalUnits = (Number(it.boxes) || 0) * (Number(it.unitsPerBox) || 0) + (Number(it.looseUnits) || 0);
+      if (totalUnits <= 0) {
+        setFormError(`'${it.productName || 'Item'}' साठी संख्या (नग / बॉक्सेस) ० पेक्षा जास्त असावी.`);
+        return;
+      }
+      if (Number(it.costPerUnit) <= 0) {
+        setFormError(`'${it.productName || 'Item'}' साठी खरेदी दर (Cost per Unit) ० पेक्षा जास्त असावा.`);
+        return;
+      }
+    }
+
+    setFormError(null);
 
     const newCreatedProducts: Product[] = [];
 
@@ -628,6 +665,13 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs font-bold">
+              {formError && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               {/* Manufacturer / Supplier Information */}
               <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
                 <div className="text-[11px] uppercase font-black text-slate-500">
@@ -644,7 +688,10 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                       required
                       placeholder={t('pur.supplierNamePlaceholder')}
                       value={supplierName}
-                      onChange={(e) => setSupplierName(e.target.value)}
+                      onChange={(e) => {
+                        setSupplierName(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
                     />
                   </div>
@@ -658,7 +705,10 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                       required
                       placeholder="e.g. MFG-884"
                       value={billNo}
-                      onChange={(e) => setBillNo(e.target.value)}
+                      onChange={(e) => {
+                        setBillNo(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 font-mono text-slate-900 dark:text-white"
                     />
                   </div>
@@ -686,13 +736,23 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 mb-1">{t('pur.phone')} / {t('pur.gstin')}</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-slate-700 dark:text-slate-300">{t('pur.phone')}</label>
+                      <span className={`text-[10px] font-mono font-bold ${supplierPhone.length === 10 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                        {supplierPhone.length}/10 {supplierPhone.length === 10 ? '✓' : ''}
+                      </span>
+                    </div>
                     <input
-                      type="text"
-                      placeholder="e.g. 9822334455 / 24AAACA1234F1Z5"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      placeholder="उदा. 9822334455 (10 अंक)"
                       value={supplierPhone}
-                      onChange={(e) => setSupplierPhone(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
+                      onChange={(e) => {
+                        setSupplierPhone(cleanPhoneNumber(e.target.value));
+                        if (formError) setFormError(null);
+                      }}
+                      className={`w-full bg-white dark:bg-slate-900 border ${supplierPhone.length === 10 ? 'border-emerald-500' : 'border-slate-300 dark:border-slate-700'} rounded-xl p-2.5 text-slate-900 dark:text-white font-mono`}
                     />
                   </div>
                 </div>

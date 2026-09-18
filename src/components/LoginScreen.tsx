@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { authService, UserSession } from '../services/authService';
+import { cleanPhoneNumber, validatePhone, validateName } from '../utils/validators';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserSession) => void;
@@ -162,8 +163,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   // Handle Client Sign Up
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName.trim()) {
-      setErrorMessage('Client / Firm Name is required');
+    const nameErr = validateName(clientName, 'Client / Firm Name', 2);
+    if (nameErr) {
+      setErrorMessage(nameErr);
       return;
     }
     if (!signupEmail.trim()) {
@@ -174,8 +176,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setErrorMessage('Please enter a valid email address');
       return;
     }
-    if (!signupPhone.trim()) {
-      setErrorMessage('Phone Number is required');
+    const phoneErr = validatePhone(signupPhone, 'Phone Number');
+    if (phoneErr) {
+      setErrorMessage(phoneErr);
       return;
     }
     if (!agreeTerms) {
@@ -420,11 +423,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <Phone className="w-3.5 h-3.5" />
                     </div>
                     <input
-                      type="text"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       value={otpPhone}
-                      onChange={(e) => setOtpPhone(e.target.value)}
-                      placeholder="+91 98XXXXXX89"
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-[#FF7A00]"
+                      onChange={(e) => setOtpPhone(cleanPhoneNumber(e.target.value))}
+                      placeholder="98XXXXXX89 (10 digits)"
+                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-[#FF7A00] font-mono"
                     />
                   </div>
                 </div>
@@ -559,21 +564,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
                   {/* Phone Number */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Phone Number *
-                    </label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Phone Number *
+                      </label>
+                      <span className={`text-[10px] font-mono font-bold ${signupPhone.length === 10 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {signupPhone.length}/10 {signupPhone.length === 10 ? '✓' : ''}
+                      </span>
+                    </div>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Phone className="w-4 h-4" />
                       </div>
                       <input
                         type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
                         required
                         disabled={isLoading}
                         value={signupPhone}
-                        onChange={(e) => setSignupPhone(e.target.value)}
-                        placeholder="e.g. +91 98765 43210"
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-sm text-[#132238] font-medium placeholder-slate-400 focus:outline-none focus:border-[#FF7A00] focus:ring-2 focus:ring-[#FF7A00]/20 focus:bg-white transition-all"
+                        onChange={(e) => {
+                          setSignupPhone(cleanPhoneNumber(e.target.value));
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        placeholder="e.g. 9876543210 (10 digits)"
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl text-sm text-[#132238] font-medium placeholder-slate-400 focus:outline-none focus:border-[#FF7A00] focus:ring-2 focus:ring-[#FF7A00]/20 focus:bg-white transition-all font-mono"
                       />
                     </div>
                   </div>

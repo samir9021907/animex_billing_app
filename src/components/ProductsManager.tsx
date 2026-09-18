@@ -10,9 +10,11 @@ import {
   ArrowDownToLine,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Layers,
   X,
 } from 'lucide-react';
+import { validateName } from '../utils/validators';
 
 interface ProductsManagerProps {
   products: Product[];
@@ -33,6 +35,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [showLowStockModal, setShowLowStockModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Stock Inward Modal State
   const [showInwardModal, setShowInwardModal] = useState(false);
@@ -65,6 +68,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setBoxCapacity(50);
     setStockQuantity(500);
     setMinStockAlert(50);
+    setFormError(null);
     setShowModal(true);
   };
 
@@ -80,6 +84,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setBoxCapacity(isLoose ? 1 : (p.boxCapacity || 50));
     setStockQuantity(p.stockQuantity ?? 0);
     setMinStockAlert(p.minStockAlert || 50);
+    setFormError(null);
     setShowModal(true);
   };
 
@@ -104,36 +109,79 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && defaultPrice) {
-      if (editingProduct) {
-        const updated: Product = {
-          ...editingProduct,
-          name,
-          category,
-          defaultUnit,
-          mrp,
-          defaultPrice,
-          boxCapacity: isLoosePackaging ? 1 : (Number(boxCapacity) || 50),
-          stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-          minStockAlert: Number(minStockAlert) || 50,
-        };
-        onUpdateProduct(updated);
-      } else {
-        const created: Product = {
-          id: `p-${Date.now()}`,
-          name,
-          category,
-          defaultUnit,
-          mrp,
-          defaultPrice,
-          boxCapacity: isLoosePackaging ? 1 : (Number(boxCapacity) || 50),
-          stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-          minStockAlert: Number(minStockAlert) || 50,
-        };
-        onAddProduct(created);
-      }
-      setShowModal(false);
+
+    // 1. Validate Product Title
+    const nameErr = validateName(name, 'प्रॉडक्टचे नाव (Product Title)', 2);
+    if (nameErr) {
+      setFormError(nameErr);
+      return;
     }
+
+    // Duplicate check (case-insensitive)
+    const clean = name.trim().toLowerCase();
+    const isDuplicate = products.some(p => 
+      p.name.trim().toLowerCase() === clean && (!editingProduct || p.id !== editingProduct.id)
+    );
+    if (isDuplicate) {
+      setFormError(`'${name.trim()}' नावाचे प्रॉडक्ट आधीपासून अस्तित्वात आहे. कृपया वेगळे नाव द्या.`);
+      return;
+    }
+
+    // 2. Validate Selling Price
+    if (!defaultPrice || Number(defaultPrice) <= 0) {
+      setFormError('विक्री किंमत (Selling Price) ० पेक्षा जास्त असणे आवश्यक आहे.');
+      return;
+    }
+
+    // 3. Validate MRP vs Selling Price
+    if (mrp && Number(mrp) > 0 && Number(mrp) < Number(defaultPrice)) {
+      setFormError('MRP ही विक्री किंमतीपेक्षा (Selling Price) कमी असू शकत नाही.');
+      return;
+    }
+
+    // 4. Validate Box Capacity
+    const finalBoxCap = isLoosePackaging ? 1 : (Number(boxCapacity) || 1);
+    if (finalBoxCap < 1) {
+      setFormError('खोक्यात प्रमाण (Box Capacity) किमान १ असावे.');
+      return;
+    }
+
+    // 5. Validate Stock Quantity
+    if (Number(stockQuantity) < 0) {
+      setFormError('स्टॉक संख्या (Stock Quantity) निगेटिव्ह असू शकत नाही.');
+      return;
+    }
+
+    setFormError(null);
+
+    if (editingProduct) {
+      const updated: Product = {
+        ...editingProduct,
+        name: name.trim(),
+        category,
+        defaultUnit,
+        mrp: Number(mrp) || 0,
+        defaultPrice: Number(defaultPrice),
+        boxCapacity: finalBoxCap,
+        stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
+        minStockAlert: Number(minStockAlert) || 50,
+      };
+      onUpdateProduct(updated);
+    } else {
+      const created: Product = {
+        id: `p-${Date.now()}`,
+        name: name.trim(),
+        category,
+        defaultUnit,
+        mrp: Number(mrp) || 0,
+        defaultPrice: Number(defaultPrice),
+        boxCapacity: finalBoxCap,
+        stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
+        minStockAlert: Number(minStockAlert) || 50,
+      };
+      onAddProduct(created);
+    }
+    setShowModal(false);
   };
 
   const handleConfirmInward = (e: React.FormEvent) => {
@@ -659,6 +707,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3 text-xs font-bold">
+              {formError && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">Product Title *</label>
                 <input
@@ -666,7 +721,10 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   required
                   placeholder="e.g. Calcimex Gel Advance (300ml)"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
                 />
               </div>

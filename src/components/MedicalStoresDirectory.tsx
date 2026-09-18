@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MedicalStore } from '../types';
-import { Store, Plus, Phone, MapPin, Search, Edit2, Trash2 } from 'lucide-react';
+import { Store, Plus, Phone, MapPin, Search, Edit2, Trash2, AlertCircle } from 'lucide-react';
+import { cleanPhoneNumber, validatePhone, validateName } from '../utils/validators';
 
 interface MedicalStoresDirectoryProps {
   stores: MedicalStore[];
@@ -19,6 +20,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   const [editingStore, setEditingStore] = useState<MedicalStore | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states
   const [firmName, setFirmName] = useState('');
@@ -37,6 +39,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setEmail('');
     setDistrict('Ahmednagar');
     setAddress('');
+    setFormError(null);
     setIsSubmitting(false);
     setShowModal(true);
   };
@@ -49,6 +52,8 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setEmail(st.email || '');
     setDistrict(st.district || 'Ahmednagar');
     setAddress(st.address || '');
+    setFormError(null);
+    setIsSubmitting(false);
     setShowModal(true);
   };
 
@@ -61,38 +66,68 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (firmName.trim() && phone.trim()) {
-      setIsSubmitting(true);
-      try {
-        if (editingStore) {
-          const updated: MedicalStore = {
-            ...editingStore,
-            firmName: firmName.trim(),
-            contactName: contactName.trim(),
-            phone: phone.trim(),
-            email: email.trim(),
-            district,
-            state,
-            address: address.trim()
-          };
-          await onUpdateStore(updated);
-        } else {
-          const created: MedicalStore = {
-            id: `store-${Date.now()}`,
-            firmName: firmName.trim(),
-            contactName: contactName.trim(),
-            phone: phone.trim(),
-            email: email.trim(),
-            district,
-            state,
-            address: address.trim()
-          };
-          await onAddStore(created);
-        }
-        setShowModal(false);
-      } finally {
-        setIsSubmitting(false);
+
+    // 1. Validate Firm Name
+    const firmNameErr = validateName(firmName, 'मेडिकल स्टोअरचे नाव (Firm Name)', 2);
+    if (firmNameErr) {
+      setFormError(firmNameErr);
+      return;
+    }
+
+    // Duplicate check for firm name
+    const cleanFirm = firmName.trim().toLowerCase();
+    const isDuplicate = stores.some(s => 
+      s.firmName.trim().toLowerCase() === cleanFirm && (!editingStore || s.id !== editingStore.id)
+    );
+    if (isDuplicate) {
+      setFormError(`'${firmName.trim()}' नावाचे मेडिकल स्टोअर आधीपासून जोडलेले आहे. कृपया वेगळे नाव द्या.`);
+      return;
+    }
+
+    // 2. Validate Phone (must be strictly 10 digits starting with 6, 7, 8, 9)
+    const phoneErr = validatePhone(phone, 'मोबाईल नंबर (Phone Number)');
+    if (phoneErr) {
+      setFormError(phoneErr);
+      return;
+    }
+
+    // 3. Validate Contact Person (if entered)
+    if (contactName.trim() && contactName.trim().length < 2) {
+      setFormError('कॉन्टॅक्ट पर्सनचे नाव किमान २ अक्षरांचे असणे आवश्यक आहे.');
+      return;
+    }
+
+    setFormError(null);
+    setIsSubmitting(true);
+    try {
+      if (editingStore) {
+        const updated: MedicalStore = {
+          ...editingStore,
+          firmName: firmName.trim(),
+          contactName: contactName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          district,
+          state,
+          address: address.trim()
+        };
+        await onUpdateStore(updated);
+      } else {
+        const created: MedicalStore = {
+          id: `store-${Date.now()}`,
+          firmName: firmName.trim(),
+          contactName: contactName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          district,
+          state,
+          address: address.trim()
+        };
+        await onAddStore(created);
       }
+      setShowModal(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -231,6 +266,13 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3 text-xs font-bold">
+              {formError && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">Firm Name (Medical Store Name) *</label>
                 <input
@@ -238,7 +280,10 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                   required
                   placeholder="e.g. Sai Balaji Medical"
                   value={firmName}
-                  onChange={(e) => setFirmName(e.target.value)}
+                  onChange={(e) => {
+                    setFirmName(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
                 />
               </div>
@@ -249,21 +294,34 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                   type="text"
                   placeholder="e.g. Ramdas Patil"
                   value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
+                  onChange={(e) => {
+                    setContactName(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">Phone Number *</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-slate-700 dark:text-slate-300">Phone Number *</label>
+                    <span className={`text-[10px] font-mono font-bold ${phone.length === 10 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                      {phone.length}/10 {phone.length === 10 ? '✓' : ''}
+                    </span>
+                  </div>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     required
-                    placeholder="e.g. 9822012345"
+                    placeholder="उदा. 9822012345"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
+                    onChange={(e) => {
+                      setPhone(cleanPhoneNumber(e.target.value));
+                      if (formError) setFormError(null);
+                    }}
+                    className={`w-full bg-slate-50 dark:bg-slate-800 border ${phone.length === 10 ? 'border-emerald-500 dark:border-emerald-600' : 'border-slate-300 dark:border-slate-700'} rounded-xl p-2.5 text-slate-900 dark:text-white font-mono tracking-wider`}
                   />
                 </div>
                 <div>

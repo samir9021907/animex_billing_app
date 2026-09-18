@@ -17,9 +17,11 @@ import {
   Receipt,
   Smartphone,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { CompanyProfile } from '../types';
 import { UserSession } from '../services/authService';
+import { cleanPhoneNumber, validatePhone, validateName, cleanPincode, isValidPincode, cleanGstin } from '../utils/validators';
 
 interface ProfileManagerProps {
   user: UserSession | null;
@@ -73,9 +75,29 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [formData, setFormData] = useState<CompanyProfile>(profile);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const nameErr = validateName(formData.companyName, 'Company Name', 2);
+    if (nameErr) {
+      setFormError(nameErr);
+      return;
+    }
+
+    const phoneErr = validatePhone(formData.phone, 'Phone Number');
+    if (phoneErr) {
+      setFormError(phoneErr);
+      return;
+    }
+
+    if (formData.pincode && !isValidPincode(formData.pincode)) {
+      setFormError('Pincode must be exactly 6 digits (६ अंकी पिनकोड आवश्यक आहे)');
+      return;
+    }
+
+    setFormError(null);
     setProfile(formData);
     try {
       localStorage.setItem('animex_company_profile', JSON.stringify(formData));
@@ -293,13 +315,23 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             </div>
 
             <form onSubmit={handleSave} className="space-y-4 mt-4">
+              {formError && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Company Legal Name</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Company Legal Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.companyName}
-                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, companyName: e.target.value });
+                    if (formError) setFormError(null);
+                  }}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none"
                 />
               </div>
@@ -320,17 +352,32 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   <input
                     type="text"
                     value={formData.contactPerson}
-                    onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, contactPerson: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number *</label>
+                    <span className={`text-[10px] font-mono font-bold ${formData.phone.length === 10 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {formData.phone.length}/10 {formData.phone.length === 10 ? '✓' : ''}
+                    </span>
+                  </div>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    required
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none"
+                    onChange={(e) => {
+                      setFormData({ ...formData, phone: cleanPhoneNumber(e.target.value) });
+                      if (formError) setFormError(null);
+                    }}
+                    placeholder="e.g. 9822012345 (10 digits)"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none font-mono"
                   />
                 </div>
               </div>
@@ -340,9 +387,10 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">GSTIN</label>
                   <input
                     type="text"
+                    maxLength={15}
                     value={formData.gstin}
-                    onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-animex-orange-500 outline-none"
+                    onChange={(e) => setFormData({ ...formData, gstin: cleanGstin(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-animex-orange-500 outline-none uppercase"
                   />
                 </div>
                 <div>
@@ -361,6 +409,23 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">PIN Code</label>
+                    <span className={`text-[10px] font-mono font-bold ${formData.pincode?.length === 6 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {formData.pincode?.length || 0}/6 {formData.pincode?.length === 6 ? '✓' : ''}
+                    </span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={formData.pincode || ''}
+                    onChange={(e) => setFormData({ ...formData, pincode: cleanPincode(e.target.value) })}
+                    placeholder="e.g. 423601"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-animex-orange-500 outline-none"
                   />
                 </div>
               </div>

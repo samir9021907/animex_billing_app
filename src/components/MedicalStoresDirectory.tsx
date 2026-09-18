@@ -27,7 +27,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [district, setDistrict] = useState('Ahmednagar');
+  const [district, setDistrict] = useState('');
   const [state] = useState('Maharashtra');
   const [address, setAddress] = useState('');
 
@@ -37,7 +37,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setContactName('');
     setPhone('');
     setEmail('');
-    setDistrict('Ahmednagar');
+    setDistrict('');
     setAddress('');
     setFormError(null);
     setIsSubmitting(false);
@@ -50,7 +50,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setContactName(st.contactName || '');
     setPhone(st.phone || '');
     setEmail(st.email || '');
-    setDistrict(st.district || 'Ahmednagar');
+    setDistrict(st.district || '');
     setAddress(st.address || '');
     setFormError(null);
     setIsSubmitting(false);
@@ -107,7 +107,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
           contactName: contactName.trim(),
           phone: phone.trim(),
           email: email.trim(),
-          district,
+          district: district.trim(),
           state,
           address: address.trim()
         };
@@ -119,7 +119,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
           contactName: contactName.trim(),
           phone: phone.trim(),
           email: email.trim(),
-          district,
+          district: district.trim(),
           state,
           address: address.trim()
         };

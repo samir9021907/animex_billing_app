@@ -278,7 +278,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Sai Balaji Medical"
+                  placeholder="Medical Name"
                   value={firmName}
                   onChange={(e) => {
                     setFirmName(e.target.value);
@@ -292,7 +292,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">Contact Person Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Ramdas Patil"
+                  placeholder="Person Name"
                   value={contactName}
                   onChange={(e) => {
                     setContactName(e.target.value);
@@ -304,30 +304,26 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-700 dark:text-slate-300">Phone Number *</label>
-                    <span className={`text-[10px] font-mono font-bold ${phone.length === 10 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                      {phone.length}/10 {phone.length === 10 ? '✓' : ''}
-                    </span>
-                  </div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1">Phone Number *</label>
                   <input
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
                     required
-                    placeholder="उदा. 9822012345"
+                    placeholder="Phone Number"
                     value={phone}
                     onChange={(e) => {
                       setPhone(cleanPhoneNumber(e.target.value));
                       if (formError) setFormError(null);
                     }}
-                    className={`w-full bg-slate-50 dark:bg-slate-800 border ${phone.length === 10 ? 'border-emerald-500 dark:border-emerald-600' : 'border-slate-300 dark:border-slate-700'} rounded-xl p-2.5 text-slate-900 dark:text-white font-mono tracking-wider`}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">District</label>
                   <input
                     type="text"
+                    placeholder="District"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
@@ -339,7 +335,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">Address</label>
                 <textarea
                   rows={2}
-                  placeholder="Full shop address..."
+                  placeholder="Address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"

@@ -719,7 +719,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Calcimex Gel Advance (300ml)"
+                  placeholder="Product Name"
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);

@@ -360,12 +360,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number *</label>
-                    <span className={`text-[10px] font-mono font-bold ${formData.phone.length === 10 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {formData.phone.length}/10 {formData.phone.length === 10 ? '✓' : ''}
-                    </span>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number *</label>
                   <input
                     type="tel"
                     inputMode="numeric"
@@ -376,7 +371,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                       setFormData({ ...formData, phone: cleanPhoneNumber(e.target.value) });
                       if (formError) setFormError(null);
                     }}
-                    placeholder="e.g. 9822012345 (10 digits)"
+                    placeholder="Phone Number"
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-animex-orange-500 outline-none font-mono"
                   />
                 </div>
@@ -412,19 +407,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-bold text-slate-700 uppercase">PIN Code</label>
-                    <span className={`text-[10px] font-mono font-bold ${formData.pincode?.length === 6 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {formData.pincode?.length || 0}/6 {formData.pincode?.length === 6 ? '✓' : ''}
-                    </span>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">PIN Code</label>
                   <input
                     type="tel"
                     inputMode="numeric"
                     maxLength={6}
                     value={formData.pincode || ''}
                     onChange={(e) => setFormData({ ...formData, pincode: cleanPincode(e.target.value) })}
-                    placeholder="e.g. 423601"
+                    placeholder="PIN Code"
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-animex-orange-500 outline-none"
                   />
                 </div>

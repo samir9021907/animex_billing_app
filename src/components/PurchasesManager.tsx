@@ -703,7 +703,7 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                     <input
                       type="text"
                       required
-                      placeholder="e.g. MFG-884"
+                      placeholder="Bill Number"
                       value={billNo}
                       onChange={(e) => {
                         setBillNo(e.target.value);
@@ -729,30 +729,25 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                     <label className="block text-slate-700 dark:text-slate-300 mb-1">{t('pur.city')}</label>
                     <input
                       type="text"
-                      placeholder="e.g. Ahmedabad, Gujarat"
+                      placeholder="City"
                       value={supplierCity}
                       onChange={(e) => setSupplierCity(e.target.value)}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-slate-700 dark:text-slate-300">{t('pur.phone')}</label>
-                      <span className={`text-[10px] font-mono font-bold ${supplierPhone.length === 10 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                        {supplierPhone.length}/10 {supplierPhone.length === 10 ? '✓' : ''}
-                      </span>
-                    </div>
+                    <label className="block text-slate-700 dark:text-slate-300 mb-1">{t('pur.phone')}</label>
                     <input
                       type="tel"
                       inputMode="numeric"
                       maxLength={10}
-                      placeholder="उदा. 9822334455 (10 अंक)"
+                      placeholder="Phone Number"
                       value={supplierPhone}
                       onChange={(e) => {
                         setSupplierPhone(cleanPhoneNumber(e.target.value));
                         if (formError) setFormError(null);
                       }}
-                      className={`w-full bg-white dark:bg-slate-900 border ${supplierPhone.length === 10 ? 'border-emerald-500' : 'border-slate-300 dark:border-slate-700'} rounded-xl p-2.5 text-slate-900 dark:text-white font-mono`}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-mono"
                     />
                   </div>
                 </div>

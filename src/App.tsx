@@ -629,7 +629,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main View Router */}
-      <main className="flex-grow p-4 sm:p-6 md:p-8">
+      <main className="flex-grow p-4 sm:p-6 md:p-8 pb-20 lg:pb-8">
         {activeTab === 'dashboard' && (
           <DashboardView
             invoices={invoices}
@@ -715,7 +715,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Footer */}
-      <footer className="bg-animex-blue-900 text-slate-300 py-4 text-center text-xs font-semibold border-t border-slate-800">
+      <footer className="bg-animex-blue-900 text-slate-300 py-4 text-center text-xs font-semibold border-t border-slate-800 mb-16 lg:mb-0">
         ANIMEX ANIMAL HEALTH CARE PRIVATE LIMITED • Kopargaon, Ahmednagar • Helpline: 9307990811 / 8999323908
       </footer>
 

@@ -415,8 +415,11 @@ export const App: React.FC = () => {
     // 2. Automatic stock deduction for each billed product & check low stock
     const newlyLowStock: string[] = [];
     setProducts(prevProducts => {
-      return prevProducts.map(prod => {
-        const billedItems = finalInvoice.items.filter(item => item.productId === prod.id);
+      const updatedProducts = prevProducts.map(prod => {
+        const billedItems = finalInvoice.items.filter(item => 
+          (item.productId && item.productId === prod.id) ||
+          (item.itemName && prod.name && item.itemName.trim().toLowerCase() === prod.name.trim().toLowerCase())
+        );
         if (billedItems.length === 0) return prod;
 
         const totalBilledQty = billedItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -428,11 +431,15 @@ export const App: React.FC = () => {
           newlyLowStock.push(`• ${prod.name}: Only ${newStock} ${prod.defaultUnit} left (Alert Limit: ${limit} ${prod.defaultUnit})`);
         }
 
-        return {
+        const updatedProd = {
           ...prod,
           stockQuantity: newStock,
         };
+        // Also sync updated stock to cloud backend
+        syncProductToBackend(updatedProd).catch(e => console.warn('Product stock sync err:', e));
+        return updatedProd;
       });
+      return updatedProducts;
     });
 
     if (newlyLowStock.length > 0) {
@@ -447,28 +454,47 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDeleteInvoice = (invoiceId: string) => {
+  const handleDeleteInvoice = async (invoiceId: string) => {
     const invToDelete = invoices.find(inv => inv.id === invoiceId);
-    if (window.confirm('Are you sure you want to delete this bill from history?')) {
-      setInvoices(invoices.filter(inv => inv.id !== invoiceId));
-      deleteInvoiceFromBackend(invoiceId);
-
-      // Automatic stock restoration back to products
-      if (invToDelete) {
-        setProducts(prevProducts => {
-          return prevProducts.map(prod => {
-            const restoredItems = invToDelete.items.filter(item => item.productId === prod.id);
-            if (restoredItems.length === 0) return prod;
-
-            const totalRestoredQty = restoredItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-            return {
-              ...prod,
-              stockQuantity: (prod.stockQuantity ?? 0) + totalRestoredQty,
-            };
-          });
-        });
-      }
+    if (!window.confirm('Are you sure you want to delete this bill from history?\n(हे बिल डिलीट करायचे आहे का? या बिलातील सर्व प्रॉडक्ट्सचा स्टॉक पुन्हा गोडाऊनमध्ये जमा होईल.)')) {
+      return;
     }
+
+    // 1. Remove from invoices state
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+
+    // 2. Automatic stock restoration back to products
+    if (invToDelete && Array.isArray(invToDelete.items)) {
+      setProducts(prevProducts => {
+        const updatedProducts = prevProducts.map(prod => {
+          const restoredItems = invToDelete.items.filter(item => 
+            (item.productId && item.productId === prod.id) ||
+            (item.itemName && prod.name && item.itemName.trim().toLowerCase() === prod.name.trim().toLowerCase())
+          );
+          if (restoredItems.length === 0) return prod;
+
+          const totalRestoredQty = restoredItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+          const newQty = (prod.stockQuantity ?? 0) + totalRestoredQty;
+          const updatedProd = {
+            ...prod,
+            stockQuantity: newQty,
+          };
+          // Sync restored product stock to cloud backend immediately
+          syncProductToBackend(updatedProd).catch(e => console.warn('Stock restore sync err:', e));
+          return updatedProd;
+        });
+
+        return updatedProducts;
+      });
+    }
+
+    // 3. Delete invoice from cloud backend (backend also restores stock in database)
+    await deleteInvoiceFromBackend(invoiceId);
+
+    // 4. Background refresh cloud data to stay in sync
+    setTimeout(() => {
+      syncCloudData();
+    }, 1500);
   };
 
   // Add inward stock entry (Boxes * UnitsPerBox + LooseUnits)

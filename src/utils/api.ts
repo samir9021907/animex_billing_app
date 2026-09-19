@@ -68,7 +68,7 @@ export const fetchInvoicesFromBackend = async (): Promise<any[]> => {
         const rawItems = Array.isArray(inv.items) ? inv.items : [];
         const items = rawItems.map((it: any, idx: number) => ({
           id: `item-${idx}-${Date.now()}`,
-          productId: it.productId || `p-${idx}`,
+          productId: it.productId || it.product_id || '',
           itemName: it.product_title || it.itemName || 'Product',
           quantity: Number(it.quantity || 1),
           unit: it.unit || 'Ltr',
@@ -168,6 +168,8 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     const itemsPayload = (invoice.items || []).map((item: any) => ({
+      product_id: item.productId || undefined,
+      productId: item.productId || undefined,
       product_title: item.itemName || item.name,
       quantity: Number(item.quantity || 1),
       unit: item.unit || 'Ltr',

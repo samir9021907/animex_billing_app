@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Invoice, BillStatus } from '../types';
-import { FileText, Eye, Search, Calendar, Store, Trash2, Printer, Share2, Filter } from 'lucide-react';
+import { FileText, Eye, Search, Calendar, Store, Trash2, Printer, Share2, Filter, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { formatInvoiceNumber, getStatusBadgeConfig } from '../utils/invoiceUtils';
 
 interface InvoiceHistoryProps {
@@ -18,7 +18,32 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
+  const [storeFilter, setStoreFilter] = useState<string>('ALL');
+  const [paymentModeFilter, setPaymentModeFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<string>('');
+  const [showFilterPanel, setShowFilterPanel] = useState<boolean>(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const uniqueStores = Array.from(
+    new Set(
+      invoices
+        .map(inv => inv.billTo?.firmName?.trim())
+        .filter((name): name is string => Boolean(name))
+    )
+  ).sort();
+
+  const handleResetAllFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    setStoreFilter('ALL');
+    setPaymentModeFilter('ALL');
+    setDateFilter('');
+  };
+
+  const activeAdvancedCount = 
+    (storeFilter !== 'ALL' ? 1 : 0) +
+    (paymentModeFilter !== 'ALL' ? 1 : 0) +
+    (dateFilter ? 1 : 0);
 
   const getResolvedStatus = (inv: Invoice): BillStatus => {
     if (inv.status) {
@@ -42,6 +67,19 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
       if (statusFilter !== 'ALL' && status !== statusFilter) {
         return false;
       }
+      if (storeFilter !== 'ALL' && (inv.billTo?.firmName?.trim() !== storeFilter)) {
+        return false;
+      }
+      if (paymentModeFilter !== 'ALL' && (inv.paymentType?.trim() !== paymentModeFilter)) {
+        return false;
+      }
+      if (dateFilter) {
+        const invDate = inv.date || '';
+        const reversedDate = invDate.split('-').reverse().join('-');
+        if (!invDate.includes(dateFilter) && !reversedDate.includes(dateFilter)) {
+          return false;
+        }
+      }
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       const globalIdStr = (inv.globalBillId || '').toString();
@@ -50,7 +88,8 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
       const matchFirm = (inv.billTo?.firmName || '').toLowerCase().includes(q);
       const matchContact = (inv.billTo?.contactName || '').toLowerCase().includes(q);
       const matchDate = (inv.date || '').includes(q);
-      return globalIdStr.includes(q) || numStr.includes(q) || codeStr.includes(q) || matchFirm || matchContact || matchDate;
+      const matchPayment = (inv.paymentType || '').toLowerCase().includes(q);
+      return globalIdStr.includes(q) || numStr.includes(q) || codeStr.includes(q) || matchFirm || matchContact || matchDate || matchPayment;
     })
     .sort((a, b) => {
       const idA = a.globalBillId || a.companyInvoiceNumber || a.invoiceNo || 0;
@@ -119,62 +158,176 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
           </div>
         </div>
 
-          {/* Filter Chips matching animex_frontend */}
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 pt-1 text-xs">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter:</span>
-            </span>
+        {/* Filter Bar & Options */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 pt-1 text-xs">
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Interactive Filter Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setShowFilterPanel(prev => !prev)}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5 transition-all cursor-pointer border ${
+                  showFilterPanel || activeAdvancedCount > 0
+                    ? 'bg-animex-orange-500 text-white border-animex-orange-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                title="Click to open filter options (अधिक फिल्टर्स उघडा)"
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filter</span>
+                {activeAdvancedCount > 0 && (
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white text-animex-orange-600">
+                    {activeAdvancedCount}
+                  </span>
+                )}
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showFilterPanel ? 'rotate-180' : ''}`} />
+              </button>
 
-            {(
-              [
-                { key: 'ALL', label: 'All Bills', count: countAll },
-                { key: 'PAID', label: 'Paid', count: countPaid },
-                { key: 'PENDING', label: 'Pending', count: countPending },
-                { key: 'PARTIALLY PAID', label: 'Partially Paid', count: countPartial },
-              ] as const
-            ).map((tab) => {
-              const isActive = statusFilter === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setStatusFilter(tab.key)}
-                  className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-animex-blue-900 dark:bg-sky-600 text-white shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+              {/* Status Tabs */}
+              {(
+                [
+                  { key: 'ALL', label: 'All Bills', count: countAll },
+                  { key: 'PAID', label: 'Paid', count: countPaid },
+                  { key: 'PENDING', label: 'Pending', count: countPending },
+                  { key: 'PARTIALLY PAID', label: 'Partially Paid', count: countPartial },
+                ] as const
+              ).map((tab) => {
+                const isActive = statusFilter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setStatusFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5 transition-all cursor-pointer border ${
                       isActive
-                        ? 'bg-white/20 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                        ? 'bg-animex-blue-900 dark:bg-sky-600 text-white border-animex-blue-900 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer ml-auto"
+              title="Toggle Bill Sequence Order"
+            >
+              <span>Sr No: {sortOrder === 'asc' ? '1, 2, 3... (Sequence)' : 'Newest First'}</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer ml-auto"
-            title="Toggle Bill Sequence Order"
-          >
-            <span>Sr No: {sortOrder === 'asc' ? '1, 2, 3... (Sequence)' : 'Newest First'}</span>
-          </button>
+          {/* Expandable Advanced Filters Panel */}
+          {showFilterPanel && (
+            <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-700/60">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-animex-orange-500" />
+                  <span>Advanced Filters (अधिक पर्याय)</span>
+                </span>
+                {(storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || statusFilter !== 'ALL' || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={handleResetAllFilters}
+                    className="text-xs text-red-600 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset All (सर्व पूर्ववत करा)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Store Filter */}
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    Medical Store (मेडिकल नाव)
+                  </label>
+                  <select
+                    value={storeFilter}
+                    onChange={(e) => setStoreFilter(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-white outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Medical Stores (सर्व मेडिकल)</option>
+                    {uniqueStores.map((st) => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Payment Mode Filter */}
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    Payment Mode (देयक पद्धत)
+                  </label>
+                  <select
+                    value={paymentModeFilter}
+                    onChange={(e) => setPaymentModeFilter(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-white outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Modes (सर्व पद्धती)</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Credit">Credit (उधारी)</option>
+                    <option value="Card">Card</option>
+                    <option value="Cheque">Cheque</option>
+                  </select>
+                </div>
+
+                {/* Date Filter */}
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
+                    Filter by Date (तारीख)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-white outline-none cursor-pointer text-xs"
+                    />
+                    {dateFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setDateFilter('')}
+                        className="absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mobile Card List View (Visible only on mobile screens < md) */}
         <div className="md:hidden space-y-3">
           {filteredInvoices.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-500 font-bold bg-slate-50 dark:bg-slate-800/40 rounded-xl">
-              No bills found matching your search / filter.
+            <div className="text-center py-8 px-4 text-xs text-slate-500 font-bold bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-2">
+              <p>तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.</p>
+              <p className="text-[11px] text-slate-400 font-normal">(No bills found matching selected filter)</p>
+              {(statusFilter !== 'ALL' || storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={handleResetAllFilters}
+                  className="mt-1 px-3.5 py-1.5 rounded-lg bg-animex-orange-500 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm hover:bg-animex-orange-600 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>सर्व फिल्टर्स क्लिअर करा (Reset Filters)</span>
+                </button>
+              )}
             </div>
           ) : (
             filteredInvoices.map((inv) => {
@@ -286,8 +439,21 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-xs text-slate-500 font-bold">
-                    No bills found matching your search / filter.
+                  <td colSpan={7} className="text-center py-10 px-4 text-xs text-slate-500 font-bold space-y-2">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.</p>
+                    <p className="text-[11px] text-slate-400 font-normal">(No bills found matching selected filter criteria)</p>
+                    {(statusFilter !== 'ALL' || storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || searchQuery) && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleResetAllFilters}
+                          className="px-4 py-1.5 rounded-lg bg-animex-orange-500 hover:bg-animex-orange-600 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>सर्व फिल्टर्स क्लिअर करा (Reset Filters)</span>
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (

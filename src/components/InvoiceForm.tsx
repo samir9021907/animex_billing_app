@@ -161,17 +161,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   const [discount, setDiscount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<string>('UPI');
   const [isFullPaid, setIsFullPaid] = useState<boolean>(true);
-  const [receivedAmount, setReceivedAmount] = useState<number>(0);
+  const [receivedAmount, setReceivedAmount] = useState<number>(() => {
+    const firstProd = products[0];
+    return firstProd?.defaultPrice || 300;
+  });
   const [termsAndConditions, setTermsAndConditions] = useState<string>('Goods once sold will not be taken back.');
 
   // Complete form refresh / reset
   const handleResetForm = () => {
     if (window.confirm('नवीन बिल तयार करण्यासाठी संपूर्ण फॉर्म रिफ्रेश (Reset) करायचा आहे का?\n(Reset entire form to create a new bill?)')) {
-      setItems(createInitialItems());
+      const freshItems = createInitialItems();
+      setItems(freshItems);
       setDiscount(0);
       setPaymentType('UPI');
       setIsFullPaid(true);
-      setReceivedAmount(0);
+      const freshTotal = freshItems.reduce((sum, i) => sum + i.amount, 0);
+      setReceivedAmount(freshTotal);
       setDate(new Date().toISOString().split('T')[0]);
       if (stores.length > 0) {
         setSelectedStoreId(stores[0].id);
@@ -188,11 +193,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     setInvoiceNo(getStoreNextInvoiceNo(newStoreId));
     
     // Refresh / Reset products and totals for the new medical store
-    setItems(createInitialItems());
+    const freshItems = createInitialItems();
+    setItems(freshItems);
     setDiscount(0);
     setPaymentType('UPI');
     setIsFullPaid(true);
-    setReceivedAmount(0);
+    const freshTotal = freshItems.reduce((sum, i) => sum + i.amount, 0);
+    setReceivedAmount(freshTotal);
   };
 
   const selectedStoreObj = stores.find(s => s.id === selectedStoreId) || stores[0];
@@ -387,11 +394,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     onSaveInvoice(newInv);
 
     // Reset / Refresh form items for next invoice
-    setItems(createInitialItems());
+    const freshItems = createInitialItems();
+    setItems(freshItems);
     setDiscount(0);
     setPaymentType('UPI');
     setIsFullPaid(true);
-    setReceivedAmount(0);
+    const freshTotal = freshItems.reduce((sum, i) => sum + i.amount, 0);
+    setReceivedAmount(freshTotal);
   };
 
   return (
@@ -893,17 +902,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   key={mode.id}
                   type="button"
                   onClick={() => {
+                    const prevType = paymentType;
                     setPaymentType(mode.id);
                     if (mode.id === 'Credit') {
                       setIsFullPaid(false);
                       setReceivedAmount(0);
-                    } else if (isFullPaid) {
-                      setReceivedAmount(totalAmount);
+                    } else {
+                      // If switching to Cash/UPI/Card/Cheque from Credit, or received was 0, or was previously full paid:
+                      if (prevType === 'Credit' || receivedAmount === 0 || isFullPaid) {
+                        setIsFullPaid(true);
+                        setReceivedAmount(totalAmount);
+                      }
                     }
                   }}
                   className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-center transition-all border cursor-pointer ${
                     paymentType === mode.id
-                      ? 'bg-animex-blue-900 text-white border-animex-blue-900 shadow-sm'
+                      ? 'bg-animex-blue-900 text-white border-animex-blue-900 shadow-sm ring-1 ring-animex-blue-500'
                       : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -921,13 +935,17 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   setReceivedAmount(totalAmount);
                   if (paymentType === 'Credit') setPaymentType('UPI');
                 }}
-                className={`py-2 px-2 rounded-xl font-bold text-xs border transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm ${
+                className={`py-2 px-2 rounded-xl font-bold text-xs border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
                   isFullPaid && Math.abs(receivedAmount - totalAmount) < 0.01
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                    : 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 border-emerald-300 hover:bg-emerald-50'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400/30'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                <span>✅ Full Paid</span>
+                {isFullPaid && Math.abs(receivedAmount - totalAmount) < 0.01 ? (
+                  <span>✅ Full Paid</span>
+                ) : (
+                  <span>Full Paid</span>
+                )}
                 <span className="text-[11px] font-semibold opacity-90">(₹{formatCurrencyDisplay(totalAmount)})</span>
               </button>
 
@@ -938,13 +956,17 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   setIsFullPaid(false);
                   setReceivedAmount(0);
                 }}
-                className={`py-2 px-2 rounded-xl font-bold text-xs border transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm ${
-                  paymentType === 'Credit'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-md'
-                    : 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-400 border-amber-300 hover:bg-amber-50'
+                className={`py-2 px-2 rounded-xl font-bold text-xs border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
+                  paymentType === 'Credit' && receivedAmount === 0
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400/30'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                <span>⏳ Credit / उधारी</span>
+                {paymentType === 'Credit' && receivedAmount === 0 ? (
+                  <span>⏳ Credit / उधारी</span>
+                ) : (
+                  <span>Credit / उधारी</span>
+                )}
                 <span className="text-[11px] font-semibold opacity-90">(₹0)</span>
               </button>
             </div>
@@ -971,11 +993,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 inputMode="decimal"
                 placeholder="0"
                 value={receivedAmount > 0 ? formatCurrencyDisplay(receivedAmount) : (receivedAmount === 0 ? '0' : '')}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const raw = e.target.value.replace(/[^0-9.]/g, '');
                   const val = raw === '' ? 0 : Number(raw);
                   setReceivedAmount(val);
-                  setIsFullPaid(Math.abs(val - totalAmount) < 0.01);
+                  setIsFullPaid(val > 0 && Math.abs(val - totalAmount) < 0.01);
                 }}
                 className="w-full h-full bg-emerald-50/30 dark:bg-slate-900 border-2 border-emerald-300 dark:border-emerald-700/60 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 rounded-xl pl-7 pr-2.5 font-bold text-sm sm:text-base text-emerald-600 dark:text-emerald-400 outline-none transition-all flex items-center"
               />
@@ -989,6 +1012,23 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             }`}>
               ₹{formatCurrencyDisplay(balanceAmount)}
             </div>
+          </div>
+
+          {/* Payment Status Summary Pill */}
+          <div className="pt-0.5">
+            {balanceAmount <= 0.001 ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                <span>✅ पूर्ण देयक जमा (Fully Paid) — बाकी: ₹0</span>
+              </div>
+            ) : receivedAmount === 0 ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                <span>⏳ पूर्ण उधारी (100% Credit) — बाकी: ₹{formatCurrencyDisplay(balanceAmount)}</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+                <span>⚡ अंशतः जमा (Partial Paid) — जमा: ₹{formatCurrencyDisplay(receivedAmount)} | बाकी: ₹{formatCurrencyDisplay(balanceAmount)}</span>
+              </div>
+            )}
           </div>
 
         </div>

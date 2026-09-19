@@ -214,6 +214,7 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
         company_invoice_number: invoice.companyInvoiceNumber || invoice.invoiceNo || undefined,
         global_bill_id: invoice.globalBillId || undefined,
         discount: invoice.discount || 0,
+        gst_rate: 0,
         received_amount: invoice.receivedAmount || 0,
         payment_type: invoice.paymentType || 'UPI',
         notes: invoice.termsAndConditions || 'Invoice generated via ANIMEX Billing',

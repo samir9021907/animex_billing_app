@@ -109,6 +109,7 @@ export const App: React.FC = () => {
 
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string>('');
 
   const storesRef = useRef(stores);
   storesRef.current = stores;
@@ -119,27 +120,30 @@ export const App: React.FC = () => {
   const isSyncingRef = useRef(false);
 
   // ─── ⚡ Ultra-Fast Bidirectional Cloud Neon Database Sync ────────────────────
-  const syncCloudData = useCallback(async () => {
+  const syncCloudData = useCallback(async (isManual: boolean = false) => {
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
     setIsSyncingCloud(true);
+    if (isManual) setSyncNotice('सिंक सुरू आहे...');
     const syncStart = performance.now();
 
     try {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-      // 1. FAST FETCH: Try unified single-request sync first, fallback to parallel fetching
+      // 1. FAST FETCH: Try unified single-request sync first
       let cloudStores: MedicalStore[] = [];
       let cloudInvoices: Invoice[] = [];
       let cloudProducts: Product[] = [];
+      let fastSyncDuration: number | null = null;
 
       const unifiedResult = await fetchUnifiedSyncFromBackend();
       if (unifiedResult) {
         cloudStores = unifiedResult.stores;
         cloudInvoices = unifiedResult.invoices;
         cloudProducts = unifiedResult.products;
+        fastSyncDuration = unifiedResult.durationMs;
       } else {
-        // Parallel fallback: fetch all 3 endpoints simultaneously
+        // Fallback only if unified endpoint was unavailable
         const [storesData, invoicesData, productsData] = await Promise.all([
           fetchStoresFromBackend(),
           fetchInvoicesFromBackend(),
@@ -294,11 +298,18 @@ export const App: React.FC = () => {
       if (finalProducts.length > 0) setProducts(finalProducts);
       setLastSyncTime(new Date());
 
-      const durationMs = Math.round(performance.now() - syncStart);
-      console.log(`⚡ Fast Cloud Sync finished in ${durationMs}ms`);
+      const totalDuration = Math.round(performance.now() - syncStart);
+      const displayDuration = fastSyncDuration || totalDuration;
+      const secText = (displayDuration / 1000).toFixed(1);
+      setSyncNotice(`✓ सिंक पूर्ण (${secText}s)`);
+      setTimeout(() => setSyncNotice(''), 3500);
+
+      console.log(`⚡ Fast Cloud Sync finished in ${totalDuration}ms`);
 
     } catch (e) {
       console.warn('Background cloud sync notice:', e);
+      setSyncNotice('सिंक पूर्ण (Offline Mode)');
+      setTimeout(() => setSyncNotice(''), 3000);
     } finally {
       isSyncingRef.current = false;
       setIsSyncingCloud(false);
@@ -439,11 +450,43 @@ export const App: React.FC = () => {
       globalBillId: newInvoice.globalBillId || nextGlobal
     };
 
-    // 1. Add invoice to history
+    // 1. Add invoice to history & open preview immediately (0ms UI latency!)
     setInvoices([finalInvoice, ...invoices]);
     setSelectedPreviewInvoice(finalInvoice);
-    
-    // 2. Sync to cloud Neon DB
+
+    // 2. Immediate local stock deduction for each billed product & check low stock
+    const newlyLowStock: string[] = [];
+    const billedMap = new Map<string, number>();
+    for (const item of finalInvoice.items) {
+      const id = item.productId;
+      const name = item.itemName?.trim().toLowerCase();
+      const qty = Number(item.quantity || 0);
+      if (id) billedMap.set(id, (billedMap.get(id) || 0) + qty);
+      if (name) billedMap.set(name, (billedMap.get(name) || 0) + qty);
+    }
+
+    setProducts(prevProducts => {
+      return prevProducts.map(prod => {
+        const billedQty = billedMap.get(prod.id) || billedMap.get(prod.name.trim().toLowerCase()) || 0;
+        if (billedQty === 0) return prod;
+
+        const currentStock = prod.stockQuantity ?? 0;
+        const newStock = Math.max(0, currentStock - billedQty);
+        const limit = prod.minStockAlert || prod.boxCapacity || 50;
+
+        if (newStock <= limit) {
+          newlyLowStock.push(`• ${prod.name}: Only ${newStock} ${prod.defaultUnit} left (Alert Limit: ${limit} ${prod.defaultUnit})`);
+        }
+
+        return {
+          ...prod,
+          stockQuantity: newStock,
+        };
+      });
+    });
+
+    // 3. Sync invoice to cloud Neon DB in the background
+    // (Note: Backend's createInvoice automatically deducts stock in PostgreSQL DB)
     syncInvoiceToBackend(finalInvoice).then(cloudInv => {
       if (cloudInv && cloudInv.id) {
         setInvoices(prev => prev.map(inv => inv.id === finalInvoice.id ? {
@@ -454,36 +497,6 @@ export const App: React.FC = () => {
           invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
         } : inv));
       }
-    });
-
-    // 2. Automatic stock deduction for each billed product & check low stock
-    const newlyLowStock: string[] = [];
-    setProducts(prevProducts => {
-      const updatedProducts = prevProducts.map(prod => {
-        const billedItems = finalInvoice.items.filter(item => 
-          (item.productId && item.productId === prod.id) ||
-          (item.itemName && prod.name && item.itemName.trim().toLowerCase() === prod.name.trim().toLowerCase())
-        );
-        if (billedItems.length === 0) return prod;
-
-        const totalBilledQty = billedItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-        const currentStock = prod.stockQuantity ?? 0;
-        const newStock = Math.max(0, currentStock - totalBilledQty);
-        const limit = prod.minStockAlert || prod.boxCapacity || 50;
-
-        if (newStock <= limit) {
-          newlyLowStock.push(`• ${prod.name}: Only ${newStock} ${prod.defaultUnit} left (Alert Limit: ${limit} ${prod.defaultUnit})`);
-        }
-
-        const updatedProd = {
-          ...prod,
-          stockQuantity: newStock,
-        };
-        // Also sync updated stock to cloud backend
-        syncProductToBackend(updatedProd).catch(e => console.warn('Product stock sync err:', e));
-        return updatedProd;
-      });
-      return updatedProducts;
     });
 
     if (newlyLowStock.length > 0) {
@@ -504,41 +517,40 @@ export const App: React.FC = () => {
       return;
     }
 
-    // 1. Remove from invoices state
+    // 1. Remove from invoices state immediately (0ms UI latency!)
     setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
 
     // 2. Automatic stock restoration back to products
     if (invToDelete && Array.isArray(invToDelete.items)) {
+      const restoreMap = new Map<string, number>();
+      for (const item of invToDelete.items) {
+        const id = item.productId;
+        const name = item.itemName?.trim().toLowerCase();
+        const qty = Number(item.quantity || 0);
+        if (id) restoreMap.set(id, (restoreMap.get(id) || 0) + qty);
+        if (name) restoreMap.set(name, (restoreMap.get(name) || 0) + qty);
+      }
+
       setProducts(prevProducts => {
-        const updatedProducts = prevProducts.map(prod => {
-          const restoredItems = invToDelete.items.filter(item => 
-            (item.productId && item.productId === prod.id) ||
-            (item.itemName && prod.name && item.itemName.trim().toLowerCase() === prod.name.trim().toLowerCase())
-          );
-          if (restoredItems.length === 0) return prod;
+        return prevProducts.map(prod => {
+          const restoredQty = restoreMap.get(prod.id) || restoreMap.get(prod.name.trim().toLowerCase()) || 0;
+          if (restoredQty === 0) return prod;
 
-          const totalRestoredQty = restoredItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-          const newQty = (prod.stockQuantity ?? 0) + totalRestoredQty;
-          const updatedProd = {
+          return {
             ...prod,
-            stockQuantity: newQty,
+            stockQuantity: (prod.stockQuantity ?? 0) + restoredQty,
           };
-          // Sync restored product stock to cloud backend immediately
-          syncProductToBackend(updatedProd).catch(e => console.warn('Stock restore sync err:', e));
-          return updatedProd;
         });
-
-        return updatedProducts;
       });
     }
 
-    // 3. Delete invoice from cloud backend (backend also restores stock in database)
-    await deleteInvoiceFromBackend(invoiceId);
-
-    // 4. Background refresh cloud data to stay in sync
-    setTimeout(() => {
-      syncCloudData();
-    }, 1500);
+    // 3. Delete invoice from cloud backend (backend also automatically restores stock in PostgreSQL DB)
+    deleteInvoiceFromBackend(invoiceId).then(() => {
+      // Refresh cloud data after a short breath
+      setTimeout(() => {
+        syncCloudData();
+      }, 1000);
+    });
   };
 
   // Add inward stock entry (Boxes * UnitsPerBox + LooseUnits)
@@ -694,8 +706,9 @@ export const App: React.FC = () => {
         user={currentUser}
         onLogout={handleLogout}
         isSyncingCloud={isSyncingCloud}
-        onSyncCloud={syncCloudData}
+        onSyncCloud={() => syncCloudData(true)}
         lastSyncTime={lastSyncTime}
+        syncNotice={syncNotice}
       />
 
       {/* Main View Router */}

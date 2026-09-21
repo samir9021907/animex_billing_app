@@ -30,10 +30,12 @@ const getClientId = (): string => {
   return PERMANENT_CLIENT_ID;
 };
 
+export const API_TIMEOUT_MS = 25000; // 25s ceiling allows Render cold-start without premature aborts
+
 // ─── Non-blocking Background Warm-Up Ping ─────────────────────────────────────
 export const warmupBackendConnection = () => {
   try {
-    fetch(`${API_BASE}/health`, { method: 'GET', keepalive: true }).catch(() => {});
+    fetch(`${API_BASE}/health`, { method: 'GET', keepalive: true, signal: AbortSignal.timeout(8000) }).catch(() => {});
   } catch {}
 };
 
@@ -107,20 +109,22 @@ export const mapBackendProduct = (p: any) => ({
 });
 
 // ─── ⚡ Unified Fast Sync (Single 1-Shot HTTP Request) ─────────────────────────
-export const fetchUnifiedSyncFromBackend = async (): Promise<{ stores: any[]; invoices: any[]; products: any[] } | null> => {
+export const fetchUnifiedSyncFromBackend = async (): Promise<{ stores: any[]; invoices: any[]; products: any[]; durationMs: number } | null> => {
+  const t0 = performance.now();
   try {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/client/${clientId}/sync-all`, {
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
     const json = await res.json();
+    const durationMs = Math.round(performance.now() - t0);
     if (json.success && json.data) {
       const stores = Array.isArray(json.data.stores) ? json.data.stores.map(mapBackendStore) : [];
       const invoices = Array.isArray(json.data.invoices) ? json.data.invoices.map(mapBackendInvoice) : [];
       const products = Array.isArray(json.data.products) ? json.data.products.map(mapBackendProduct) : [];
-      return { stores, invoices, products };
+      return { stores, invoices, products, durationMs };
     }
   } catch (e) {
     console.warn('Unified fast sync fallback:', e);
@@ -134,7 +138,7 @@ export const fetchStoresFromBackend = async (): Promise<any[]> => {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores`, {
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
     const json = await res.json();
@@ -153,7 +157,7 @@ export const fetchInvoicesFromBackend = async (): Promise<any[]> => {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/client/${clientId}/invoices`, {
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
     const json = await res.json();
@@ -172,7 +176,7 @@ export const fetchProductsFromBackend = async (): Promise<any[]> => {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products`, {
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
     const json = await res.json();
@@ -199,7 +203,7 @@ export const syncStoreToBackend = async (store: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
       body: JSON.stringify({
         firm_name: store.firmName,
@@ -227,7 +231,7 @@ export const deleteStoreFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
   } catch (e) {
@@ -283,7 +287,7 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
       body: JSON.stringify({
         medical_store_id: storeId,
@@ -314,7 +318,7 @@ export const deleteInvoiceFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/client/${clientId}/invoices/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
   } catch (e) {
@@ -336,7 +340,7 @@ export const syncProductToBackend = async (product: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
       body: JSON.stringify({
         product_title: product.name,
@@ -367,7 +371,7 @@ export const deleteProductFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
   } catch (e) {

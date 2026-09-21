@@ -34,6 +34,7 @@ interface HeaderProps {
   isSyncingCloud?: boolean;
   onSyncCloud?: () => void;
   lastSyncTime?: Date | null;
+  syncNotice?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -46,6 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncingCloud = false,
   onSyncCloud,
   lastSyncTime,
+  syncNotice = '',
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
@@ -198,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 ${isSyncingCloud ? 'animate-spin text-amber-300' : ''}`} />
                 <span className="text-[11px] font-extrabold text-emerald-300 whitespace-nowrap">
-                  {isSyncingCloud ? 'सिंक...' : 'Sync'}
+                  {syncNotice || (isSyncingCloud ? 'सिंक...' : 'Sync')}
                 </span>
               </button>
             )}
@@ -460,7 +462,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="px-2.5 py-1 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[10px] font-extrabold rounded-lg transition-all border border-white/20 flex items-center gap-1 cursor-pointer"
                     >
                       <RefreshCw className={`w-3 h-3 text-amber-300 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingCloud ? 'सिंक...' : 'सिंक करा'}</span>
+                      <span>{syncNotice || (isSyncingCloud ? 'सिंक...' : 'सिंक करा')}</span>
                     </button>
                   </div>
                 )}

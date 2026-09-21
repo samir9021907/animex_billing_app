@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Invoice } from '../types';
-import { Printer, Share2, X, CheckCircle2, Loader2, ExternalLink, Copy, Check, MessageSquare, Download } from 'lucide-react';
+import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 import { Capacitor } from '@capacitor/core';
-import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface InvoicePreviewModalProps {
@@ -25,10 +24,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
-  const [showWhatsAppWebModal, setShowWhatsAppWebModal] = useState<boolean>(false);
-  const [whatsAppWebUrl, setWhatsAppWebUrl] = useState<string>('');
-  const [copiedToClipboard, setCopiedToClipboard] = useState<boolean>(false);
-  const [lastGeneratedBlob, setLastGeneratedBlob] = useState<Blob | null>(null);
 
   const isNative = Capacitor.isNativePlatform();
   const isMobile = isNative || (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent));
@@ -71,14 +66,97 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return digits;
   };
 
+  // Generate complete, official, original bill text for WhatsApp
+  const getBillTextMessage = (): string => {
+    const storeName = invoice.billTo?.firmName || 'Valued Customer';
+    const contact = invoice.billTo?.contactName ? ` (${invoice.billTo.contactName})` : '';
+    const location = [invoice.billTo?.address, invoice.billTo?.district].filter(Boolean).join(', ');
 
+    let itemsList = '';
+    (invoice.items || []).forEach((item, index) => {
+      const isScheme = item.isFree || item.isScheme;
+      const freeTag = isScheme ? ' [FREE SCHEME]' : '';
+      const priceStr = isScheme ? '₹0.00' : `₹${(item.pricePerUnit || 0).toFixed(2)}`;
+      const amountStr = isScheme ? '₹0.00' : `₹${(item.amount || 0).toFixed(2)}`;
+      itemsList += `${index + 1}. *${item.itemName}*${freeTag}\n   ${item.quantity} ${item.unit} x ${priceStr} = *${amountStr}*\n`;
+    });
 
-  // Helper to render the original color bill into a Canvas with optimized mobile performance
+    const balanceStatus = (invoice.balanceAmount || 0) <= 0
+      ? '🟢 *PAID (पूर्ण भरले)*'
+      : (invoice.receivedAmount || 0) > 0
+        ? `🟠 *PARTIALLY PAID (अपूर्ण)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`
+        : `🔴 *PENDING (बाकी)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`;
+
+    return (
+      `🏢 *${companyProfile.companyName}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
+      `📅 *तारीख (Date):* ${invoice.date}\n` +
+      `🏥 *ग्राहक (Customer):* ${storeName}${contact}\n` +
+      (location ? `📍 *पत्ता (Address):* ${location}\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *वस्तू तपशील (Items):*\n` +
+      itemsList +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💵 *Sub Total:* ₹${(invoice.subTotal || 0).toFixed(2)}\n` +
+      (invoice.discount && invoice.discount > 0 ? `🏷️ *सवलत (Discount):* - ₹${invoice.discount.toFixed(2)}\n` : '') +
+      `💰 *निव्वळ बिल रक्कम (Total):* *₹${(invoice.totalAmount || 0).toFixed(2)}*\n` +
+      `💳 *भरलेली रक्कम (Paid):* ₹${(invoice.receivedAmount || 0).toFixed(2)} (${invoice.paymentType || 'UPI'})\n` +
+      `📌 *बाकी रक्कम (Balance):* ₹${(invoice.balanceAmount || 0).toFixed(2)}\n` +
+      `📌 *स्थिती (Status):* ${balanceStatus}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏦 *बँक / UPI तपशील (Bank Details):*\n` +
+      `• बँक: ${companyProfile.bankName}\n` +
+      `• खाते क्र.: ${companyProfile.accountNo}\n` +
+      `• IFSC: ${companyProfile.ifscCode}\n` +
+      `• UPI ID: ${companyProfile.upiId}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📞 Helpline: 9307990811 / 8999323908\n` +
+      `🙏 *आपल्या सहकार्याबद्दल धन्यवाद! (Thank you!)*`
+    );
+  };
+
+  // 1. DIRECT INSTANT WHATSAPP (0.01s) - No downloads, no second page, no permissions!
+  const handleDirectWhatsApp = () => {
+    try {
+      const text = getBillTextMessage();
+      const cleanPhone = getCleanCustomerPhone();
+
+      if (isNative || isMobile) {
+        // Direct WhatsApp launch via app intent scheme (instant 0.01s)
+        const whatsappSchemeUrl = cleanPhone
+          ? `whatsapp://send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
+          : `whatsapp://send?text=${encodeURIComponent(text)}`;
+
+        window.location.href = whatsappSchemeUrl;
+
+        // Fallback for mobile browsers if custom scheme doesn't auto-launch
+        if (!isNative) {
+          setTimeout(() => {
+            const webFallback = cleanPhone
+              ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
+              : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+            window.open(webFallback, '_blank');
+          }, 1200);
+        }
+      } else {
+        // Desktop Browser: Open WhatsApp Web directly in new tab
+        const targetUrl = cleanPhone
+          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
+          : `https://web.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+        window.open(targetUrl, '_blank');
+      }
+    } catch (err: any) {
+      console.error('Direct WhatsApp error:', err);
+      alert('WhatsApp उघडताना त्रुटी आली: ' + (err.message || 'Error'));
+    }
+  };
+
+  // Helper to render the original color bill into a Canvas for Save Photo
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
     const billElement = document.getElementById('printable-bill-area');
     if (!billElement) return null;
 
-    // Fast scale: on mobile 1.25x produces crisp HD image in ~200ms (50% faster than 1.8x)
     const renderScale = isMobile ? 1.25 : 1.6;
 
     return await html2canvas(billElement, {
@@ -94,132 +172,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     });
   };
 
-  const handleReCopyImage = async () => {
-    if (!lastGeneratedBlob) return;
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': lastGeneratedBlob }),
-        ]);
-        setCopiedToClipboard(true);
-        setTimeout(() => setCopiedToClipboard(false), 3000);
-      } else {
-        alert('फोटो Clipboard वर कॉपी करण्यास सपोर्ट नाही. डाऊनलोड झालेला फोटो वापरा.');
-      }
-    } catch (e) {
-      console.warn('Re-copy failed:', e);
-      alert('फोटो कॉपी करण्यात अडचण आली. डाऊनलोड झालेला फोटो वापरा.');
-    }
-  };
-
-  // 2. Share the REAL COLOR BILL IMAGE directly to WhatsApp / Android Share Sheet
-  const handleWhatsAppPhotoShare = async () => {
-    try {
-      setIsGeneratingImage(true);
-      setGeneratingMsg('रंगीत बिलाचा फोटो तयार होत आहे (Processing)...');
-
-      const canvas = await generateBillCanvas();
-      if (!canvas) {
-        throw new Error('Bill area not found.');
-      }
-
-      const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
-      const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
-      const cleanPhone = getCleanCustomerPhone();
-      const captionText = `*ANIMEX ANIMAL HEALTH CARE PVT LTD*\n📄 *Bill / Invoice No:* #${masterInvoiceNo}\n🏥 *Customer:* ${invoice.billTo?.firmName || 'Medical Store'}\n💰 *Net Total:* ₹${(invoice.totalAmount || 0).toFixed(2)}\n📌 *Balance Due:* ₹${(invoice.balanceAmount || 0).toFixed(2)}\n\n✅ *मूळ रंगीत बिल (Original Color Bill)*`;
-
-      // NATIVE ANDROID MOBILE (Capacitor App)
-      if (isNative) {
-        setGeneratingMsg('WhatsApp उघडत आहे (Opening WhatsApp)...');
-        // Extract pure base64 data
-        const base64Data = canvas.toDataURL('image/png', 0.95).split(',')[1];
-
-        // Save image to Cache directory
-        const savedFile = await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: Directory.Cache,
-        });
-
-        // Trigger native Android share sheet (shares original PNG image into WhatsApp)
-        await Share.share({
-          title: `ANIMEX Bill #${masterInvoiceNo} - ${invoice.billTo?.firmName || 'Store'}`,
-          text: captionText,
-          files: [savedFile.uri],
-          dialogTitle: 'WhatsApp निवडा (Select WhatsApp)',
-        });
-        return;
-      }
-
-      // MOBILE WEB BROWSER
-      const blob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/png', 0.95);
-      });
-
-      if (!blob) {
-        throw new Error('Failed to generate image file.');
-      }
-      setLastGeneratedBlob(blob);
-
-      const file = new File([blob], fileName, { type: 'image/png' });
-
-      // If mobile browser supports Web Share Level 2 file sharing
-      if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-        setGeneratingMsg('WhatsApp उघडत आहे...');
-        await navigator.share({
-          files: [file],
-          title: `ANIMEX Bill #${masterInvoiceNo} - ${invoice.billTo?.firmName || 'Store'}`,
-          text: captionText,
-        });
-        return;
-      }
-
-      // DESKTOP BROWSER (Chrome / Edge):
-      // 1. Copy image directly to Clipboard for instant Ctrl+V in WhatsApp Web
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': blob }),
-          ]);
-          setCopiedToClipboard(true);
-          setTimeout(() => setCopiedToClipboard(false), 4000);
-        } catch (clipErr) {
-          console.warn('Clipboard image copy failed:', clipErr);
-        }
-      }
-
-      // 2. Download HD image file to Downloads folder
-      setGeneratingMsg('रंगीत फोटो डाऊनलोड होत आहे...');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      // 3. Open WhatsApp Web directly
-      const targetUrl = cleanPhone
-        ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(captionText)}`
-        : `https://web.whatsapp.com/send?text=${encodeURIComponent(captionText)}`;
-
-      window.open(targetUrl, '_blank');
-      setWhatsAppWebUrl(targetUrl);
-      setShowWhatsAppWebModal(true);
-
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && !err.message?.toLowerCase().includes('cancel')) {
-        console.error('WhatsApp share error:', err);
-        alert('WhatsApp शेअर करताना त्रुटी आली: ' + (err.message || 'कृपया Save Photo वापरा.'));
-      }
-    } finally {
-      setIsGeneratingImage(false);
-      setGeneratingMsg('');
-    }
-  };
-
-  // 3. Download the REAL COLOR BILL as an HD image file to Phone / PC
+  // 2. Download/Save the REAL COLOR BILL as an HD image file to Phone / PC
   const handleDownloadPhoto = async () => {
     try {
       setIsGeneratingImage(true);
@@ -230,7 +183,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
 
-      // Native Android App: Save to Documents directory or trigger share
+      // Native Android App: Save to Documents directory
       if (isNative) {
         const base64Data = canvas.toDataURL('image/png', 0.95).split(',')[1];
         await Filesystem.writeFile({
@@ -289,19 +242,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
           {/* Action Buttons: Exactly 3 options requested by User: 1. WhatsApp, 2. Save Photo, 3. Print */}
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
-            {/* 1. WhatsApp Button - Shares Original Colorful Bill directly */}
+            {/* 1. WhatsApp Button - Direct Instant WhatsApp share */}
             <button
               type="button"
-              onClick={handleWhatsAppPhotoShare}
-              disabled={isGeneratingImage}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black px-3.5 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="WhatsApp वर ओरिजिनल बिल पाठवा (Share Original Bill on WhatsApp)"
+              onClick={handleDirectWhatsApp}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3.5 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
+              title="WhatsApp वर थेट बिल पाठवा (Direct Instant WhatsApp)"
             >
-              {isGeneratingImage ? (
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-200" />
-              ) : (
-                <MessageSquare className="w-4 h-4 text-emerald-200 fill-emerald-200/20" />
-              )}
+              <MessageSquare className="w-4 h-4 text-emerald-200 fill-emerald-200/20" />
               <span>WhatsApp</span>
             </button>
 
@@ -625,96 +573,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         </div>
 
       </div>
-
-      {/* WhatsApp Web Guidance Modal on Desktop */}
-      {showWhatsAppWebModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-2xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-700 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Share2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-black text-base text-slate-900 dark:text-white">WhatsApp Web (Chrome)</h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">रंगीत बिल शेअरिंग मार्गदर्शन</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppWebModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs sm:text-sm">
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 rounded-xl p-3.5 space-y-1.5">
-                <div className="font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>रंगीत बिल आपोआप Copy (कॉपी) झाले आहे!</span>
-                </div>
-                <p className="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">
-                  Chrome मधील WhatsApp Web चॅट उघडल्यावर फक्त <span className="font-black bg-emerald-200 dark:bg-emerald-800 text-emerald-950 dark:text-white px-2 py-0.5 rounded text-[11px]">Ctrl + V</span> दाबा (Paste करा) आणि पाठवून द्या!
-                </p>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-600 dark:text-slate-300 space-y-1">
-                <div className="font-bold text-slate-800 dark:text-slate-200">
-                  💡 माहिती:
-                </div>
-                <p>
-                  • तुमच्या कॉम्प्युटरवर डाऊनलोड फोल्डरमध्येही रंगीत फोटो सेव्ह झाला आहे.
-                </p>
-                <p>
-                  • जर WhatsApp Web आपोआप उघडले नसेल तर खालील हिरव्या बटणावर क्लिक करा.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-1">
-              {whatsAppWebUrl && (
-                <a
-                  href={whatsAppWebUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>WhatsApp Web चॅट उघडा (Open WhatsApp Web)</span>
-                </a>
-              )}
-
-              <button
-                type="button"
-                onClick={handleReCopyImage}
-                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-300 dark:border-slate-600"
-              >
-                {copiedToClipboard ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">फोटो पुन्हा क्लिपबोर्डवर कॉपी झाला!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                    <span>रंगीत फोटो पुन्हा Copy करा</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppWebModal(false)}
-                className="w-full text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-bold text-xs py-1.5 text-center transition-colors cursor-pointer"
-              >
-                बंद करा (Close)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

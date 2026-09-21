@@ -3,9 +3,20 @@ import { Invoice } from '../types';
 import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+
+interface WhatsAppOpenerPlugin {
+  openWhatsApp(options: { phone?: string; text: string }): Promise<void>;
+}
+
+const WhatsAppOpener = registerPlugin<WhatsAppOpenerPlugin>('WhatsAppOpener');
+
+const safeNum = (val: any): number => {
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+};
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -54,7 +65,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   // Helper to extract clean customer phone number
   const getCleanCustomerPhone = (): string => {
     if (!invoice.billTo?.phone) return '';
-    let digits = invoice.billTo.phone.replace(/[^0-9]/g, '');
+    let digits = String(invoice.billTo.phone).replace(/[^0-9]/g, '');
     if (digits.startsWith('0') && digits.length === 11) {
       digits = digits.substring(1);
     }
@@ -64,7 +75,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     if (digits.length === 12 && digits.startsWith('91')) {
       return digits;
     }
-    return digits;
+    if (digits.length >= 10) {
+      return digits;
+    }
+    return '';
   };
 
   // Generate complete, official, original bill text for WhatsApp
@@ -77,16 +91,24 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     (invoice.items || []).forEach((item, index) => {
       const isScheme = item.isFree || item.isScheme;
       const freeTag = isScheme ? ' [FREE SCHEME]' : '';
-      const priceStr = isScheme ? '₹0.00' : `₹${(item.pricePerUnit || 0).toFixed(2)}`;
-      const amountStr = isScheme ? '₹0.00' : `₹${(item.amount || 0).toFixed(2)}`;
+      const priceVal = safeNum(item.pricePerUnit);
+      const amtVal = safeNum(item.amount);
+      const priceStr = isScheme ? '₹0.00' : `₹${priceVal.toFixed(2)}`;
+      const amountStr = isScheme ? '₹0.00' : `₹${amtVal.toFixed(2)}`;
       itemsList += `${index + 1}. *${item.itemName}*${freeTag}\n   ${item.quantity} ${item.unit} x ${priceStr} = *${amountStr}*\n`;
     });
 
-    const balanceStatus = (invoice.balanceAmount || 0) <= 0
+    const balanceAmt = safeNum(invoice.balanceAmount);
+    const receivedAmt = safeNum(invoice.receivedAmount);
+    const totalAmt = safeNum(invoice.totalAmount);
+    const subTotalAmt = safeNum(invoice.subTotal);
+    const discountAmt = safeNum(invoice.discount);
+
+    const balanceStatus = balanceAmt <= 0
       ? '🟢 *PAID (पूर्ण भरले)*'
-      : (invoice.receivedAmount || 0) > 0
-        ? `🟠 *PARTIALLY PAID (अपूर्ण)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`
-        : `🔴 *PENDING (बाकी)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`;
+      : receivedAmt > 0
+        ? `🟠 *PARTIALLY PAID (अपूर्ण)* - बाकी: ₹${balanceAmt.toFixed(2)}`
+        : `🔴 *PENDING (बाकी)* - बाकी: ₹${balanceAmt.toFixed(2)}`;
 
     return (
       `🏢 *${companyProfile.companyName}*\n` +
@@ -99,11 +121,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       `📦 *वस्तू तपशील (Items):*\n` +
       itemsList +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 *Sub Total:* ₹${(invoice.subTotal || 0).toFixed(2)}\n` +
-      (invoice.discount && invoice.discount > 0 ? `🏷️ *सवलत (Discount):* - ₹${invoice.discount.toFixed(2)}\n` : '') +
-      `💰 *निव्वळ बिल रक्कम (Total):* *₹${(invoice.totalAmount || 0).toFixed(2)}*\n` +
-      `💳 *भरलेली रक्कम (Paid):* ₹${(invoice.receivedAmount || 0).toFixed(2)} (${invoice.paymentType || 'UPI'})\n` +
-      `📌 *बाकी रक्कम (Balance):* ₹${(invoice.balanceAmount || 0).toFixed(2)}\n` +
+      `💵 *Sub Total:* ₹${subTotalAmt.toFixed(2)}\n` +
+      (discountAmt > 0 ? `🏷️ *सवलत (Discount):* - ₹${discountAmt.toFixed(2)}\n` : '') +
+      `💰 *निव्वळ बिल रक्कम (Total):* *₹${totalAmt.toFixed(2)}*\n` +
+      `💳 *भरलेली रक्कम (Paid):* ₹${receivedAmt.toFixed(2)} (${invoice.paymentType || 'UPI'})\n` +
+      `📌 *बाकी रक्कम (Balance):* ₹${balanceAmt.toFixed(2)}\n` +
       `📌 *स्थिती (Status):* ${balanceStatus}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🏦 *बँक / UPI तपशील (Bank Details):*\n` +
@@ -117,26 +139,29 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     );
   };
 
-  // 1. DIRECT INSTANT WHATSAPP (0.01s) - 100% Reliable Native Share, No downloads, No second page, Zero permissions!
+  // 1. DIRECT INSTANT WHATSAPP (0.01s) - 100% Reliable Native Android Intent & Web Fallback
   const handleDirectWhatsApp = async () => {
     try {
       const text = getBillTextMessage();
       const cleanPhone = getCleanCustomerPhone();
 
-      // On Native Android App: Use Capacitor Share - triggers native Android intent with WhatsApp directly
+      // On Native Android App: Use custom native WhatsAppOpener plugin directly!
       if (isNative) {
         try {
-          await Share.share({
-            title: `ANIMEX Bill #${masterInvoiceNo}`,
-            text: text,
-            dialogTitle: 'WhatsApp निवडा (Select WhatsApp)',
-          });
+          await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text });
           return;
-        } catch (shareErr: any) {
-          if (shareErr?.message?.toLowerCase().includes('cancel')) {
+        } catch (pluginErr) {
+          console.warn('WhatsAppOpener failed, falling back to Share.share:', pluginErr);
+          try {
+            await Share.share({
+              title: `ANIMEX Bill #${masterInvoiceNo}`,
+              text: text,
+              dialogTitle: 'WhatsApp निवडा',
+            });
             return;
+          } catch (shareErr) {
+            console.warn('Share.share failed:', shareErr);
           }
-          console.warn('Native share fallback:', shareErr);
         }
       }
 

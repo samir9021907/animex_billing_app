@@ -2,14 +2,84 @@ package com.animex.billing;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Base64;
+import androidx.core.content.FileProvider;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.net.URLEncoder;
 
 @CapacitorPlugin(name = "WhatsAppOpener")
 public class WhatsAppPlugin extends Plugin {
+
+    @PluginMethod
+    public void openWhatsAppWithImage(PluginCall call) {
+        String base64Image = call.getString("imageBase64", "");
+        String fileName = call.getString("fileName", "ANIMEX_Invoice.png");
+        String text = call.getString("text", "");
+
+        try {
+            if (base64Image == null || base64Image.trim().isEmpty()) {
+                call.reject("Image data is empty");
+                return;
+            }
+
+            // Strip header if data URL
+            if (base64Image.contains(",")) {
+                base64Image = base64Image.substring(base64Image.indexOf(",") + 1);
+            }
+
+            byte[] decodedBytes = Base64.decode(base64Image, Base64.DEFAULT);
+
+            // Save to cacheDir
+            File cacheDir = getContext().getCacheDir();
+            File imageFile = new File(cacheDir, fileName);
+            FileOutputStream fos = new FileOutputStream(imageFile);
+            fos.write(decodedBytes);
+            fos.flush();
+            fos.close();
+
+            // Get FileProvider URI
+            Uri contentUri = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                imageFile
+            );
+
+            // Create ACTION_SEND Intent for image
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            if (text != null && !text.isEmpty()) {
+                shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+            }
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            // Launch directly to WhatsApp
+            try {
+                shareIntent.setPackage("com.whatsapp");
+                getContext().startActivity(shareIntent);
+            } catch (Exception e1) {
+                try {
+                    shareIntent.setPackage("com.whatsapp.w4b");
+                    getContext().startActivity(shareIntent);
+                } catch (Exception e2) {
+                    Intent chooser = Intent.createChooser(shareIntent, "WhatsApp निवडा");
+                    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(chooser);
+                }
+            }
+
+            call.resolve();
+        } catch (Exception ex) {
+            call.reject(ex.getMessage());
+        }
+    }
 
     @PluginMethod
     public void openWhatsApp(PluginCall call) {

@@ -9,6 +9,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface WhatsAppOpenerPlugin {
   openWhatsApp(options: { phone?: string; text: string }): Promise<void>;
+  openWhatsAppWithImage(options: { imageBase64: string; fileName: string; text?: string }): Promise<void>;
 }
 
 const WhatsAppOpener = registerPlugin<WhatsAppOpenerPlugin>('WhatsAppOpener');
@@ -141,74 +142,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     );
   };
 
-  // 1. DIRECT INSTANT WHATSAPP (0.01s) - 100% Guaranteed to open on Mobile & Web!
-  const handleDirectWhatsApp = () => {
-    try {
-      const text = getBillTextMessage();
-      const cleanPhone = getCleanCustomerPhone();
-
-      // Copy text to clipboard so it's always available to paste if needed
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).catch(() => {});
-        }
-      } catch {}
-
-      // A. On Native Android App (Capacitor):
-      if (isNative) {
-        WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text }).catch((pluginErr) => {
-          console.warn('Native WhatsAppOpener failed, fallback to Share.share:', pluginErr);
-          Share.share({
-            title: `ANIMEX Bill #${masterInvoiceNo}`,
-            text: text,
-            dialogTitle: 'WhatsApp निवडा',
-          }).catch((shareErr) => {
-            console.warn('Share.share failed:', shareErr);
-          });
-        });
-        return;
-      }
-
-      // B. On Web / Desktop PC / Laptop / Mobile Browser:
-      const encodedText = encodeURIComponent(text);
-      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      
-      let targetUrl = '';
-      if (isMobileDevice) {
-        targetUrl = cleanPhone
-          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
-          : `https://api.whatsapp.com/send?text=${encodedText}`;
-      } else {
-        // Desktop PC (Windows / Edge / Chrome): Open WhatsApp Web directly!
-        targetUrl = cleanPhone
-          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
-          : `https://web.whatsapp.com/send?text=${encodedText}`;
-      }
-
-      // 1. Try opening in a new tab first
-      let win: Window | null = null;
-      try {
-        win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      } catch (e) {
-        win = null;
-      }
-
-      // 2. If popup blocker intercepted the new tab, navigate directly so something ALWAYS opens!
-      if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = targetUrl;
-      }
-    } catch (err: any) {
-      console.error('Direct WhatsApp error:', err);
-      alert('WhatsApp उघडताना त्रुटी आली: ' + (err.message || 'Error'));
-    }
-  };
-
-  // Helper to render the original color bill into a Canvas for Save Photo
+  // Helper to render the original color bill into a Canvas
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
     const billElement = document.getElementById('printable-bill-area');
     if (!billElement) return null;
 
-    const renderScale = isMobile ? 1.25 : 1.6;
+    const renderScale = isMobile ? 1.3 : 1.6;
 
     return await html2canvas(billElement, {
       scale: renderScale,
@@ -221,6 +160,123 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       windowWidth: 850,
       imageTimeout: 3000,
     });
+  };
+
+  // 1. DIRECT INSTANT ORIGINAL BILL SHARE TO WHATSAPP (Sends the actual colorful Bill Image!)
+  const handleDirectWhatsApp = async () => {
+    try {
+      setIsGeneratingImage(true);
+      setGeneratingMsg('मूळ रंगीत बिल WhatsApp साठी तयार होत आहे...');
+
+      const cleanPhone = getCleanCustomerPhone();
+      const cleanStore = (invoice?.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
+      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *ग्राहक:* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *एकूण रक्कम (Total):* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *बाकी रक्कम (Balance):* ₹${safeNum(invoice?.balanceAmount).toFixed(2)}`;
+
+      // Generate the REAL COLORFUL ORIGINAL BILL canvas image
+      const canvas = await generateBillCanvas();
+      if (!canvas) {
+        setIsGeneratingImage(false);
+        return;
+      }
+
+      const base64Data = canvas.toDataURL('image/png', 0.95);
+
+      // A. On Native Android Mobile App (Capacitor):
+      if (isNative) {
+        try {
+          await WhatsAppOpener.openWhatsAppWithImage({
+            imageBase64: base64Data,
+            fileName: fileName,
+            text: caption,
+          });
+          setIsGeneratingImage(false);
+          return;
+        } catch (pluginErr) {
+          console.warn('Native openWhatsAppWithImage failed, fallback to Share:', pluginErr);
+          try {
+            await Share.share({
+              title: `ANIMEX Bill #${masterInvoiceNo}`,
+              text: caption,
+              dialogTitle: 'WhatsApp निवडा',
+            });
+            setIsGeneratingImage(false);
+            return;
+          } catch (e) {
+            const fullText = getBillTextMessage();
+            await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text: fullText });
+            setIsGeneratingImage(false);
+            return;
+          }
+        }
+      }
+
+      // B. On Web / Desktop PC / Laptop Browser:
+      // 1. Automatically copy the real bill image to clipboard
+      try {
+        canvas.toBlob(async (blob) => {
+          if (blob && navigator.clipboard && (window as any).ClipboardItem) {
+            const item = new (window as any).ClipboardItem({ 'image/png': blob });
+            await navigator.clipboard.write([item]);
+          }
+        }, 'image/png');
+      } catch (clipErr) {
+        console.warn('Clipboard image write:', clipErr);
+      }
+
+      // 2. If Web Share API supports file sharing (e.g. mobile Chrome):
+      if (typeof navigator !== 'undefined' && (navigator as any).canShare) {
+        try {
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (blob) {
+            const file = new File([blob], fileName, { type: 'image/png' });
+            if ((navigator as any).canShare({ files: [file] })) {
+              await (navigator as any).share({
+                files: [file],
+                title: `ANIMEX Bill #${masterInvoiceNo}`,
+                text: caption,
+              });
+              setIsGeneratingImage(false);
+              return;
+            }
+          }
+        } catch (shareErr) {
+          console.warn('Web file share error:', shareErr);
+        }
+      }
+
+      // 3. Desktop PC WhatsApp Web Launch:
+      const encodedCaption = encodeURIComponent(caption);
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      let targetUrl = '';
+      if (isMobileDevice) {
+        targetUrl = cleanPhone
+          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `https://api.whatsapp.com/send?text=${encodedCaption}`;
+      } else {
+        // Desktop PC (Windows / Edge / Chrome): Open WhatsApp Web directly!
+        targetUrl = cleanPhone
+          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `https://web.whatsapp.com/send?text=${encodedCaption}`;
+      }
+
+      let win: Window | null = null;
+      try {
+        win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      } catch (e) {
+        win = null;
+      }
+
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = targetUrl;
+      }
+    } catch (err: any) {
+      console.error('Direct WhatsApp error:', err);
+      alert('WhatsApp उघडताना त्रुटी आली: ' + (err.message || 'Error'));
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   // 2. Download/Save the REAL COLOR BILL as an HD image file to Phone / PC

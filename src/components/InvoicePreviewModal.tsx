@@ -71,90 +71,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return digits;
   };
 
-  // Generate full clean Marathi/English formatted bill text for instant WhatsApp sharing
-  const getBillTextMessage = (): string => {
-    const storeName = invoice.billTo?.firmName || 'Valued Customer';
-    const contact = invoice.billTo?.contactName ? ` (${invoice.billTo.contactName})` : '';
-    const location = [invoice.billTo?.address, invoice.billTo?.district].filter(Boolean).join(', ');
 
-    let itemsList = '';
-    (invoice.items || []).forEach((item, index) => {
-      const isScheme = item.isFree || item.isScheme;
-      const freeTag = isScheme ? ' [FREE SCHEME]' : '';
-      const priceStr = isScheme ? '₹0.00' : `₹${(item.pricePerUnit || 0).toFixed(2)}`;
-      const amountStr = isScheme ? '₹0.00' : `₹${(item.amount || 0).toFixed(2)}`;
-      itemsList += `${index + 1}. *${item.itemName}*${freeTag}\n   ${item.quantity} ${item.unit} x ${priceStr} = *${amountStr}*\n`;
-    });
-
-    const balanceStatus = invoice.balanceAmount <= 0
-      ? '🟢 *PAID (पूर्ण भरले)*'
-      : invoice.receivedAmount > 0
-        ? `🟠 *PARTIALLY PAID (अपूर्ण)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`
-        : `🔴 *PENDING (बाकी)* - बाकी: ₹${(invoice.balanceAmount || 0).toFixed(2)}`;
-
-    return (
-      `🏢 *${companyProfile.companyName}*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
-      `📅 *तारीख (Date):* ${invoice.date}\n` +
-      `🏥 *ग्राहक (Customer):* ${storeName}${contact}\n` +
-      (location ? `📍 *पत्ता (Address):* ${location}\n` : '') +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *वस्तू तपशील (Items):*\n` +
-      itemsList +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 *Sub Total:* ₹${(invoice.subTotal || 0).toFixed(2)}\n` +
-      (invoice.discount && invoice.discount > 0 ? `🏷️ *सवलत (Discount):* - ₹${invoice.discount.toFixed(2)}\n` : '') +
-      `💰 *निव्वळ बिल रक्कम (Total):* *₹${(invoice.totalAmount || 0).toFixed(2)}*\n` +
-      `💳 *भरलेली रक्कम (Paid):* ₹${(invoice.receivedAmount || 0).toFixed(2)} (${invoice.paymentType || 'UPI'})\n` +
-      `📌 *स्थिती (Status):* ${balanceStatus}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🏦 *बँक / UPI तपशील (Bank Details):*\n` +
-      `• बँक: ${companyProfile.bankName}\n` +
-      `• खाते क्र.: ${companyProfile.accountNo}\n` +
-      `• IFSC: ${companyProfile.ifscCode}\n` +
-      `• UPI ID: ${companyProfile.upiId}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📞 Helpline: 9307990811 / 8999323908\n` +
-      `🙏 *आपल्या सहकार्याबद्दल धन्यवाद! (Thank you!)*`
-    );
-  };
-
-  // 1. INSTANT WHATSAPP (0.1s) - Opens WhatsApp immediately with full bill details
-  const handleInstantWhatsApp = () => {
-    try {
-      const text = getBillTextMessage();
-      const cleanPhone = getCleanCustomerPhone();
-
-      if (isNative || isMobile) {
-        // Direct WhatsApp launch via app intent scheme (instant 0.1s)
-        const whatsappSchemeUrl = cleanPhone
-          ? `whatsapp://send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
-          : `whatsapp://send?text=${encodeURIComponent(text)}`;
-
-        window.location.href = whatsappSchemeUrl;
-
-        // Fallback for browsers if protocol is not registered
-        if (!isNative) {
-          setTimeout(() => {
-            const webFallback = cleanPhone
-              ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
-              : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-            window.open(webFallback, '_blank');
-          }, 1500);
-        }
-      } else {
-        // Desktop Browser: Open WhatsApp Web
-        const targetUrl = cleanPhone
-          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
-          : `https://web.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-        window.open(targetUrl, '_blank');
-      }
-    } catch (err: any) {
-      console.error('Instant WhatsApp error:', err);
-      alert('WhatsApp उघडताना त्रुटी आली: ' + (err.message || 'Error'));
-    }
-  };
 
   // Helper to render the original color bill into a Canvas with optimized mobile performance
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
@@ -224,12 +141,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           directory: Directory.Cache,
         });
 
-        // Trigger native Android share sheet (directly shares PNG image into WhatsApp)
+        // Trigger native Android share sheet (shares original PNG image into WhatsApp)
         await Share.share({
           title: `ANIMEX Bill #${masterInvoiceNo} - ${invoice.billTo?.firmName || 'Store'}`,
           text: captionText,
-          url: savedFile.uri,
-          dialogTitle: 'WhatsApp किंवा इतर ॲपवर बिल पाठवा',
+          files: [savedFile.uri],
+          dialogTitle: 'WhatsApp निवडा (Select WhatsApp)',
         });
         return;
       }
@@ -292,7 +209,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       setShowWhatsAppWebModal(true);
 
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
+      if (err.name !== 'AbortError' && !err.message?.toLowerCase().includes('cancel')) {
         console.error('WhatsApp share error:', err);
         alert('WhatsApp शेअर करताना त्रुटी आली: ' + (err.message || 'कृपया Save Photo वापरा.'));
       }
@@ -370,64 +287,54 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             </button>
           </div>
 
-          {/* Action Buttons: 1. Instant WhatsApp (0.1s), 2. WhatsApp Color Photo, 3. Save Photo, 4. Print/PDF */}
+          {/* Action Buttons: Exactly 3 options requested by User: 1. WhatsApp, 2. Save Photo, 3. Print */}
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
-            {/* Instant WhatsApp Button */}
-            <button
-              type="button"
-              onClick={handleInstantWhatsApp}
-              disabled={isGeneratingImage}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black px-3 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="0.1 सेकंदात WhatsApp वर संपूर्ण बिल पाठवा (Instant Text Bill)"
-            >
-              <MessageSquare className="w-4 h-4 text-emerald-200" />
-              <span>WhatsApp (थेट बिल)</span>
-            </button>
-
-            {/* WhatsApp Color Photo Share Button */}
+            {/* 1. WhatsApp Button - Shares Original Colorful Bill directly */}
             <button
               type="button"
               onClick={handleWhatsAppPhotoShare}
               disabled={isGeneratingImage}
-              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-black px-3 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="रंगीत बिलाचा फोटो WhatsApp वर शेअर करा (Color Bill Photo)"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black px-3.5 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
+              title="WhatsApp वर ओरिजिनल बिल पाठवा (Share Original Bill on WhatsApp)"
             >
               {isGeneratingImage ? (
-                <Loader2 className="w-4 h-4 animate-spin text-teal-200" />
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-200" />
               ) : (
-                <Share2 className="w-4 h-4 text-teal-200" />
+                <MessageSquare className="w-4 h-4 text-emerald-200 fill-emerald-200/20" />
               )}
-              <span>रंगीत फोटो (WhatsApp)</span>
+              <span>WhatsApp</span>
             </button>
 
-            {/* Save Photo Button */}
+            {/* 2. Save Photo Button */}
             <button
               type="button"
               onClick={handleDownloadPhoto}
               disabled={isGeneratingImage}
-              className="bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-black px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="रंगीत बिल फोटो म्हणून सेव्ह करा (Save Photo)"
+              className="bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-black px-3 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
+              title="रंगीत बिल फोटो सेव्ह करा (Save Photo)"
             >
               <Download className="w-4 h-4 text-sky-200" />
               <span>Save Photo</span>
             </button>
 
-            {/* Print / PDF Button */}
+            {/* 3. Print Button */}
             <button
               type="button"
               onClick={handlePrint}
               disabled={isGeneratingImage}
-              className="bg-animex-blue-600 hover:bg-animex-blue-700 disabled:opacity-60 text-white font-black px-2.5 sm:px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
+              className="bg-animex-blue-600 hover:bg-animex-blue-700 disabled:opacity-60 text-white font-black px-3 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
               title="Print or Save as PDF"
             >
               <Printer className="w-4 h-4" />
               <span>Print</span>
             </button>
 
+            {/* Close Modal Button */}
             <button
               type="button"
               onClick={onClose}
               className="hidden sm:block bg-slate-600 hover:bg-slate-500 text-white font-bold p-2 rounded-xl text-xs transition-all cursor-pointer"
+              title="Close"
             >
               <X className="w-5 h-5" />
             </button>

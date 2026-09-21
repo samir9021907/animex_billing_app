@@ -12,6 +12,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { PurchasesManager } from './components/PurchasesManager';
 import { Invoice, MedicalStore, Product, PurchaseInvoice } from './types';
 import { INITIAL_INVOICES, INITIAL_PRODUCTS, INITIAL_STORES, INITIAL_PURCHASES } from './data/seedData';
+import { convertNumberToWords } from './utils/numberToWords';
 import {
   syncInvoiceToBackend,
   deleteInvoiceFromBackend,
@@ -21,7 +22,9 @@ import {
   fetchInvoicesFromBackend,
   fetchProductsFromBackend,
   syncProductToBackend,
-  deleteProductFromBackend
+  deleteProductFromBackend,
+  fetchUnifiedSyncFromBackend,
+  warmupBackendConnection
 } from './utils/api';
 import { authService, UserSession } from './services/authService';
 
@@ -113,34 +116,62 @@ export const App: React.FC = () => {
   invoicesRef.current = invoices;
   const productsRef = useRef(products);
   productsRef.current = products;
+  const isSyncingRef = useRef(false);
 
-  // ─── Bidirectional Cloud Neon Database Sync ─────────────────────────────────
+  // ─── ⚡ Ultra-Fast Bidirectional Cloud Neon Database Sync ────────────────────
   const syncCloudData = useCallback(async () => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setIsSyncingCloud(true);
+    const syncStart = performance.now();
+
     try {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-      // 1. Fetch stores from Neon DB (Cloud is master source of truth)
-      const cloudStores = await fetchStoresFromBackend();
-      if (cloudStores && Array.isArray(cloudStores)) {
-        const storeMap = new Map<string, MedicalStore>();
-        for (const s of cloudStores) {
-          const key = s.firmName?.trim().toLowerCase();
-          if (key && !storeMap.has(key)) {
-            storeMap.set(key, s);
-          }
+      // 1. FAST FETCH: Try unified single-request sync first, fallback to parallel fetching
+      let cloudStores: MedicalStore[] = [];
+      let cloudInvoices: Invoice[] = [];
+      let cloudProducts: Product[] = [];
+
+      const unifiedResult = await fetchUnifiedSyncFromBackend();
+      if (unifiedResult) {
+        cloudStores = unifiedResult.stores;
+        cloudInvoices = unifiedResult.invoices;
+        cloudProducts = unifiedResult.products;
+      } else {
+        // Parallel fallback: fetch all 3 endpoints simultaneously
+        const [storesData, invoicesData, productsData] = await Promise.all([
+          fetchStoresFromBackend(),
+          fetchInvoicesFromBackend(),
+          fetchProductsFromBackend(),
+        ]);
+        cloudStores = storesData;
+        cloudInvoices = invoicesData;
+        cloudProducts = productsData;
+      }
+
+      // 2. PROCESS STORES (Local-First Merge + Parallel Upload)
+      const storeMap = new Map<string, MedicalStore>();
+      for (const s of cloudStores) {
+        const key = s.firmName?.trim().toLowerCase();
+        if (key && !storeMap.has(key)) {
+          storeMap.set(key, s);
         }
+      }
 
-        const currentStores = storesRef.current;
-        // Only push genuinely new local offline stores (no UUID)
-        const unsyncedStores = currentStores.filter(
-          (ls) => !uuidRegex.test(ls.id) &&
-                  !storeMap.has(ls.firmName.trim().toLowerCase())
+      const currentStores = storesRef.current;
+      const unsyncedStores = currentStores.filter(
+        (ls) => !uuidRegex.test(ls.id) &&
+                !storeMap.has(ls.firmName.trim().toLowerCase())
+      );
+
+      if (unsyncedStores.length > 0) {
+        const storeUploads = await Promise.allSettled(
+          unsyncedStores.map(unsynced => syncStoreToBackend(unsynced))
         );
-
-        for (const unsynced of unsyncedStores) {
-          const created = await syncStoreToBackend(unsynced);
-          if (created && created.id) {
+        storeUploads.forEach(res => {
+          if (res.status === 'fulfilled' && res.value && res.value.id) {
+            const created = res.value;
             const syncedStore: MedicalStore = {
               id: created.id,
               firmName: created.firm_name,
@@ -152,28 +183,29 @@ export const App: React.FC = () => {
             };
             storeMap.set(syncedStore.firmName.trim().toLowerCase(), syncedStore);
           }
-        }
-
-        setStores(Array.from(storeMap.values()));
+        });
       }
+      const finalStores = Array.from(storeMap.values());
 
-      // 2. Fetch invoices from Neon DB (Cloud is master source of truth)
-      const cloudInvoices = await fetchInvoicesFromBackend();
-      if (cloudInvoices && Array.isArray(cloudInvoices)) {
-        const currentInvoices = invoicesRef.current;
-        // Only push genuinely new local offline bills (no UUID)
-        const unsyncedInvoices = currentInvoices.filter(
-          (li) => !uuidRegex.test(li.id) &&
-                  !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
+      // 3. PROCESS INVOICES (Local-First Merge + Parallel Upload)
+      const currentInvoices = invoicesRef.current;
+      const unsyncedInvoices = currentInvoices.filter(
+        (li) => !uuidRegex.test(li.id) &&
+                !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
+      );
+
+      if (unsyncedInvoices.length > 0) {
+        const invoiceUploads = await Promise.allSettled(
+          unsyncedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
         );
-
-        for (const unsynced of unsyncedInvoices) {
-          const created = await syncInvoiceToBackend(unsynced);
-          if (created && created.id) {
+        invoiceUploads.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value && res.value.id) {
+            const created = res.value;
+            const unsynced = unsyncedInvoices[idx];
             const rawItems = Array.isArray(created.items) ? created.items : [];
-            const items = rawItems.map((it: any, idx: number) => ({
-              id: `item-${idx}-${Date.now()}`,
-              productId: it.productId || `p-${idx}`,
+            const items = rawItems.map((it: any, i: number) => ({
+              id: `item-${i}-${Date.now()}`,
+              productId: it.productId || `p-${i}`,
               itemName: it.product_title || it.itemName || 'Product',
               quantity: Number(it.quantity || 1),
               unit: it.unit || 'Ltr',
@@ -203,6 +235,7 @@ export const App: React.FC = () => {
               subTotal: Number(created.subtotal || 0),
               discount: Number(created.discount || 0),
               totalAmount: Number(created.grand_total || 0),
+              amountInWords: unsynced.amountInWords || convertNumberToWords(Number(created.grand_total || unsynced.totalAmount || 0)),
               paymentType: created.payment_type || 'UPI',
               receivedAmount: Number(created.received_amount || 0),
               balanceAmount: Number(created.balance_due || 0),
@@ -212,32 +245,32 @@ export const App: React.FC = () => {
               createdAt: created.created_at || new Date().toISOString(),
             });
           }
-        }
-
-        setInvoices(cloudInvoices);
+        });
       }
 
-      // 3. Fetch products from Neon DB (Cloud is master source of truth)
-      const cloudProducts = await fetchProductsFromBackend();
-      if (cloudProducts && Array.isArray(cloudProducts) && cloudProducts.length > 0) {
-        const prodMap = new Map<string, Product>();
-        for (const p of cloudProducts) {
-          const key = p.name?.trim().toLowerCase();
-          if (key && !prodMap.has(key)) {
-            prodMap.set(key, p);
-          }
+      // 4. PROCESS PRODUCTS (Local-First Merge + Parallel Upload)
+      const prodMap = new Map<string, Product>();
+      for (const p of cloudProducts) {
+        const key = p.name?.trim().toLowerCase();
+        if (key && !prodMap.has(key)) {
+          prodMap.set(key, p);
         }
+      }
 
-        const currentProducts = productsRef.current;
-        // Only push genuinely new local offline products (no UUID and not in cloud by name)
-        const unsyncedProducts = currentProducts.filter(
-          (lp) => !uuidRegex.test(lp.id) &&
-                  !prodMap.has(lp.name.trim().toLowerCase())
+      const currentProducts = productsRef.current;
+      const unsyncedProducts = currentProducts.filter(
+        (lp) => !uuidRegex.test(lp.id) &&
+                !prodMap.has(lp.name.trim().toLowerCase())
+      );
+
+      if (unsyncedProducts.length > 0) {
+        const productUploads = await Promise.allSettled(
+          unsyncedProducts.map(unsynced => syncProductToBackend(unsynced))
         );
-
-        for (const unsynced of unsyncedProducts) {
-          const created = await syncProductToBackend(unsynced);
-          if (created && created.id) {
+        productUploads.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value && res.value.id) {
+            const created = res.value;
+            const unsynced = unsyncedProducts[idx];
             const syncedProduct: Product = {
               id: created.id,
               name: created.product_title || unsynced.name,
@@ -251,21 +284,32 @@ export const App: React.FC = () => {
             };
             prodMap.set(syncedProduct.name.trim().toLowerCase(), syncedProduct);
           }
-        }
-
-        setProducts(Array.from(prodMap.values()));
+        });
       }
+      const finalProducts = Array.from(prodMap.values());
 
+      // 5. BATCH SINGLE STATE UPDATE (prevents UI re-render jitter)
+      if (finalStores.length > 0) setStores(finalStores);
+      if (cloudInvoices.length > 0) setInvoices(cloudInvoices);
+      if (finalProducts.length > 0) setProducts(finalProducts);
       setLastSyncTime(new Date());
+
+      const durationMs = Math.round(performance.now() - syncStart);
+      console.log(`⚡ Fast Cloud Sync finished in ${durationMs}ms`);
+
     } catch (e) {
       console.warn('Background cloud sync notice:', e);
     } finally {
+      isSyncingRef.current = false;
       setIsSyncingCloud(false);
     }
   }, []);
 
   // Set up listeners for real-time multi-device sync (only when user is logged in)
   useEffect(() => {
+    // 0. Instant non-blocking connection warm-up
+    warmupBackendConnection();
+
     if (!currentUser) return;
 
     let lastAutoSync = Date.now();
@@ -273,10 +317,10 @@ export const App: React.FC = () => {
     // 1. Initial mount sync
     syncCloudData();
 
-    // 2. Tab / Window focus (with 45-second cooldown to prevent repeated calls on DevTools/tab clicks)
+    // 2. Tab / Window focus (with 30-second cooldown to prevent repeated calls)
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastAutoSync > 45000) {
+      if (now - lastAutoSync > 30000) {
         lastAutoSync = now;
         syncCloudData();
       }
@@ -287,7 +331,7 @@ export const App: React.FC = () => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        if (now - lastAutoSync > 45000) {
+        if (now - lastAutoSync > 30000) {
           lastAutoSync = now;
           syncCloudData();
         }
@@ -295,11 +339,11 @@ export const App: React.FC = () => {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 4. Gentle background auto-sync interval every 60 seconds (1 minute)
+    // 4. Gentle background auto-sync interval every 45 seconds
     const intervalId = setInterval(() => {
       lastAutoSync = Date.now();
       syncCloudData();
-    }, 60000);
+    }, 45000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);

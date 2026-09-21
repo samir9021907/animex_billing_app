@@ -1,5 +1,5 @@
-// API Client for ANIMEX BILLING APP
-// Connected to dedicated 24/7 live backend on Render & Neon PostgreSQL Database
+import { convertNumberToWords } from './numberToWords';
+
 export const API_BASE = (import.meta as any).env?.VITE_API_URL || 'https://animex-billing-backend.onrender.com';
 
 export const PERMANENT_CLIENT_ID = 'c1111111-1111-1111-1111-111111111111';
@@ -30,24 +30,116 @@ const getClientId = (): string => {
   return PERMANENT_CLIENT_ID;
 };
 
+// ─── Non-blocking Background Warm-Up Ping ─────────────────────────────────────
+export const warmupBackendConnection = () => {
+  try {
+    fetch(`${API_BASE}/health`, { method: 'GET', keepalive: true }).catch(() => {});
+  } catch {}
+};
+
+// ─── Data Mappers ─────────────────────────────────────────────────────────────
+export const mapBackendStore = (s: any) => ({
+  id: s.id,
+  firmName: s.firm_name,
+  contactName: s.contact_person_name || '',
+  phone: s.phone_number || '',
+  district: s.district || 'Maharashtra',
+  address: s.address || '',
+  state: 'Maharashtra',
+});
+
+export const mapBackendInvoice = (inv: any) => {
+  const rawItems = Array.isArray(inv.items) ? inv.items : [];
+  const items = rawItems.map((it: any, idx: number) => ({
+    id: `item-${idx}-${Date.now()}`,
+    productId: it.productId || it.product_id || '',
+    itemName: it.product_title || it.itemName || 'Product',
+    quantity: Number(it.quantity || 1),
+    unit: it.unit || 'Ltr',
+    mrp: Number(it.mrp || 0),
+    pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
+    amount: Number(it.amount || 0),
+    isFree: Boolean(it.is_free),
+    isScheme: Boolean(it.is_free),
+  }));
+
+  const storeData = inv.medical_store || {};
+  return {
+    id: inv.id,
+    invoiceNo: inv.company_invoice_number || (inv.invoice_number ? Number(inv.invoice_number.replace(/\D/g, '')) : 1),
+    invoiceNumber: inv.invoice_number || `#${inv.company_invoice_number || 1}`,
+    globalBillId: inv.global_bill_id ? Number(inv.global_bill_id) : undefined,
+    date: inv.date ? inv.date.split('T')[0] : new Date().toISOString().split('T')[0],
+    billTo: {
+      id: storeData.id || inv.medical_store_id,
+      firmName: storeData.firm_name || 'Medical Store',
+      contactName: storeData.contact_person_name || '',
+      phone: storeData.phone_number || '',
+      district: storeData.district || '',
+      address: storeData.address || '',
+      state: 'Maharashtra',
+    },
+    items,
+    subTotal: Number(inv.subtotal || 0),
+    discount: Number(inv.discount || 0),
+    totalAmount: Number(inv.grand_total || 0),
+    amountInWords: inv.amountInWords || convertNumberToWords(Number(inv.grand_total || 0)),
+    paymentType: inv.payment_type || 'UPI',
+    receivedAmount: Number(inv.received_amount || 0),
+    balanceAmount: Number(inv.balance_due || 0),
+    status: inv.status?.toUpperCase() || 'PENDING',
+    notes: inv.notes || '',
+    termsAndConditions: inv.notes || 'Goods once sold will not be taken back.',
+    createdAt: inv.created_at || new Date().toISOString(),
+  };
+};
+
+export const mapBackendProduct = (p: any) => ({
+  id: p.id,
+  name: p.product_title,
+  category: p.category?.category_name || 'General',
+  defaultUnit: p.unit || 'Ltr',
+  defaultPrice: Number(p.selling_price || 0),
+  mrp: Number(p.mrp || 0),
+  stockQuantity: Number(p.quantity ?? 100),
+  boxCapacity: Number(p.box_capacity ?? (p.product_title?.includes('25kg') ? 1 : 50)),
+  minStockAlert: Number(p.min_stock_alert ?? 50),
+});
+
+// ─── ⚡ Unified Fast Sync (Single 1-Shot HTTP Request) ─────────────────────────
+export const fetchUnifiedSyncFromBackend = async (): Promise<{ stores: any[]; invoices: any[]; products: any[] } | null> => {
+  try {
+    const clientId = getClientId();
+    const res = await fetch(`${API_BASE}/client/${clientId}/sync-all`, {
+      headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
+    });
+    const json = await res.json();
+    if (json.success && json.data) {
+      const stores = Array.isArray(json.data.stores) ? json.data.stores.map(mapBackendStore) : [];
+      const invoices = Array.isArray(json.data.invoices) ? json.data.invoices.map(mapBackendInvoice) : [];
+      const products = Array.isArray(json.data.products) ? json.data.products.map(mapBackendProduct) : [];
+      return { stores, invoices, products };
+    }
+  } catch (e) {
+    console.warn('Unified fast sync fallback:', e);
+  }
+  return null;
+};
+
 // ─── Fetch All Medical Stores from Neon DB ────────────────────────────────────
 export const fetchStoresFromBackend = async (): Promise<any[]> => {
   try {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores`, {
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
     });
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
-      return json.data.map((s: any) => ({
-        id: s.id,
-        firmName: s.firm_name,
-        contactName: s.contact_person_name || '',
-        phone: s.phone_number || '',
-        district: s.district || 'Maharashtra',
-        address: s.address || '',
-        state: 'Maharashtra',
-      }));
+      return json.data.map(mapBackendStore);
     }
   } catch (e) {
     console.warn('Failed to fetch stores from cloud backend:', e);
@@ -61,56 +153,34 @@ export const fetchInvoicesFromBackend = async (): Promise<any[]> => {
     const clientId = getClientId();
     const res = await fetch(`${API_BASE}/client/${clientId}/invoices`, {
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
     });
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
-      return json.data.map((inv: any) => {
-        const rawItems = Array.isArray(inv.items) ? inv.items : [];
-        const items = rawItems.map((it: any, idx: number) => ({
-          id: `item-${idx}-${Date.now()}`,
-          productId: it.productId || it.product_id || '',
-          itemName: it.product_title || it.itemName || 'Product',
-          quantity: Number(it.quantity || 1),
-          unit: it.unit || 'Ltr',
-          mrp: Number(it.mrp || 0),
-          pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
-          amount: Number(it.amount || 0),
-          isFree: Boolean(it.is_free),
-          isScheme: Boolean(it.is_free),
-        }));
-
-        const storeData = inv.medical_store || {};
-        return {
-          id: inv.id,
-          invoiceNo: inv.company_invoice_number || (inv.invoice_number ? Number(inv.invoice_number.replace(/\D/g, '')) : 1),
-          invoiceNumber: inv.invoice_number || `#${inv.company_invoice_number || 1}`,
-          globalBillId: inv.global_bill_id ? Number(inv.global_bill_id) : undefined,
-          date: inv.date ? inv.date.split('T')[0] : new Date().toISOString().split('T')[0],
-          billTo: {
-            id: storeData.id || inv.medical_store_id,
-            firmName: storeData.firm_name || 'Medical Store',
-            contactName: storeData.contact_person_name || '',
-            phone: storeData.phone_number || '',
-            district: storeData.district || '',
-            address: storeData.address || '',
-            state: 'Maharashtra',
-          },
-          items,
-          subTotal: Number(inv.subtotal || 0),
-          discount: Number(inv.discount || 0),
-          totalAmount: Number(inv.grand_total || 0),
-          paymentType: inv.payment_type || 'UPI',
-          receivedAmount: Number(inv.received_amount || 0),
-          balanceAmount: Number(inv.balance_due || 0),
-          status: inv.status?.toUpperCase() || 'PENDING',
-          notes: inv.notes || '',
-          termsAndConditions: inv.notes || 'Goods once sold will not be taken back.',
-          createdAt: inv.created_at || new Date().toISOString(),
-        };
-      });
+      return json.data.map(mapBackendInvoice);
     }
   } catch (e) {
     console.warn('Failed to fetch invoices from cloud backend:', e);
+  }
+  return [];
+};
+
+// ─── Fetch All Medical Products from Neon DB ──────────────────────────────────
+export const fetchProductsFromBackend = async (): Promise<any[]> => {
+  try {
+    const clientId = getClientId();
+    const res = await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products`, {
+      headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
+    });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      return json.data.map(mapBackendProduct);
+    }
+  } catch (e) {
+    console.warn('Failed to fetch products from cloud backend:', e);
   }
   return [];
 };
@@ -129,6 +199,8 @@ export const syncStoreToBackend = async (store: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
       body: JSON.stringify({
         firm_name: store.firmName,
         contact_person_name: store.contactName || '',
@@ -155,6 +227,8 @@ export const deleteStoreFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
     });
   } catch (e) {
     console.warn('Store delete failed, saved locally:', e);
@@ -209,6 +283,8 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
       body: JSON.stringify({
         medical_store_id: storeId,
         date: isoDate,
@@ -238,37 +314,12 @@ export const deleteInvoiceFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/client/${clientId}/invoices/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
     });
   } catch (e) {
     console.warn('Backend delete failed, saved locally:', e);
   }
-};
-
-// ─── Fetch All Medical Products from Neon DB ──────────────────────────────────
-export const fetchProductsFromBackend = async (): Promise<any[]> => {
-  try {
-    const clientId = getClientId();
-    const res = await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products`, {
-      headers: getAuthHeaders(),
-    });
-    const json = await res.json();
-    if (json.success && Array.isArray(json.data)) {
-      return json.data.map((p: any) => ({
-        id: p.id,
-        name: p.product_title,
-        category: p.category?.category_name || 'General',
-        defaultUnit: p.unit || 'Ltr',
-        defaultPrice: Number(p.selling_price || 0),
-        mrp: Number(p.mrp || 0),
-        stockQuantity: Number(p.quantity ?? 100),
-        boxCapacity: Number(p.box_capacity ?? (p.product_title?.includes('25kg') ? 1 : 50)),
-        minStockAlert: Number(p.min_stock_alert ?? 50),
-      }));
-    }
-  } catch (e) {
-    console.warn('Failed to fetch products from cloud backend:', e);
-  }
-  return [];
 };
 
 // ─── Save / Sync Medical Product to Neon DB ───────────────────────────────────
@@ -285,6 +336,8 @@ export const syncProductToBackend = async (product: any): Promise<any> => {
     const res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
       body: JSON.stringify({
         product_title: product.name,
         category_name: product.category || 'General',
@@ -314,9 +367,10 @@ export const deleteProductFromBackend = async (id: string) => {
     await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
+      signal: AbortSignal.timeout(6500),
+      keepalive: true,
     });
   } catch (e) {
     console.warn('Product delete failed, saved locally:', e);
   }
 };
-

@@ -197,8 +197,8 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-label="Neon Cloud PostgreSQL Live Sync"
               >
                 <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 ${isSyncingCloud ? 'animate-spin text-amber-300' : ''}`} />
-                <span className="hidden sm:inline text-[11px] font-extrabold text-emerald-300">
-                  {isSyncingCloud ? 'सिंक होत आहे...' : 'Cloud Synced'}
+                <span className="text-[11px] font-extrabold text-emerald-300 whitespace-nowrap">
+                  {isSyncingCloud ? 'सिंक...' : 'Sync'}
                 </span>
               </button>
             )}

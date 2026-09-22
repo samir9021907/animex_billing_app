@@ -438,9 +438,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 {/* Logo Area */}
                 <div className="w-28 sm:w-36 h-16 sm:h-24 flex items-center justify-center shrink-0 bg-white p-1.5 border border-slate-200 rounded-xl shadow-sm">
                   <img
-                    src="/images/logo image.jpg"
+                    src="/images/logo.png"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/images/logo.png';
+                      (e.target as HTMLImageElement).src = '/images/logo image.jpg';
                     }}
                     alt="ANIMEX Official Logo"
                     className="max-h-14 sm:max-h-20 max-w-full object-contain"

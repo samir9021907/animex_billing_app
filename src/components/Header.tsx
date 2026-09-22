@@ -89,10 +89,10 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => handleTabClick('dashboard')}
             >
               <img
-                src="/images/logo image.jpg"
-                onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo.png'; }}
+                src="/images/logo.png"
+                onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo image.jpg'; }}
                 alt="ANIMEX Logo"
-                className="h-8 sm:h-10 w-auto object-contain rounded-lg bg-white p-0.5 shadow-md"
+                className="h-9 sm:h-11 w-auto object-contain rounded-xl bg-white p-1 shadow-md border border-white/20"
               />
               <div>
                 <div className="flex items-center gap-1.5">
@@ -394,8 +394,8 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0D2A4D] via-[#123963] to-[#17395F] border border-white/10 shadow-lg relative overflow-hidden">
                 <div className="flex items-start justify-between">
                   <img
-                    src="/images/logo image.jpg"
-                    onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo.png'; }}
+                    src="/images/logo.png"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/images/logo image.jpg'; }}
                     alt="ANIMEX Logo"
                     className="h-12 w-12 object-contain rounded-xl bg-white p-1.5 shadow-md border border-white/20"
                   />

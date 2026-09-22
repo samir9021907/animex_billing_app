@@ -227,9 +227,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         <div className="flex items-center gap-3.5 mb-6">
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-[0_8px_20px_rgba(13,42,77,0.08)] border border-slate-100 flex items-center justify-center p-2.5 flex-shrink-0">
             <img
-              src="/images/logo image.jpg"
+              src="/images/logo.png"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/logo.png';
+                (e.target as HTMLImageElement).src = '/images/logo image.jpg';
               }}
               alt="ANIMEX Logo"
               className="w-full h-full object-contain rounded-xl"

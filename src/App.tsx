@@ -24,11 +24,15 @@ import {
   syncProductToBackend,
   deleteProductFromBackend,
   fetchUnifiedSyncFromBackend,
-  warmupBackendConnection
+  warmupBackendConnection,
 } from './utils/api';
 import { authService, UserSession } from './services/authService';
+import { useLanguage } from './context/LanguageContext';
 
 export const App: React.FC = () => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
@@ -124,7 +128,7 @@ export const App: React.FC = () => {
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
     setIsSyncingCloud(true);
-    if (isManual) setSyncNotice('सिंक सुरू आहे...');
+    if (isManual) setSyncNotice(isMr ? 'सिंक सुरू आहे...' : isHi ? 'सिंक हो रहा है...' : 'Syncing with cloud...');
     const syncStart = performance.now();
 
     try {
@@ -301,20 +305,20 @@ export const App: React.FC = () => {
       const totalDuration = Math.round(performance.now() - syncStart);
       const displayDuration = fastSyncDuration || totalDuration;
       const secText = (displayDuration / 1000).toFixed(1);
-      setSyncNotice(`✓ सिंक पूर्ण (${secText}s)`);
+      setSyncNotice(isMr ? `✓ सिंक पूर्ण (${secText}s)` : isHi ? `✓ सिंक सफल (${secText}s)` : `✓ Synced (${secText}s)`);
       setTimeout(() => setSyncNotice(''), 3500);
 
       console.log(`⚡ Fast Cloud Sync finished in ${totalDuration}ms`);
 
     } catch (e) {
       console.warn('Background cloud sync notice:', e);
-      setSyncNotice('सिंक पूर्ण (Offline Mode)');
+      setSyncNotice(isMr ? 'ऑफलाईन मोड' : isHi ? 'ऑफ़लाइन मोड' : 'Offline Mode');
       setTimeout(() => setSyncNotice(''), 3000);
     } finally {
       isSyncingRef.current = false;
       setIsSyncingCloud(false);
     }
-  }, []);
+  }, [isMr, isHi]);
 
   // Set up listeners for real-time multi-device sync (only when user is logged in)
   useEffect(() => {
@@ -513,7 +517,12 @@ export const App: React.FC = () => {
 
   const handleDeleteInvoice = async (invoiceId: string) => {
     const invToDelete = invoices.find(inv => inv.id === invoiceId);
-    if (!window.confirm('Are you sure you want to delete this bill from history?\n(हे बिल डिलीट करायचे आहे का? या बिलातील सर्व प्रॉडक्ट्सचा स्टॉक पुन्हा गोडाऊनमध्ये जमा होईल.)')) {
+    const confirmMsg = isMr
+      ? 'तुम्हाला हे बिल कायमचे डिलीट करायचे आहे का?\n(या बिलातील सर्व उत्पादनांचा स्टॉक पुन्हा गोदामात जमा केला जाईल.)'
+      : isHi
+      ? 'क्या आप इस बिल को हटाना चाहते हैं?\n(इस बिल के सभी उत्पादों का स्टॉक गोदाम में वापस जोड़ दिया जाएगा।)'
+      : 'Are you sure you want to delete this bill from history?\n(All product stock from this bill will be restored to your inventory.)';
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 

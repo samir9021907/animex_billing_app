@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { useLanguage } from '../context/LanguageContext';
 
 interface WhatsAppOpenerPlugin {
   openWhatsApp(options: { phone?: string; text: string }): Promise<void>;
@@ -29,6 +30,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   invoice,
   onClose,
 }) => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+
   // Master continuous Bill Number matching animex_frontend
   const masterInvoiceNo = invoice.companyInvoiceNumber || invoice.invoiceNo;
   const statusBadge = getStatusBadgeConfig(
@@ -106,39 +111,54 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     const discountAmt = safeNum(invoice?.discount);
 
     const balanceStatus = balanceAmt <= 0
-      ? '🟢 *PAID (पूर्ण भरले)*'
+      ? (isMr ? '🟢 *पूर्ण भरले (PAID)*' : isHi ? '🟢 *पूर्ण भुगतान (PAID)*' : '🟢 *PAID*')
       : receivedAmt > 0
-        ? `🟠 *PARTIALLY PAID (अपूर्ण)* - बाकी: ₹${balanceAmt.toFixed(2)}`
-        : `🔴 *PENDING (बाकी)* - बाकी: ₹${balanceAmt.toFixed(2)}`;
+        ? (isMr ? `🟠 *अंशतः भरले* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🟠 *आंशिक भुगतान* - शेष: ₹${balanceAmt.toFixed(2)}` : `🟠 *PARTIALLY PAID* - Balance: ₹${balanceAmt.toFixed(2)}`)
+        : (isMr ? `🔴 *बाकी* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🔴 *बकाया* - शेष: ₹${balanceAmt.toFixed(2)}` : `🔴 *PENDING* - Balance: ₹${balanceAmt.toFixed(2)}`);
 
     const invDate = invoice?.date || new Date().toISOString().split('T')[0];
+
+    const labelDate = isMr ? 'तारीख' : isHi ? 'दिनांक' : 'Date';
+    const labelCustomer = isMr ? 'ग्राहक' : isHi ? 'ग्राहक' : 'Customer';
+    const labelAddress = isMr ? 'पत्ता' : isHi ? 'पता' : 'Address';
+    const labelItems = isMr ? 'वस्तू तपशील' : isHi ? 'सामग्री विवरण' : 'Items';
+    const labelSubTotal = 'Sub Total';
+    const labelDiscount = isMr ? 'सवलत' : isHi ? 'छूट' : 'Discount';
+    const labelTotal = isMr ? 'एकूण बिल रक्कम' : isHi ? 'कुल बिल राशि' : 'Total Amount';
+    const labelPaid = isMr ? 'भरलेली रक्कम' : isHi ? 'भुगतान राशि' : 'Paid Amount';
+    const labelBalance = isMr ? 'बाकी रक्कम' : isHi ? 'बकाया राशि' : 'Balance Due';
+    const labelStatus = isMr ? 'स्थिती' : isHi ? 'स्थिति' : 'Status';
+    const labelBank = isMr ? 'बँक / UPI तपशील' : isHi ? 'बैंक / UPI विवरण' : 'Bank & UPI Details';
+    const labelBankName = isMr ? 'बँक' : isHi ? 'बैंक' : 'Bank';
+    const labelAccountNo = isMr ? 'खाते क्र.' : isHi ? 'खाता सं.' : 'A/C No.';
+    const thankYou = isMr ? 'आपल्या सहकार्याबद्दल धन्यवाद!' : isHi ? 'व्यापार के लिए धन्यवाद!' : 'Thank you for your business!';
 
     return (
       `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
-      `📅 *तारीख (Date):* ${invDate}\n` +
-      `🏥 *ग्राहक (Customer):* ${storeName}${contact}\n` +
-      (location ? `📍 *पत्ता (Address):* ${location}\n` : '') +
+      `📅 *${labelDate}:* ${invDate}\n` +
+      `🏥 *${labelCustomer}:* ${storeName}${contact}\n` +
+      (location ? `📍 *${labelAddress}:* ${location}\n` : '') +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *वस्तू तपशील (Items):*\n` +
+      `📦 *${labelItems}:*\n` +
       itemsList +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 *Sub Total:* ₹${subTotalAmt.toFixed(2)}\n` +
-      (discountAmt > 0 ? `🏷️ *सवलत (Discount):* - ₹${discountAmt.toFixed(2)}\n` : '') +
-      `💰 *निव्वळ बिल रक्कम (Total):* *₹${totalAmt.toFixed(2)}*\n` +
-      `💳 *भरलेली रक्कम (Paid):* ₹${receivedAmt.toFixed(2)} (${invoice?.paymentType || 'UPI'})\n` +
-      `📌 *बाकी रक्कम (Balance):* ₹${balanceAmt.toFixed(2)}\n` +
-      `📌 *स्थिती (Status):* ${balanceStatus}\n` +
+      `💵 *${labelSubTotal}:* ₹${subTotalAmt.toFixed(2)}\n` +
+      (discountAmt > 0 ? `🏷️ *${labelDiscount}:* - ₹${discountAmt.toFixed(2)}\n` : '') +
+      `💰 *${labelTotal}:* *₹${totalAmt.toFixed(2)}*\n` +
+      `💳 *${labelPaid}:* ₹${receivedAmt.toFixed(2)} (${invoice?.paymentType || 'UPI'})\n` +
+      `📌 *${labelBalance}:* ₹${balanceAmt.toFixed(2)}\n` +
+      `📌 *${labelStatus}:* ${balanceStatus}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🏦 *बँक / UPI तपशील (Bank Details):*\n` +
-      `• बँक: ${companyProfile?.bankName || 'State Bank of India'}\n` +
-      `• खाते क्र.: ${companyProfile?.accountNo || '389920194821'}\n` +
+      `🏦 *${labelBank}:*\n` +
+      `• ${labelBankName}: ${companyProfile?.bankName || 'State Bank of India'}\n` +
+      `• ${labelAccountNo}: ${companyProfile?.accountNo || '389920194821'}\n` +
       `• IFSC: ${companyProfile?.ifscCode || 'SBIN0004123'}\n` +
       `• UPI ID: ${companyProfile?.upiId || 'animex@sbi'}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📞 Helpline: 8799883858 / 9146133858\n` +
-      `🙏 *आपल्या सहकार्याबद्दल धन्यवाद! (Thank you!)*`
+      `🙏 *${thankYou}*`
     );
   };
 
@@ -166,12 +186,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const handleDirectWhatsApp = async () => {
     try {
       setIsGeneratingImage(true);
-      setGeneratingMsg('मूळ रंगीत बिल WhatsApp साठी तयार होत आहे...');
+      setGeneratingMsg(isMr ? 'मूळ रंगीत बिल WhatsApp साठी तयार होत आहे...' : isHi ? 'WhatsApp के लिए बिल तैयार हो रहा है...' : 'Preparing bill image for WhatsApp...');
 
       const cleanPhone = getCleanCustomerPhone();
       const cleanStore = (invoice?.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
-      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *ग्राहक:* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *एकूण रक्कम (Total):* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *बाकी रक्कम (Balance):* ₹${safeNum(invoice?.balanceAmount).toFixed(2)}`;
+      const customerLabel = isMr ? 'ग्राहक:' : isHi ? 'ग्राहक:' : 'Customer:';
+      const totalLabel = isMr ? 'एकूण रक्कम:' : isHi ? 'कुल राशि:' : 'Total:';
+      const balanceLabel = isMr ? 'बाकी रक्कम:' : isHi ? 'बकाया:' : 'Balance:';
+      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ₹${safeNum(invoice?.balanceAmount).toFixed(2)}`;
 
       // Generate the REAL COLORFUL ORIGINAL BILL canvas image
       const canvas = await generateBillCanvas();
@@ -198,7 +221,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             await Share.share({
               title: `ANIMEX Bill #${masterInvoiceNo}`,
               text: caption,
-              dialogTitle: 'WhatsApp निवडा',
+              dialogTitle: isMr ? 'WhatsApp निवडा' : 'Select WhatsApp',
             });
             setIsGeneratingImage(false);
             return;
@@ -273,7 +296,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
     } catch (err: any) {
       console.error('Direct WhatsApp error:', err);
-      alert('WhatsApp उघडताना त्रुटी आली: ' + (err.message || 'Error'));
+      alert((isMr ? 'WhatsApp उघडताना त्रुटी आली: ' : 'Error opening WhatsApp: ') + (err.message || 'Error'));
     } finally {
       setIsGeneratingImage(false);
     }
@@ -283,7 +306,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const handleDownloadPhoto = async () => {
     try {
       setIsGeneratingImage(true);
-      setGeneratingMsg('रंगीत फोटो सेव्ह होत आहे (Saving HD Photo)...');
+      setGeneratingMsg(isMr ? 'रंगीत फोटो सेव्ह होत आहे...' : isHi ? 'बिल फोटो सेव हो रहा है...' : 'Saving HD bill photo...');
       const canvas = await generateBillCanvas();
       if (!canvas) return;
 
@@ -298,7 +321,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           data: base64Data,
           directory: Directory.Documents,
         });
-        alert(`रंगीत बिल फोटो सेव्ह झाला आहे!\nफाईल: ${fileName}\n(Documents फोल्डरमध्ये उपलब्ध)`);
+        alert(isMr ? `रंगीत बिल फोटो सेव्ह झाला आहे!\nफाईल: ${fileName}\n(Documents फोल्डरमध्ये उपलब्ध)` : `Bill photo saved successfully!\nFile: ${fileName}\n(Saved to Documents folder)`);
         return;
       }
 
@@ -312,7 +335,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       document.body.removeChild(a);
     } catch (err: any) {
       console.error('Download photo error:', err);
-      alert('फोटो सेव्ह करताना त्रुटी आली: ' + (err.message || 'Failed'));
+      alert((isMr ? 'फोटो सेव्ह करताना त्रुटी आली: ' : 'Failed to save photo: ') + (err.message || 'Failed'));
     } finally {
       setIsGeneratingImage(false);
       setGeneratingMsg('');
@@ -354,7 +377,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               type="button"
               onClick={handleDirectWhatsApp}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3.5 sm:px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="WhatsApp वर थेट बिल पाठवा (Direct Instant WhatsApp)"
+              title={isMr ? 'WhatsApp वर थेट बिल पाठवा' : 'Direct Instant WhatsApp'}
             >
               <MessageSquare className="w-4 h-4 text-emerald-200 fill-emerald-200/20" />
               <span>WhatsApp</span>
@@ -366,7 +389,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               onClick={handleDownloadPhoto}
               disabled={isGeneratingImage}
               className="bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-black px-3 sm:px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 active:scale-95"
-              title="रंगीत बिल फोटो सेव्ह करा (Save Photo)"
+              title={isMr ? 'रंगीत बिल फोटो सेव्ह करा' : 'Save Photo'}
             >
               <Download className="w-4 h-4 text-sky-200" />
               <span>Save Photo</span>
@@ -400,7 +423,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         {isGeneratingImage && (
           <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse no-print">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-            <span>{generatingMsg || 'मूळ रंगीत बिल तयार होत आहे...'}</span>
+            <span>{generatingMsg || (isMr ? 'मूळ रंगीत बिल तयार होत आहे...' : isHi ? 'बिल तैयार हो रहा है...' : 'Preparing bill image...')}</span>
           </div>
         )}
 
@@ -619,7 +642,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   {invoice.discount !== undefined && invoice.discount > 0 && (
                     <div className="flex justify-between p-2 text-red-600 bg-red-50/50">
-                      <span>Trade Discount (सवलत)</span>
+                      <span>{isMr ? 'सूट (Discount)' : 'Trade Discount'}</span>
                       <span className="font-bold">: - ₹ {invoice.discount.toFixed(2)}</span>
                     </div>
                   )}
@@ -645,7 +668,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   </div>
 
                   <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700">
-                    <span>Balance Due (बाकी)</span>
+                    <span>{isMr ? 'बाकी रक्कम (Balance Due)' : 'Balance Due'}</span>
                     <span>: ₹ {invoice.balanceAmount.toFixed(2)}</span>
                   </div>
                 </div>

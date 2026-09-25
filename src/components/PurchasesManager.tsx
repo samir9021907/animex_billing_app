@@ -155,7 +155,7 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
 
   const handleRemoveItemRow = (idx: number) => {
     if (items.length === 1) {
-      alert('कमीत कमी १ उत्पादन असणे आवश्यक आहे.');
+      alert(language === 'mr' ? 'कमीत कमी १ उत्पादन असणे आवश्यक आहे.' : 'At least 1 item is required.');
       return;
     }
     setItems(items.filter((_, i) => i !== idx));
@@ -195,14 +195,16 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
     e.preventDefault();
 
     // 1. Validate Supplier Name
-    const suppErr = validateName(supplierName, 'सप्लायर / कंपनीचे नाव (Supplier Name)', 2);
+    const suppLabel = language === 'mr' ? 'सप्लायरचे नाव' : language === 'hi' ? 'आपूर्तिकर्ता का नाम' : 'Supplier Name';
+    const suppErr = validateName(supplierName, suppLabel, 2);
     if (suppErr) {
       setFormError(suppErr);
       return;
     }
 
     // 2. Validate Bill No
-    const billErr = validateName(billNo, 'खरेदी बिल नंबर (Bill No)', 2);
+    const billLabel = language === 'mr' ? 'खरेदी बिल नंबर' : language === 'hi' ? 'खरीद बिल नंबर' : 'Purchase Bill No';
+    const billErr = validateName(billNo, billLabel, 2);
     if (billErr) {
       setFormError(billErr);
       return;
@@ -210,7 +212,8 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
 
     // 3. Validate Supplier Phone if entered (must be 10 digits starting with 6-9)
     if (supplierPhone && supplierPhone.trim()) {
-      const phoneErr = validatePhone(supplierPhone, 'सप्लायर फोन नंबर (Phone)', false);
+      const phoneLabel = language === 'mr' ? 'सप्लायर फोन नंबर' : language === 'hi' ? 'आपूर्तिकर्ता फोन' : 'Supplier Phone';
+      const phoneErr = validatePhone(supplierPhone, phoneLabel, false);
       if (phoneErr) {
         setFormError(phoneErr);
         return;
@@ -219,18 +222,18 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
 
     // 4. Validate items
     if (!items || items.length === 0) {
-      setFormError('किमान एक औषध (Medicine Item) जोडणे आवश्यक आहे.');
+      setFormError(language === 'mr' ? 'किमान एक उत्पादन जोडणे आवश्यक आहे.' : language === 'hi' ? 'कम से कम एक उत्पाद जोड़ना आवश्यक है।' : 'Please add at least one product item.');
       return;
     }
 
     for (const it of items) {
       const totalUnits = (Number(it.boxes) || 0) * (Number(it.unitsPerBox) || 0) + (Number(it.looseUnits) || 0);
       if (totalUnits <= 0) {
-        setFormError(`'${it.productName || 'Item'}' साठी संख्या (नग / बॉक्सेस) ० पेक्षा जास्त असावी.`);
+        setFormError(language === 'mr' ? `'${it.productName || 'Item'}' साठी संख्या ० पेक्षा जास्त असावी.` : `'${it.productName || 'Item'}' quantity must be greater than 0.`);
         return;
       }
       if (Number(it.costPerUnit) <= 0) {
-        setFormError(`'${it.productName || 'Item'}' साठी खरेदी दर (Cost per Unit) ० पेक्षा जास्त असावा.`);
+        setFormError(language === 'mr' ? `'${it.productName || 'Item'}' साठी खरेदी दर ० पेक्षा जास्त असावा.` : `'${it.productName || 'Item'}' cost per unit must be greater than 0.`);
         return;
       }
     }
@@ -1124,7 +1127,7 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
             {/* Supplier Information Card */}
             <div className="bg-slate-50 p-4 rounded-xl border text-xs space-y-1">
               <div className="font-bold text-slate-500 uppercase text-[10px]">
-                MANUFACTURER / SUPPLIER DETAILS (कारखाना):
+                {language === 'mr' ? 'कारखाना / पुरवठादार तपशील:' : language === 'hi' ? 'निर्माता / आपूर्तिकर्ता विवरण:' : 'MANUFACTURER / SUPPLIER DETAILS:'}
               </div>
               <div className="text-sm font-black text-slate-900">{previewPurchase.supplierName}</div>
               {previewPurchase.supplierCity && <div className="text-slate-600">📍 {previewPurchase.supplierCity}</div>}

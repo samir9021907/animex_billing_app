@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { validateName } from '../utils/validators';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ProductsManagerProps {
   products: Product[];
@@ -31,6 +32,10 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   onDeleteProduct,
   onInwardStock,
 }) => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+
   const [showModal, setShowModal] = useState(false);
   const [showLowStockModal, setShowLowStockModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -97,7 +102,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setInwardBoxes(isLoose ? 0 : 15);
     setInwardUnitsPerBox(target.boxCapacity && target.boxCapacity > 1 ? target.boxCapacity : 1);
     setInwardLooseUnits(isLoose ? 15 : 0);
-    setInwardNote('गोदाम आवक (Stock Inward)');
+    setInwardNote(isMr ? 'गोदाम आवक' : isHi ? 'गोदाम आवक' : 'Stock Inward');
     setShowInwardModal(true);
   };
 
@@ -111,7 +116,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     e.preventDefault();
 
     // 1. Validate Product Title
-    const nameErr = validateName(name, 'प्रॉडक्टचे नाव (Product Title)', 2);
+    const nameLabel = isMr ? 'प्रॉडक्टचे नाव' : isHi ? 'उत्पाद का नाम' : 'Product Title';
+    const nameErr = validateName(name, nameLabel, 2);
     if (nameErr) {
       setFormError(nameErr);
       return;
@@ -123,32 +129,37 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       p.name.trim().toLowerCase() === clean && (!editingProduct || p.id !== editingProduct.id)
     );
     if (isDuplicate) {
-      setFormError(`'${name.trim()}' नावाचे प्रॉडक्ट आधीपासून अस्तित्वात आहे. कृपया वेगळे नाव द्या.`);
+      setFormError(isMr 
+        ? `'${name.trim()}' नावाचे प्रॉडक्ट आधीपासून अस्तित्वात आहे. कृपया वेगळे नाव द्या.` 
+        : isHi 
+        ? `'${name.trim()}' नाम का उत्पाद पहले से मौजूद है।` 
+        : `Product '${name.trim()}' already exists. Please enter a different title.`
+      );
       return;
     }
 
     // 2. Validate Selling Price
     if (!defaultPrice || Number(defaultPrice) <= 0) {
-      setFormError('विक्री किंमत (Selling Price) ० पेक्षा जास्त असणे आवश्यक आहे.');
+      setFormError(isMr ? 'विक्री किंमत ० पेक्षा जास्त असणे आवश्यक आहे.' : isHi ? 'बिक्री मूल्य 0 से अधिक होना चाहिए।' : 'Selling price must be greater than 0.');
       return;
     }
 
     // 3. Validate MRP vs Selling Price
     if (mrp && Number(mrp) > 0 && Number(mrp) < Number(defaultPrice)) {
-      setFormError('MRP ही विक्री किंमतीपेक्षा (Selling Price) कमी असू शकत नाही.');
+      setFormError(isMr ? 'MRP ही विक्री किंमतीपेक्षा कमी असू शकत नाही.' : isHi ? 'MRP बिक्री मूल्य से कम नहीं हो सकती।' : 'MRP cannot be less than selling price.');
       return;
     }
 
     // 4. Validate Box Capacity
     const finalBoxCap = isLoosePackaging ? 1 : (Number(boxCapacity) || 1);
     if (finalBoxCap < 1) {
-      setFormError('खोक्यात प्रमाण (Box Capacity) किमान १ असावे.');
+      setFormError(isMr ? 'खोक्यात प्रमाण किमान १ असावे.' : isHi ? 'बॉक्स क्षमता कम से कम 1 होनी चाहिए।' : 'Box capacity must be at least 1.');
       return;
     }
 
     // 5. Validate Stock Quantity
     if (Number(stockQuantity) < 0) {
-      setFormError('स्टॉक संख्या (Stock Quantity) निगेटिव्ह असू शकत नाही.');
+      setFormError(isMr ? 'स्टॉक संख्या निगेटिव्ह असू शकत नाही.' : isHi ? 'स्टॉक मात्रा नकारात्मक नहीं हो सकती।' : 'Stock quantity cannot be negative.');
       return;
     }
 
@@ -188,7 +199,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     e.preventDefault();
     if (!inwardProductId) return;
     if (totalInwardAdded <= 0) {
-      alert('कृपया आवक मालाची संख्या टाका (Enter valid stock quantity).');
+      alert(isMr ? 'कृपया आवक मालाची संख्या टाका.' : isHi ? 'कृपया आवक मात्रा दर्ज करें।' : 'Please enter a valid stock inward quantity.');
       return;
     }
     if (onInwardStock) {
@@ -225,13 +236,17 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     const boxes = Math.floor(stock / capacity);
     const loose = stock % capacity;
 
+    const boxLabel = isMr ? 'खोके' : isHi ? 'बॉक्स' : boxes === 1 ? 'Box' : 'Boxes';
+    const looseLabel = isMr ? 'सुटे' : isHi ? 'खुला' : 'Loose';
+    const totalLabel = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
+
     if (boxes === 0) {
-      return `${loose.toLocaleString('en-IN')} ${unit} (सुट्या)`;
+      return `${loose.toLocaleString('en-IN')} ${unit} (${looseLabel})`;
     }
     if (loose === 0) {
-      return `${boxes} खोके (${stock.toLocaleString('en-IN')} ${unit})`;
+      return `${boxes} ${boxLabel} (${stock.toLocaleString('en-IN')} ${unit})`;
     }
-    return `${boxes} खोके + ${loose} ${unit} (एकूण ${stock.toLocaleString('en-IN')})`;
+    return `${boxes} ${boxLabel} + ${loose} ${unit} (${totalLabel} ${stock.toLocaleString('en-IN')})`;
   };
 
   const selectedInwardProduct = products.find((p) => p.id === inwardProductId);
@@ -256,7 +271,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
             <span>ANIMEX Products & Godown Stock</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            कंपनीतील सर्व उत्पादनांचा दर, खोके पॅकिंग आणि ऑटोमॅटिक शिल्लक स्टॉक व्यवस्थापन.
+            {isMr
+              ? 'कंपनीतील सर्व उत्पादनांचा दर, खोके पॅकिंग आणि ऑटोमॅटिक शिल्लक साठा व्यवस्थापन.'
+              : isHi
+              ? 'कंपनी के सभी उत्पादों के मूल्य, बॉक्स पैकिंग और इन्वेंट्री स्टॉक प्रबंधन।'
+              : 'Manage company products, rates, box packaging, and inventory stock.'}
           </p>
         </div>
 
@@ -266,7 +285,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
             className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"
           >
             <ArrowDownToLine className="w-4 h-4" />
-            <span>माल जमा करा (+ खोके)</span>
+            <span>{isMr ? 'माल जमा करा (+ खोके)' : isHi ? 'माल जमा करें (+ बॉक्स)' : 'Inward Stock (+ Boxes)'}</span>
           </button>
 
           <button
@@ -274,7 +293,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
             className="bg-animex-blue-600 hover:bg-animex-blue-700 active:scale-95 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>नवीन उत्पादन जोडा</span>
+            <span>{isMr ? 'नवीन उत्पादन जोडा' : isHi ? 'नया उत्पाद जोड़ें' : 'Add New Product'}</span>
           </button>
         </div>
       </div>
@@ -283,7 +302,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:bg-slate-800/80 p-4 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-blue-700 uppercase">एकूण उत्पादने (Total Items)</span>
+            <span className="text-[11px] font-bold text-blue-700 uppercase">
+              {isMr ? 'एकूण उत्पादने' : isHi ? 'कुल उत्पाद' : 'Total Products'}
+            </span>
             <div className="text-2xl font-black text-blue-900 dark:text-sky-300 mt-0.5">
               {products.length}
             </div>
@@ -293,7 +314,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:bg-slate-800/80 p-4 rounded-2xl border border-emerald-100 dark:border-slate-700 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-emerald-700 uppercase">गोदामातील एकूण माल (Total Units)</span>
+            <span className="text-[11px] font-bold text-emerald-700 uppercase">
+              {isMr ? 'गोदामातील एकूण साठा' : isHi ? 'गोदाम में कुल स्टॉक' : 'Total Godown Stock'}
+            </span>
             <div className="text-2xl font-black text-emerald-900 dark:text-emerald-300 mt-0.5">
               {totalStockUnits.toLocaleString('en-IN')}
             </div>
@@ -356,7 +379,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       <button
                         onClick={() => handleOpenInwardModal(p)}
                         className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors"
-                        title="माल जमा करा (+ खोके)"
+                        title={isMr ? 'माल जमा करा (+ खोके)' : isHi ? 'स्टॉक आवक (+ बॉक्सेस)' : 'Inward Stock (+ Boxes)'}
                       >
                         <ArrowDownToLine className="w-3.5 h-3.5" />
                       </button>
@@ -395,20 +418,28 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 {/* Stock Details Box */}
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 bg-slate-50/70 dark:bg-slate-800/40 p-2.5 rounded-xl">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-bold">पॅकिंग प्रकार (Packaging):</span>
+                    <span className="text-slate-500 font-bold">
+                      {isMr ? 'पॅकिंग:' : isHi ? 'पैकिंग:' : 'Packaging:'}
+                    </span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
                       {capacity <= 1 ? (
                         <span className="text-amber-600 dark:text-amber-400 font-extrabold">
-                          {p.defaultUnit === 'Bucket' ? '🪣 सुटी बकेट (No Box)' : '📦 सुटे नग (No Box)'}
+                          {p.defaultUnit === 'Bucket'
+                            ? (isMr ? '🪣 सुटी बकेट (खोके नाहीत)' : isHi ? '🪣 खुली बकेट' : '🪣 Loose Bucket')
+                            : (isMr ? '📦 सुटे नग (खोके नाहीत)' : isHi ? '📦 खुले नग' : '📦 Loose Units')}
                         </span>
                       ) : (
-                        <span>📦 {capacity} {p.defaultUnit}/खोका</span>
+                        <span>
+                          📦 {capacity} {p.defaultUnit}/{isMr ? 'खोका' : isHi ? 'बॉक्स' : 'Box'}
+                        </span>
                       )}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-600 font-extrabold">शिल्लक गोदामात:</span>
+                    <span className="text-slate-600 font-extrabold">
+                      {isMr ? 'शिल्लक गोदामात:' : isHi ? 'उपलब्ध स्टॉक:' : 'In Stock:'}
+                    </span>
                     <span
                       className={`font-black ${
                         isOutOfStock
@@ -426,15 +457,18 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   <div className="flex items-center justify-between pt-1">
                     {isOutOfStock ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                        <AlertTriangle className="w-3 h-3" /> स्टॉक संपला (Out of stock)
+                        <AlertTriangle className="w-3 h-3" />
+                        {isMr ? 'स्टॉक संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock'}
                       </span>
                     ) : isLowStock ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                        <AlertTriangle className="w-3 h-3" /> कमी स्टॉक (Low stock)
+                        <AlertTriangle className="w-3 h-3" />
+                        {isMr ? 'कमी स्टॉक' : isHi ? 'कम स्टॉक' : 'Low Stock'}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        <CheckCircle2 className="w-3 h-3" /> उपलब्ध (In stock)
+                        <CheckCircle2 className="w-3 h-3" />
+                        {isMr ? 'उपलब्ध' : isHi ? 'स्टॉक में उपलब्ध' : 'In Stock'}
                       </span>
                     )}
 
@@ -442,7 +476,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onClick={() => handleOpenInwardModal(p)}
                       className="text-[11px] font-black text-animex-blue-600 hover:text-animex-blue-800 underline cursor-pointer"
                     >
-                      + माल भरा
+                      {isMr ? '+ माल भरा' : isHi ? '+ माल भरें' : '+ Inward Stock'}
                     </button>
                   </div>
                 </div>
@@ -463,10 +497,14 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 </div>
                 <div>
                   <h3 className="font-black text-base text-slate-900 dark:text-white">
-                    गोदामात माल जमा करा (Stock Inward)
+                    {isMr ? 'गोदामात माल जमा करा' : isHi ? 'गोदाम में माल जमा करें' : 'Stock Inward & Receiving'}
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    खोके किंवा सुट्या बकेट्स / नगांची आवक नोंदवा.
+                    {isMr
+                      ? 'खोके किंवा सुट्या बकेट्स / नगांची आवक नोंदवा.'
+                      : isHi
+                      ? 'बॉक्स या खुले नग की आवक दर्ज करें।'
+                      : 'Record inward boxes or loose unit additions to stock.'}
                   </p>
                 </div>
               </div>
@@ -482,7 +520,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               {/* Product Select */}
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                  उत्पादन निवडा (Select Product) *
+                  {isMr ? 'उत्पादन निवडा *' : isHi ? 'उत्पाद चुनें *' : 'Select Product *'}
                 </label>
                 <select
                   value={inwardProductId}
@@ -505,7 +543,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} (सध्या शिल्लक: {p.stockQuantity ?? 0} {p.defaultUnit})
+                      {p.name} ({isMr ? 'सध्या शिल्लक' : isHi ? 'वर्तमान शेष' : 'Stock'}: {p.stockQuantity ?? 0} {p.defaultUnit})
                     </option>
                   ))}
                 </select>
@@ -514,7 +552,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               {/* Current Stock Banner */}
               {selectedInwardProduct && (
                 <div className="bg-blue-50 dark:bg-slate-800 p-3 rounded-xl border border-blue-100 dark:border-slate-700 text-xs text-blue-900 dark:text-blue-300 flex items-center justify-between">
-                  <span>सध्या गोदामात शिल्लक:</span>
+                  <span>{isMr ? 'सध्या गोदामात शिल्लक:' : isHi ? 'वर्तमान में गोदाम में शेष:' : 'Current Godown Stock:'}</span>
                   <span className="font-black">
                     {formatStockText(
                       selectedInwardProduct.stockQuantity || 0,
@@ -541,10 +579,16 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <span>🪣 सुटी आवक / थेट {selectedInwardProduct?.defaultUnit || 'बकेट'}</span>
+                  <span>
+                    {isMr
+                      ? `🪣 सुटी आवक / थेट ${selectedInwardProduct?.defaultUnit || 'बकेट'}`
+                      : isHi
+                      ? `🪣 खुली आवक / सीधा ${selectedInwardProduct?.defaultUnit || 'बकेट'}`
+                      : `🪣 Loose Inward / Direct ${selectedInwardProduct?.defaultUnit || 'Bucket'}`}
+                  </span>
                   {((selectedInwardProduct?.boxCapacity || 1) <= 1) && (
                     <span className="text-[9px] bg-white text-emerald-800 px-1.5 py-0.2 rounded font-black">
-                      शिफारस
+                      {isMr ? 'शिफारस' : isHi ? 'अनुशंसित' : 'Recommended'}
                     </span>
                   )}
                 </button>
@@ -558,7 +602,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <span>📦 खोके पॅकिंगने आवक (By Box)</span>
+                  <span>{isMr ? '📦 खोके पॅकिंगने आवक' : isHi ? '📦 बॉक्स पैकिंग से आवक' : '📦 By Box Packaging'}</span>
                 </button>
               </div>
 
@@ -567,10 +611,14 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-300 dark:border-emerald-700/80 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-emerald-900 dark:text-emerald-200 text-xs font-black">
-                      किती {selectedInwardProduct?.defaultUnit || 'बकेट'} आले? (Total Inward {selectedInwardProduct?.defaultUnit || 'Bucket'}) *
+                      {isMr
+                        ? `किती ${selectedInwardProduct?.defaultUnit || 'बकेट'} आले? *`
+                        : isHi
+                        ? `कितने ${selectedInwardProduct?.defaultUnit || 'बकेट'} आए? *`
+                        : `Inward Count (${selectedInwardProduct?.defaultUnit || 'Bucket'}) *`}
                     </label>
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-extrabold">
-                      सुटी आवक / No Box
+                      {isMr ? 'सुटी आवक (खोके नाहीत)' : isHi ? 'खुली आवक (कोई बॉक्स नहीं)' : 'Loose Inward (No Box)'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -580,7 +628,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       required
                       value={inwardLooseUnits || ''}
                       onChange={(e) => setInwardLooseUnits(Number(e.target.value))}
-                      placeholder="उदा. 15"
+                      placeholder={isMr ? 'उदा. 15' : isHi ? 'उदा. 15' : 'e.g. 15'}
                       className="w-full bg-white dark:bg-slate-900 border-2 border-emerald-400 dark:border-emerald-600 rounded-xl p-3 text-slate-900 dark:text-white font-black text-lg focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm"
                     />
                     <span className="text-sm font-black text-emerald-800 dark:text-emerald-200 px-3.5 py-3 bg-emerald-100 dark:bg-emerald-900/60 rounded-xl border border-emerald-300 dark:border-emerald-700 shrink-0">
@@ -588,14 +636,18 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     </span>
                   </div>
                   <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
-                    ✨ 25kg च्या मोठ्या बकेट्स खोक्यात येत नाहीत. त्यांची थेट आवक संख्या येथे टाका.
+                    {isMr
+                      ? '✨ 25kg च्या मोठ्या बकेट्स किंवा सुटे नग खोक्यात येत नाहीत. त्यांची थेट आवक संख्या येथे टाका.'
+                      : isHi
+                      ? '✨ 25kg के बड़े बकेट्स या खुले नग बॉक्स में नहीं आते। उनकी संख्या सीधे यहां दर्ज करें।'
+                      : '✨ Large 25kg buckets or loose units do not come in packaging boxes. Enter direct inward units here.'}
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                      खोके किती आले? (Boxes)
+                      {isMr ? 'खोके किती आले?' : isHi ? 'कितने बॉक्स आए?' : 'No. of Boxes'}
                     </label>
                     <input
                       type="number"
@@ -604,12 +656,14 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => setInwardBoxes(Number(e.target.value))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 15 खोके</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {isMr ? 'उदा. 15 खोके' : isHi ? 'उदा. 15 बॉक्स' : 'e.g. 15 Boxes'}
+                    </span>
                   </div>
 
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                      १ खोक्यात किती? (Per Box)
+                      {isMr ? '१ खोक्यात किती?' : isHi ? '१ बॉक्स में कितने?' : 'Units per Box'}
                     </label>
                     <input
                       type="number"
@@ -618,12 +672,18 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => setInwardUnitsPerBox(Number(e.target.value))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">उदा. 20, 50, 100</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {isMr ? 'उदा. 20, 50, 100' : isHi ? 'उदा. 20, 50, 100' : 'e.g. 20, 50, 100'}
+                    </span>
                   </div>
 
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                      सुटे {selectedInwardProduct?.defaultUnit || 'नग'} (Loose)
+                      {isMr
+                        ? `सुटे ${selectedInwardProduct?.defaultUnit || 'नग'}`
+                        : isHi
+                        ? `खुले ${selectedInwardProduct?.defaultUnit || 'नग'}`
+                        : `Loose ${selectedInwardProduct?.defaultUnit || 'Units'}`}
                     </label>
                     <input
                       type="number"
@@ -632,7 +692,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => setInwardLooseUnits(Number(e.target.value))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">सुटी संख्या असल्यास</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {isMr ? 'सुटी संख्या असल्यास' : isHi ? 'खुली संख्या होने पर' : 'Loose units if any'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -640,15 +702,15 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               {/* Inward Calculation Preview */}
               <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
-                  <span>हिशोब:</span>
+                  <span>{isMr ? 'हिशोब:' : isHi ? 'हिसाब:' : 'Calculation:'}</span>
                   <span className="font-mono font-bold">
                     {inwardMode === 'loose'
-                      ? `+${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Bucket'} (थेट सुटी आवक)`
-                      : `(${inwardBoxes} खोके × ${inwardUnitsPerBox}) + ${inwardLooseUnits} = +${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Units'}`}
+                      ? `+${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Bucket'}`
+                      : `(${inwardBoxes} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'} × ${inwardUnitsPerBox}) + ${inwardLooseUnits} = +${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Units'}`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-extrabold text-emerald-900 dark:text-emerald-200 pt-1 border-t border-emerald-200/60 dark:border-emerald-800">
-                  <span>नवीन एकूण शिल्लक स्टॉक होईल:</span>
+                  <span>{isMr ? 'नवीन एकूण शिल्लक साठा:' : isHi ? 'नया कुल शेष स्टॉक:' : 'Projected Total Stock:'}</span>
                   <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
                     {newProjectedStock.toLocaleString('en-IN')} {selectedInwardProduct?.defaultUnit}
                   </span>
@@ -658,11 +720,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               {/* Note */}
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                  टीप / बॅच माहिती (Optional Note)
+                  {isMr ? 'टीप / बॅच माहिती' : isHi ? 'टिप्पणी / बैच विवरण' : 'Optional Note / Batch Info'}
                 </label>
                 <input
                   type="text"
-                  placeholder="उदा. लॉट नं. 45 / नवीन सप्लाय"
+                  placeholder={isMr ? 'उदा. लॉट नं. 45 / नवीन सप्लाय' : isHi ? 'उदा. लॉट नं. 45' : 'e.g. Batch Lot 45 / Fresh Supply'}
                   value={inwardNote}
                   onChange={(e) => setInwardNote(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-medium"
@@ -675,14 +737,14 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   onClick={() => setShowInwardModal(false)}
                   className="bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer"
                 >
-                  रद्द करा
+                  {isMr ? 'रद्द करा' : isHi ? 'रद्द करें' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-5 py-2.5 rounded-xl text-xs shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>स्टॉकमध्ये जमा करा</span>
+                  <span>{isMr ? 'साठ्यात जमा करा' : isHi ? 'स्टॉक में जोड़ें' : 'Add to Stock'}</span>
                 </button>
               </div>
             </form>
@@ -787,13 +849,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               {/* Stock & Box Packaging Settings */}
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
                 <div className="text-[11px] font-extrabold text-animex-blue-900 dark:text-sky-300">
-                  📦 इन्व्हेंटरी आणि पॅकिंग सेटिंग्ज (Packaging & Stock)
+                  {isMr ? '📦 इन्व्हेंटरी आणि पॅकिंग सेटिंग्ज' : isHi ? '📦 इन्वेंट्री और पैकिंग सेटिंग्स' : '📦 Packaging & Stock Settings'}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      पॅकिंग प्रकार (Packaging Type)
+                      {isMr ? 'पॅकिंग प्रकार' : isHi ? 'पैकिंग प्रकार' : 'Packaging Type'}
                     </label>
                     <select
                       value={isLoosePackaging ? 'loose' : 'box'}
@@ -805,15 +867,15 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       }}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
                     >
-                      <option value="box">📦 खोके पॅकिंग (Box Packaging)</option>
-                      <option value="loose">🪣 सुटे नग / बकेट्स (Loose / No Box)</option>
+                      <option value="box">{isMr ? '📦 खोके पॅकिंग' : isHi ? '📦 बॉक्स पैकिंग' : '📦 Box Packaging'}</option>
+                      <option value="loose">{isMr ? '🪣 सुटे नग / बकेट्स' : isHi ? '🪣 खुले नग / बकेट्स' : '🪣 Loose Units / Buckets'}</option>
                     </select>
                   </div>
 
                   {!isLoosePackaging ? (
                     <div>
                       <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                        खोक्यात प्रमाण (Per Box) *
+                        {isMr ? 'खोक्यात प्रमाण (Per Box) *' : isHi ? 'प्रति बॉक्स मात्रा *' : 'Units per Box *'}
                       </label>
                       <input
                         type="number"
@@ -821,12 +883,12 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         value={boxCapacity}
                         onChange={(e) => setBoxCapacity(Number(e.target.value))}
                         className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white text-xs"
-                        placeholder="उदा. 20, 50, 100"
+                        placeholder={isMr ? 'उदा. 20, 50, 100' : isHi ? 'उदा. 20, 50, 100' : 'e.g. 20, 50, 100'}
                       />
                     </div>
                   ) : (
                     <div className="flex items-center pt-4 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold">
-                      <span>✓ सुटी बकेट (खोके नाहीत)</span>
+                      <span>{isMr ? '✓ सुटी बकेट (खोके नाहीत)' : isHi ? '✓ खुली बकेट (कोई बॉक्स नहीं)' : '✓ Loose Bucket (No Box)'}</span>
                     </div>
                   )}
                 </div>
@@ -834,7 +896,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      सध्याचा शिल्लक स्टॉक (Units)
+                      {isMr ? 'सध्याचा शिल्लक साठा (Units)' : isHi ? 'वर्तमान स्टॉक (Units)' : 'Initial Stock Quantity (Units)'}
                     </label>
                     <input
                       type="number"

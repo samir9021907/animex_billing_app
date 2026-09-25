@@ -51,7 +51,9 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
 
   const lowStockProducts = (products || []).filter(
     (p) => (p.stockQuantity ?? 0) <= (p.minStockAlert || p.boxCapacity || 50)
@@ -195,12 +197,16 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={onSyncCloud}
                 disabled={isSyncingCloud}
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer border border-white/15 shadow-sm text-xs font-bold"
-                title={lastSyncTime ? `Neon Cloud Live Sync (शेवटचे सिंक: ${lastSyncTime.toLocaleTimeString()})` : 'Neon Cloud PostgreSQL Live Sync (क्लाउड सिंक करा)'}
+                title={
+                  lastSyncTime
+                    ? (isMr ? `क्लाउड सिंक (शेवटचे: ${lastSyncTime.toLocaleTimeString()})` : `Neon Cloud Sync (Last: ${lastSyncTime.toLocaleTimeString()})`)
+                    : (isMr ? 'क्लाउड सिंक करा' : 'Sync with Neon Cloud')
+                }
                 aria-label="Neon Cloud PostgreSQL Live Sync"
               >
                 <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 ${isSyncingCloud ? 'animate-spin text-amber-300' : ''}`} />
                 <span className="text-[11px] font-extrabold text-emerald-300 whitespace-nowrap">
-                  {syncNotice || (isSyncingCloud ? 'सिंक...' : 'Sync')}
+                  {syncNotice || (isSyncingCloud ? (isMr ? 'सिंक...' : isHi ? 'सिंक...' : 'Syncing...') : (isMr ? 'सिंक' : isHi ? 'सिंक' : 'Sync'))}
                 </span>
               </button>
             )}
@@ -208,7 +214,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 sm:p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer flex items-center justify-center border border-white/15 shadow-sm"
-              title="Stock Alert Notifications (कमी साठा चेतावणी)"
+              title={isMr ? 'कमी साठा सूचना' : isHi ? 'कम स्टॉक सूचना' : 'Low Stock Alerts'}
               aria-label="Stock Alert Notifications"
             >
               <Bell className="w-5 h-5 text-amber-300" />
@@ -443,11 +449,11 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className={`w-2.5 h-2.5 rounded-full ${isSyncingCloud ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`} />
                       <div>
                         <span className="text-[11px] font-bold text-emerald-300 block leading-tight">
-                          {isSyncingCloud ? 'क्लाउड सिंक होत आहे...' : 'Cloud Connected'}
+                          {isSyncingCloud ? (isMr ? 'क्लाउड सिंक सुरू आहे...' : isHi ? 'क्लाउड सिंक हो रहा है...' : 'Syncing with Cloud...') : 'Cloud Connected'}
                         </span>
                         {lastSyncTime && (
                           <span className="text-[9px] text-slate-400 font-normal block leading-tight">
-                            सिंक वेळ: {lastSyncTime.toLocaleTimeString()}
+                            {isMr ? 'शेवटचा सिंक:' : isHi ? 'अंतिम सिंक:' : 'Last Synced:'} {lastSyncTime.toLocaleTimeString()}
                           </span>
                         )}
                       </div>
@@ -462,7 +468,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="px-2.5 py-1 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[10px] font-extrabold rounded-lg transition-all border border-white/20 flex items-center gap-1 cursor-pointer"
                     >
                       <RefreshCw className={`w-3 h-3 text-amber-300 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                      <span>{syncNotice || (isSyncingCloud ? 'सिंक...' : 'सिंक करा')}</span>
+                      <span>{syncNotice || (isSyncingCloud ? (isMr ? 'सिंक...' : isHi ? 'सिंक...' : 'Syncing...') : (isMr ? 'सिंक करा' : isHi ? 'सिंक करें' : 'Sync Now'))}</span>
                     </button>
                   </div>
                 )}

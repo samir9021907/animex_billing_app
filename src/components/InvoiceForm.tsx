@@ -3,6 +3,7 @@ import { Invoice, InvoiceItem, MedicalStore, Product, BillStatus } from '../type
 import { convertNumberToWords } from '../utils/numberToWords';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
 import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 // Custom Touch-Friendly Scrollable Unit Selector
 const UNIT_OPTIONS = ['Ltr', 'Ml', 'Bucket', 'Kg', 'Can', 'Pack', 'Box', 'Bottle', 'Nos'];
@@ -97,6 +98,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   onSaveInvoice,
   nextInvoiceNo = 1
 }) => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.id || '');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
@@ -169,7 +174,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
   // Complete form refresh / reset
   const handleResetForm = () => {
-    if (window.confirm('नवीन बिल तयार करण्यासाठी संपूर्ण फॉर्म रिफ्रेश (Reset) करायचा आहे का?\n(Reset entire form to create a new bill?)')) {
+    if (window.confirm(isMr ? 'नवीन बिल तयार करण्यासाठी संपूर्ण फॉर्म रिफ्रेश करायचा आहे का?' : 'Reset entire form to create a new bill?')) {
       const freshItems = createInitialItems();
       setItems(freshItems);
       setDiscount(0);
@@ -333,7 +338,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     // Check if total items quantity is 0
     const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
     if (totalQty <= 0) {
-      alert('कृपया उत्पादनांची संख्या (Quantity) टाका. बिलामध्ये किमान १ नग असणे आवश्यक आहे.\n(Please enter product quantity greater than 0 before generating bill.)');
+      alert(isMr
+        ? 'कृपया उत्पादनांची संख्या टाका. बिलामध्ये किमान १ नग असणे आवश्यक आहे.'
+        : isHi
+        ? 'कृपया उत्पादों की मात्रा दर्ज करें। बिल में कम से कम 1 मात्रा होनी चाहिए।'
+        : 'Please enter product quantity greater than 0 before generating bill.');
       return;
     }
 
@@ -352,7 +361,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
         .join('\n');
 
       const confirmProceed = window.confirm(
-        `⚠️ Warning! Low godown stock for the following items:\n\n${warningDetails}\n\nDo you want to proceed and deduct from godown stock?`
+        isMr
+          ? `⚠️ सावधान! खालील उत्पादनांचा गोदामातील साठा कमी आहे:\n\n${warningDetails}\n\nतरीही बिल तयार करून गोदामातून साठा वजा करायचा आहे का?`
+          : isHi
+          ? `⚠️ चेतावनी! निम्नलिखित उत्पादों का स्टॉक कम है:\n\n${warningDetails}\n\nक्या आप बिल जारी रखना चाहते हैं?`
+          : `⚠️ Warning! Low godown stock for the following items:\n\n${warningDetails}\n\nDo you want to proceed and deduct from godown stock?`
       );
       if (!confirmProceed) return;
     }
@@ -425,10 +438,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             type="button"
             onClick={handleResetForm}
             className="bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-black px-3.5 py-2.5 rounded-xl transition-all border border-white/20 shadow flex items-center gap-1.5 cursor-pointer"
-            title="नवीन बिल सुरू करण्यासाठी फॉर्म रिफ्रेश करा (Reset / Refresh Form)"
+            title={isMr ? 'नवीन बिल सुरू करण्यासाठी फॉर्म रिफ्रेश करा' : 'Reset / Refresh Form for new bill'}
           >
             <RotateCcw className="w-3.5 h-3.5 text-amber-300" />
-            <span>रिफ्रेश (New Bill)</span>
+            <span>{isMr ? 'नवीन बिल' : isHi ? 'नया बिल' : 'New Bill'}</span>
           </button>
 
           <div className="bg-white/10 backdrop-blur-md rounded-xl py-2 px-5 border border-white/20 text-center min-w-[120px] shadow-sm shrink-0">
@@ -730,11 +743,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       return (
                         <div className="mt-1 text-[10px] flex items-center justify-between">
                           <span className={isOver ? 'text-red-600 font-extrabold' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                            📦 शिल्लक: {stock} {item.unit}{cap > 1 ? ` (${b} खोके${l > 0 ? ` + ${l}` : ''})` : ''}
+                            📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'Stock:'} {stock} {item.unit}
+                            {cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l}` : ''})` : ''}
                           </span>
                           {isOver && (
                             <span className="bg-red-100 text-red-700 px-1 py-0.2 rounded font-black text-[9px]">
-                              कमी!
+                              {isMr ? 'कमी!' : isHi ? 'कम!' : 'Low!'}
                             </span>
                           )}
                         </div>
@@ -862,7 +876,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           </div>
 
           <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300 pt-1 border-t border-slate-200 dark:border-slate-700/60">
-            <span>Trade Discount / सवलत (₹):</span>
+            <span>{isMr ? 'व्यापारी सवलत (₹):' : isHi ? 'व्यापार छूट (₹):' : 'Trade Discount (₹):'}</span>
             <div className="w-28 sm:w-32">
               <input
                 type="number"
@@ -888,7 +902,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           {/* Payment Type Selection (Cash, UPI, Card, Credit, Cheque) */}
           <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
             <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
-              Payment Mode (देयक पद्धत) *
+              {isMr ? 'देयक पद्धत *' : isHi ? 'भुगतान प्रकार *' : 'Payment Mode *'}
             </span>
             <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
               {[
@@ -963,9 +977,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 }`}
               >
                 {paymentType === 'Credit' && receivedAmount === 0 ? (
-                  <span>⏳ Credit / उधारी</span>
+                  <span>⏳ {isMr ? 'उधारी' : isHi ? 'उधार' : 'Credit'}</span>
                 ) : (
-                  <span>Credit / उधारी</span>
+                  <span>{isMr ? 'उधारी' : isHi ? 'उधार' : 'Credit'}</span>
                 )}
                 <span className="text-[11px] font-semibold opacity-90">(₹0)</span>
               </button>
@@ -975,12 +989,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 text-xs font-bold pt-1 items-end">
             {/* Row 1: Left Label */}
             <label className="block text-[10px] uppercase font-bold text-slate-700 dark:text-slate-300 leading-tight">
-              Received (₹) <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">(जमा रक्कम)</span>
+              {isMr ? 'जमा रक्कम (₹)' : isHi ? 'प्राप्त राशि (₹)' : 'Received Amount (₹)'}
             </label>
 
             {/* Row 1: Right Label */}
             <label className="block text-[10px] uppercase font-bold text-slate-500 leading-tight text-right sm:text-left">
-              Balance Due (बाकी रक्कम)
+              {isMr ? 'बाकी रक्कम (₹)' : isHi ? 'बकाया राशि (₹)' : 'Balance Due (₹)'}
             </label>
 
             {/* Row 2: Left Input Box */}
@@ -1018,15 +1032,15 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
           <div className="pt-0.5">
             {balanceAmount <= 0.001 ? (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                <span>✅ पूर्ण देयक जमा (Fully Paid) — बाकी: ₹0</span>
+                <span>{isMr ? '✅ पूर्ण देयक जमा — बाकी: ₹0' : isHi ? '✅ पूर्ण भुगतान — शेष: ₹0' : '✅ Fully Paid — Balance: ₹0'}</span>
               </div>
             ) : receivedAmount === 0 ? (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                <span>⏳ पूर्ण उधारी (100% Credit) — बाकी: ₹{formatCurrencyDisplay(balanceAmount)}</span>
+                <span>{isMr ? `⏳ पूर्ण उधारी — बाकी: ₹${formatCurrencyDisplay(balanceAmount)}` : isHi ? `⏳ 100% उधार — शेष: ₹${formatCurrencyDisplay(balanceAmount)}` : `⏳ 100% Credit — Due: ₹${formatCurrencyDisplay(balanceAmount)}`}</span>
               </div>
             ) : (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-[11px] font-bold text-blue-700 dark:text-blue-300">
-                <span>⚡ अंशतः जमा (Partial Paid) — जमा: ₹{formatCurrencyDisplay(receivedAmount)} | बाकी: ₹{formatCurrencyDisplay(balanceAmount)}</span>
+                <span>{isMr ? `⚡ अंशतः जमा — जमा: ₹${formatCurrencyDisplay(receivedAmount)} | बाकी: ₹${formatCurrencyDisplay(balanceAmount)}` : isHi ? `⚡ आंशिक भुगतान — प्राप्त: ₹${formatCurrencyDisplay(receivedAmount)} | शेष: ₹${formatCurrencyDisplay(balanceAmount)}` : `⚡ Partial Payment — Paid: ₹${formatCurrencyDisplay(receivedAmount)} | Due: ₹${formatCurrencyDisplay(balanceAmount)}`}</span>
               </div>
             )}
           </div>

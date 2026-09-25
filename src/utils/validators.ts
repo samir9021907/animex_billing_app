@@ -32,14 +32,14 @@ export const validatePhone = (
   required: boolean = true
 ): string | null => {
   if (!phone || !phone.trim()) {
-    return required ? `${fieldName} आवश्यक आहे (Required)` : null;
+    return required ? `${fieldName} is required` : null;
   }
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 10) {
-    return `${fieldName} १० अंकांचा असणे आवश्यक आहे (${digits.length}/10 digits entered)`;
+    return `${fieldName} must be 10 digits (${digits.length}/10 entered)`;
   }
   if (!/^[6-9]/.test(digits)) {
-    return 'वैध १० अंकी मोबाईल नंबर टाका (६, ७, ८ किंवा ९ ने सुरू होणारा)';
+    return 'Enter a valid 10-digit mobile number (starts with 6, 7, 8, or 9)';
   }
   return null;
 };
@@ -57,11 +57,11 @@ export const validateName = (
   required: boolean = true
 ): string | null => {
   if (!name || !name.trim()) {
-    return required ? `कृपया ${fieldLabel} प्रविष्ट करा (Required)` : null;
+    return required ? `Please enter ${fieldLabel}` : null;
   }
   const trimmed = name.trim();
   if (trimmed.length < minLength) {
-    return `${fieldLabel} किमान ${minLength} अक्षरांचे असणे आवश्यक आहे`;
+    return `${fieldLabel} must be at least ${minLength} characters`;
   }
   return null;
 };

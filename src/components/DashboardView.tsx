@@ -258,7 +258,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <span className="text-[10px] font-black text-slate-500 uppercase">
                       {cap <= 1 ? (
-                        p.defaultUnit === 'Bucket' ? '🪣 सुटी बकेट (No Box)' : '📦 सुटे नग (No Box)'
+                        language === 'en'
+                          ? (p.defaultUnit === 'Bucket' ? '🪣 Loose Bucket' : '📦 Loose Units')
+                          : language === 'hi'
+                          ? (p.defaultUnit === 'Bucket' ? '🪣 खुली बकेट' : '📦 खुले नग')
+                          : (p.defaultUnit === 'Bucket' ? '🪣 सुटी बकेट' : '📦 सुटे नग')
                       ) : (
                         `📦 ${cap} ${p.defaultUnit}/${perBoxWord}`
                       )}

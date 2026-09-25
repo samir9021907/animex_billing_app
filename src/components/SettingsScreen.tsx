@@ -114,7 +114,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Dark Mode (डार्क थीम)
+                {language === 'mr' ? 'डार्क मोड' : language === 'hi' ? 'डार्क थीम' : 'Dark Mode'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {isDarkMode
@@ -142,7 +142,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Notifications (सूचना)
+                {language === 'mr' ? 'सूचना' : language === 'hi' ? 'सूचनाएं' : 'Notifications'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Receive UI alerts, bill creation reminders and payment dues
@@ -227,7 +227,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Privacy Policy (गोपनीयता धोरण)
+                {language === 'mr' ? 'गोपनीयता धोरण' : language === 'hi' ? 'गोपनीयता नीति' : 'Privacy Policy'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Read how we handle and protect billing records
@@ -248,7 +248,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Terms of Service (सेवा अटी)
+                {language === 'mr' ? 'सेवा अटी' : language === 'hi' ? 'सेवा की शर्तें' : 'Terms of Service'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Review pharmaceutical billing terms and conditions
@@ -269,7 +269,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                About (ॲप विषयी माहिती)
+                {language === 'mr' ? 'ॲप विषयी माहिती' : language === 'hi' ? 'ऐप विवरण' : 'About ANIMEX'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 ANIMEX Billing Suite • Animal Health Care Pvt. Ltd.
@@ -287,7 +287,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                App Version (ॲप व्हर्जन)
+                {language === 'mr' ? 'ॲप व्हर्जन' : language === 'hi' ? 'ऐप संस्करण' : 'App Version'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 1.0.0 (Capacitor Android & Web Build)
@@ -310,7 +310,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Support & Helpline (मदत व संपर्क)
+                {language === 'mr' ? 'मदत व संपर्क' : language === 'hi' ? 'सहायता व हेल्पलाइन' : 'Support & Helpline'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Contact the ANIMEX technical support team
@@ -328,7 +328,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             onClick={onLogout}
             className="w-full py-3.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>Log Out (खात्यातून बाहेर पडा)</span>
+            <span>{language === 'mr' ? 'खात्यातून बाहेर पडा' : language === 'hi' ? 'लॉगआउट करें' : 'Log Out'}</span>
           </button>
         </div>
       )}
@@ -417,7 +417,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               onClick={() => setActiveModal(null)}
               className="mt-6 w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
             >
-              Close (बंद करा)
+              {language === 'mr' ? 'बंद करा' : language === 'hi' ? 'बंद करें' : 'Close'}
             </button>
           </div>
         </div>
@@ -454,7 +454,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               onClick={() => setActiveModal(null)}
               className="mt-6 w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
             >
-              Close (बंद करा)
+              {language === 'mr' ? 'बंद करा' : language === 'hi' ? 'बंद करें' : 'Close'}
             </button>
           </div>
         </div>
@@ -500,7 +500,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               onClick={() => setActiveModal(null)}
               className="mt-4 w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
             >
-              Close (बंद करा)
+              {language === 'mr' ? 'बंद करा' : language === 'hi' ? 'बंद करें' : 'Close'}
             </button>
           </div>
         </div>
@@ -560,7 +560,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               onClick={() => setActiveModal(null)}
               className="mt-6 w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
             >
-              Close (बंद करा)
+              {language === 'mr' ? 'बंद करा' : language === 'hi' ? 'बंद करें' : 'Close'}
             </button>
           </div>
         </div>

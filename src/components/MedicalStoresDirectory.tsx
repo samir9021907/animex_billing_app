@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MedicalStore } from '../types';
 import { Store, Plus, Phone, MapPin, Search, Edit2, Trash2, AlertCircle } from 'lucide-react';
 import { cleanPhoneNumber, validatePhone, validateName } from '../utils/validators';
+import { useLanguage } from '../context/LanguageContext';
 
 interface MedicalStoresDirectoryProps {
   stores: MedicalStore[];
@@ -16,6 +17,10 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   onUpdateStore,
   onDeleteStore
 }) => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+
   const [showModal, setShowModal] = useState(false);
   const [editingStore, setEditingStore] = useState<MedicalStore | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +73,8 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     if (isSubmitting) return;
 
     // 1. Validate Firm Name
-    const firmNameErr = validateName(firmName, 'मेडिकल स्टोअरचे नाव (Firm Name)', 2);
+    const firmNameLabel = isMr ? 'मेडिकल स्टोअरचे नाव' : isHi ? 'मेडिकल स्टोर का नाम' : 'Store / Firm Name';
+    const firmNameErr = validateName(firmName, firmNameLabel, 2);
     if (firmNameErr) {
       setFormError(firmNameErr);
       return;
@@ -80,12 +86,18 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
       s.firmName.trim().toLowerCase() === cleanFirm && (!editingStore || s.id !== editingStore.id)
     );
     if (isDuplicate) {
-      setFormError(`'${firmName.trim()}' नावाचे मेडिकल स्टोअर आधीपासून जोडलेले आहे. कृपया वेगळे नाव द्या.`);
+      setFormError(isMr 
+        ? `'${firmName.trim()}' नावाचे मेडिकल स्टोअर आधीपासून जोडलेले आहे. कृपया वेगळे नाव द्या.` 
+        : isHi 
+        ? `'${firmName.trim()}' नाम का मेडिकल स्टोर पहले से मौजूद है। कृपया दूसरा नाम दर्ज करें।` 
+        : `Store '${firmName.trim()}' already exists. Please enter a different name.`
+      );
       return;
     }
 
     // 2. Validate Phone (must be strictly 10 digits starting with 6, 7, 8, 9)
-    const phoneErr = validatePhone(phone, 'मोबाईल नंबर (Phone Number)');
+    const phoneLabel = isMr ? 'मोबाईल नंबर' : isHi ? 'मोबाइल नंबर' : 'Phone Number';
+    const phoneErr = validatePhone(phone, phoneLabel);
     if (phoneErr) {
       setFormError(phoneErr);
       return;
@@ -93,7 +105,12 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
 
     // 3. Validate Contact Person (if entered)
     if (contactName.trim() && contactName.trim().length < 2) {
-      setFormError('कॉन्टॅक्ट पर्सनचे नाव किमान २ अक्षरांचे असणे आवश्यक आहे.');
+      setFormError(isMr 
+        ? 'कॉन्टॅक्ट पर्सनचे नाव किमान २ अक्षरांचे असणे आवश्यक आहे.' 
+        : isHi 
+        ? 'संपर्क व्यक्ति का नाम कम से कम 2 अक्षरों का होना चाहिए।' 
+        : 'Contact person name must be at least 2 characters.'
+      );
       return;
     }
 

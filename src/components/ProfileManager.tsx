@@ -93,7 +93,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     }
 
     if (formData.pincode && !isValidPincode(formData.pincode)) {
-      setFormError('Pincode must be exactly 6 digits (६ अंकी पिनकोड आवश्यक आहे)');
+      setFormError('Pincode must be exactly 6 digits');
       return;
     }
 

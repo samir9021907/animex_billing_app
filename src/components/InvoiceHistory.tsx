@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Invoice, BillStatus } from '../types';
 import { FileText, Eye, Search, Calendar, Store, Trash2, Printer, Share2, Filter, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { formatInvoiceNumber, getStatusBadgeConfig } from '../utils/invoiceUtils';
+import { useLanguage } from '../context/LanguageContext';
 
 interface InvoiceHistoryProps {
   invoices: Invoice[];
@@ -16,6 +17,10 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
   onSelectInvoice,
   onDeleteInvoice
 }) => {
+  const { language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
   const [storeFilter, setStoreFilter] = useState<string>('ALL');
@@ -171,7 +176,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                     ? 'bg-animex-orange-500 text-white border-animex-orange-500 shadow-sm'
                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                 }`}
-                title="Click to open filter options (अधिक फिल्टर्स उघडा)"
+                title={isMr ? 'अधिक फिल्टर्स उघडा' : 'Click to toggle filter options'}
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span>Filter</span>
@@ -233,7 +238,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 dark:border-slate-700/60">
                 <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                   <Filter className="w-3.5 h-3.5 text-animex-orange-500" />
-                  <span>Advanced Filters (अधिक पर्याय)</span>
+                  <span>{isMr ? 'अधिक पर्याय' : isHi ? 'उन्नत फ़िल्टर' : 'Advanced Filters'}</span>
                 </span>
                 {(storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || statusFilter !== 'ALL' || searchQuery) && (
                   <button
@@ -242,7 +247,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                     className="text-xs text-red-600 font-bold flex items-center gap-1 hover:underline cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span>Reset All (सर्व पूर्ववत करा)</span>
+                    <span>{isMr ? 'सर्व पूर्ववत करा' : isHi ? 'रीसेट करें' : 'Reset All'}</span>
                   </button>
                 )}
               </div>
@@ -251,14 +256,14 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 {/* Store Filter */}
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    Medical Store (मेडिकल नाव)
+                    {isMr ? 'मेडिकल स्टोअर' : isHi ? 'मेडिकल स्टोर' : 'Medical Store'}
                   </label>
                   <select
                     value={storeFilter}
                     onChange={(e) => setStoreFilter(e.target.value)}
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-white outline-none cursor-pointer"
                   >
-                    <option value="ALL">All Medical Stores (सर्व मेडिकल)</option>
+                    <option value="ALL">{isMr ? 'सर्व मेडिकल स्टोअर्स' : isHi ? 'सभी मेडिकल स्टोर' : 'All Medical Stores'}</option>
                     {uniqueStores.map((st) => (
                       <option key={st} value={st}>{st}</option>
                     ))}
@@ -268,17 +273,17 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 {/* Payment Mode Filter */}
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    Payment Mode (देयक पद्धत)
+                    {isMr ? 'देयक पद्धत' : isHi ? 'भुगतान प्रकार' : 'Payment Mode'}
                   </label>
                   <select
                     value={paymentModeFilter}
                     onChange={(e) => setPaymentModeFilter(e.target.value)}
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-white outline-none cursor-pointer"
                   >
-                    <option value="ALL">All Modes (सर्व पद्धती)</option>
+                    <option value="ALL">{isMr ? 'सर्व पद्धती' : isHi ? 'सभी प्रकार' : 'All Modes'}</option>
                     <option value="UPI">UPI</option>
                     <option value="Cash">Cash</option>
-                    <option value="Credit">Credit (उधारी)</option>
+                    <option value="Credit">{isMr ? 'उधारी' : isHi ? 'उधार' : 'Credit'}</option>
                     <option value="Card">Card</option>
                     <option value="Cheque">Cheque</option>
                   </select>
@@ -287,7 +292,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 {/* Date Filter */}
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
-                    Filter by Date (तारीख)
+                    {isMr ? 'तारीख' : isHi ? 'दिनांक' : 'Filter by Date'}
                   </label>
                   <div className="relative">
                     <input
@@ -316,8 +321,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
         <div className="md:hidden space-y-3">
           {filteredInvoices.length === 0 ? (
             <div className="text-center py-8 px-4 text-xs text-slate-500 font-bold bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-2">
-              <p>तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.</p>
-              <p className="text-[11px] text-slate-400 font-normal">(No bills found matching selected filter)</p>
+              <p>{isMr ? 'तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.' : isHi ? 'चयनित फ़िल्टर के अनुसार कोई बिल नहीं मिला।' : 'No bills found matching selected filters.'}</p>
               {(statusFilter !== 'ALL' || storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || searchQuery) && (
                 <button
                   type="button"
@@ -325,7 +329,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                   className="mt-1 px-3.5 py-1.5 rounded-lg bg-animex-orange-500 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm hover:bg-animex-orange-600 cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>सर्व फिल्टर्स क्लिअर करा (Reset Filters)</span>
+                  <span>{isMr ? 'सर्व फिल्टर्स क्लिअर करा' : isHi ? 'फ़िल्टर साफ़ करें' : 'Reset Filters'}</span>
                 </button>
               )}
             </div>
@@ -440,8 +444,16 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
               {filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-10 px-4 text-xs text-slate-500 font-bold space-y-2">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.</p>
-                    <p className="text-[11px] text-slate-400 font-normal">(No bills found matching selected filter criteria)</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                      {isMr
+                        ? 'तुमच्या फिल्टरनुसार कोणतीही बिले आढळली नाहीत.'
+                        : isHi
+                        ? 'फ़िल्टर के अनुसार कोई बिल नहीं मिला।'
+                        : 'No bills found matching selected filter criteria.'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-normal">
+                      {isMr ? 'कृपया वेगळा फिल्टर निवडा.' : isHi ? 'फ़िल्टर सेटिंग्स बदलें।' : 'Try changing your filter settings.'}
+                    </p>
                     {(statusFilter !== 'ALL' || storeFilter !== 'ALL' || paymentModeFilter !== 'ALL' || dateFilter || searchQuery) && (
                       <div className="pt-2">
                         <button
@@ -450,7 +462,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                           className="px-4 py-1.5 rounded-lg bg-animex-orange-500 hover:bg-animex-orange-600 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
-                          <span>सर्व फिल्टर्स क्लिअर करा (Reset Filters)</span>
+                          <span>{isMr ? 'सर्व फिल्टर्स क्लिअर करा' : isHi ? 'फ़िल्टर साफ़ करें' : 'Reset Filters'}</span>
                         </button>
                       </div>
                     )}

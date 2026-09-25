@@ -89,8 +89,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   // Generate complete, official, original bill text for WhatsApp
   const getBillTextMessage = (): string => {
-    const storeName = invoice?.billTo?.firmName || 'Valued Customer';
-    const contact = invoice?.billTo?.contactName ? ` (${invoice.billTo.contactName})` : '';
+    const isCust = invoice?.billTo?.customerType === 'customer';
+    const storeName = invoice?.billTo?.firmName || (isCust ? 'Valued Customer' : 'Medical Store');
+    const contact = (!isCust && invoice?.billTo?.contactName) ? ` (${invoice.billTo.contactName})` : '';
     const location = [invoice?.billTo?.address, invoice?.billTo?.district].filter(Boolean).join(', ');
 
     let itemsList = '';
@@ -493,12 +494,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x-2 border-b-2 border-[#1e293b] bg-[#f8fafc] text-xs">
                 <div className="p-2.5 sm:p-3">
                   <span className="font-extrabold text-[#64748b] uppercase tracking-wider text-[9px] sm:text-[10px] block">
-                    Bill To (Medical Store):
+                    {invoice.billTo?.customerType === 'customer' ? 'Billed To (Customer):' : 'Billed To (Medical Store):'}
                   </span>
                   <div className="font-black text-xs sm:text-sm text-[#0F4C81] mt-0.5">
                     {invoice.billTo?.firmName || 'Valued Customer'}
                   </div>
-                  {invoice.billTo?.contactName && (
+                  {invoice.billTo?.customerType !== 'customer' && invoice.billTo?.contactName && (
                     <div className="text-[11px] sm:text-xs font-bold text-[#334155] mt-0.5">
                       Proprietor: {invoice.billTo.contactName}
                     </div>

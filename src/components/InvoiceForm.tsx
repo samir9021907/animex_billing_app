@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Invoice, InvoiceItem, MedicalStore, Product, BillStatus } from '../types';
 import { convertNumberToWords } from '../utils/numberToWords';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
-import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check, User } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 // Custom Touch-Friendly Scrollable Unit Selector
@@ -455,11 +455,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       {/* 1. Customer & Metadata Form */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 shadow-md border border-slate-300 dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         
-        {/* Bill To Medical Store Selector */}
+        {/* Bill To Customer / Store Selector */}
         <div className="md:col-span-2 space-y-3">
-          <label className="text-xs font-extrabold uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-            <Store className="w-4 h-4 text-animex-blue-600" />
-            <span>Select Medical Store (Customer) *</span>
+          <label className="text-xs font-extrabold uppercase text-slate-700 dark:text-slate-300 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Store className="w-4 h-4 text-animex-blue-600" />
+              <span>{isMr ? 'बिल प्राप्तकर्ता (स्टोअर / ग्राहक) निवडा *' : 'Select Customer / Store *'}</span>
+            </span>
           </label>
           <select
             value={selectedStoreId}
@@ -467,30 +469,43 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-animex-orange-500 outline-none"
           >
             {stores.length === 0 ? (
-              <option value="">-- No Medical Stores Found! Please add a store first --</option>
+              <option value="">{isMr ? '-- कोणतेही स्टोअर किंवा ग्राहक उपलब्ध नाही --' : '-- No Store or Customer Found! Please add one first --'}</option>
             ) : (
-              stores.map(st => (
-                <option key={st.id} value={st.id}>
-                  {st.firmName} ({st.district}, {st.state}) - Ph: {st.phone}
-                </option>
-              ))
+              stores.map(st => {
+                const isCust = st.customerType === 'customer';
+                return (
+                  <option key={st.id} value={st.id}>
+                    {isCust ? `👤 [Customer] ${st.firmName}` : `🏬 [Store] ${st.firmName}`} ({st.district || 'MH'}) - Ph: {st.phone}
+                  </option>
+                );
+              })
             )}
           </select>
 
           {stores.length === 0 && (
             <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200 font-bold">
-              ⚠️ No medical store registered yet. Please add your first medical store from the "Medical Stores" directory to generate a bill.
+              {isMr
+                ? '⚠️ अद्याप कोणतेही मेडिकल स्टोअर किंवा ग्राहक जोडलेला नाही. कृपया आधी स्टोअर किंवा ग्राहक जोडा.'
+                : '⚠️ No medical store or customer registered yet. Please add a store or customer to generate a bill.'}
             </div>
           )}
 
           {selectedStoreObj && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs pt-1">
               <div className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                <Store className="w-4 h-4 text-orange-500 shrink-0" />
+                {selectedStoreObj.customerType === 'customer' ? (
+                  <User className="w-4 h-4 text-emerald-500 shrink-0" />
+                ) : (
+                  <Store className="w-4 h-4 text-orange-500 shrink-0" />
+                )}
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-slate-400">Firm / Contact</div>
+                  <div className="text-[10px] uppercase font-bold text-slate-400">
+                    {selectedStoreObj.customerType === 'customer' ? 'Direct Customer' : 'Firm / Contact'}
+                  </div>
                   <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{selectedStoreObj.firmName}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{selectedStoreObj.contactName}</div>
+                  {selectedStoreObj.customerType !== 'customer' && selectedStoreObj.contactName && (
+                    <div className="text-[10px] text-slate-500 truncate">{selectedStoreObj.contactName}</div>
+                  )}
                 </div>
               </div>
 
@@ -507,7 +522,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                 <MapPin className="w-4 h-4 text-sky-500 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase font-bold text-slate-400">Location</div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{selectedStoreObj.district}, {selectedStoreObj.state}</div>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{selectedStoreObj.district || selectedStoreObj.state}</div>
                   <div className="text-[10px] text-slate-500 truncate">{selectedStoreObj.address}</div>
                 </div>
               </div>

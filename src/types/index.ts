@@ -20,6 +20,7 @@ export interface MedicalStore {
   district: string;
   state: string;
   address: string;
+  customerType?: 'store' | 'customer';
 }
 
 export type BillStatus = 'PAID' | 'PENDING' | 'PARTIALLY PAID' | 'CANCELLED';

@@ -610,7 +610,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </p>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3 h-3 text-orange-400 flex-shrink-0" />
-                    <span>9307990811 / 8999323908</span>
+                    <span>8799883858 / 9146133858</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-3 h-3 text-orange-400 flex-shrink-0" />

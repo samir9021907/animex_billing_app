@@ -50,7 +50,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return {
       companyName: 'ANIMEX ANIMAL HEALTH CARE PVT LTD',
       address: '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
-      phone: '9307990811',
+      phone: '8799883858',
       email: 'animexanimalhealthcare@gmail.com',
       bankName: 'State Bank of India',
       accountNo: '389920194821',
@@ -137,7 +137,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       `• IFSC: ${companyProfile?.ifscCode || 'SBIN0004123'}\n` +
       `• UPI ID: ${companyProfile?.upiId || 'animex@sbi'}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📞 Helpline: 9307990811 / 8999323908\n` +
+      `📞 Helpline: 8799883858 / 9146133858\n` +
       `🙏 *आपल्या सहकार्याबद्दल धन्यवाद! (Thank you!)*`
     );
   };
@@ -457,7 +457,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   </p>
                   <div className="text-[10px] sm:text-xs font-extrabold text-[#0F4C81] mt-1.5 flex flex-wrap justify-center sm:justify-start gap-x-4 sm:gap-x-6 gap-y-0.5">
                     <span>
-                      Helpline: <strong className="text-[#F97316]">9307990811 / 8999323908</strong>
+                      Helpline: <strong className="text-[#F97316]">8799883858 / 9146133858</strong>
                     </span>
                     <span>
                       Email: <strong>{companyProfile.email}</strong>

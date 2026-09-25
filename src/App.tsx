@@ -799,7 +799,7 @@ export const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="bg-animex-blue-900 text-slate-300 py-4 text-center text-xs font-semibold border-t border-slate-800 mb-16 lg:mb-0">
-        ANIMEX ANIMAL HEALTH CARE PRIVATE LIMITED • Kopargaon, Ahmednagar • Helpline: 9307990811 / 8999323908
+        ANIMEX ANIMAL HEALTH CARE PRIVATE LIMITED • Kopargaon, Ahmednagar • Helpline: 8799883858 / 9146133858
       </footer>
 
     </div>

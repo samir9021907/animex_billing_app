@@ -1110,7 +1110,7 @@ export const PurchasesManager: React.FC<PurchasesManagerProps> = ({
                   ANIMEX ANIMAL HEALTH CARE PVT. LTD.
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Kopargaon, Ahmednagar, Maharashtra • Contact: 9307990811
+                  Kopargaon, Ahmednagar, Maharashtra • Contact: 8799883858 / 9146133858
                 </p>
               </div>
 

@@ -524,24 +524,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div className="space-y-3">
               <a
-                href="tel:9307990811"
+                href="tel:8799883858"
                 className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-orange-500/10 dark:hover:bg-orange-500/10 border border-slate-200 dark:border-slate-700/60 transition-all text-slate-800 dark:text-white"
               >
                 <Phone className="w-5 h-5 text-orange-500" />
                 <div className="flex-1">
                   <p className="text-xs font-bold">Helpline 1</p>
-                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+91 9307990811</p>
+                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+91 8799883858</p>
                 </div>
               </a>
 
               <a
-                href="tel:8999323908"
+                href="tel:9146133858"
                 className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-orange-500/10 dark:hover:bg-orange-500/10 border border-slate-200 dark:border-slate-700/60 transition-all text-slate-800 dark:text-white"
               >
                 <Phone className="w-5 h-5 text-orange-500" />
                 <div className="flex-1">
                   <p className="text-xs font-bold">Helpline 2</p>
-                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+91 8999323908</p>
+                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+91 9146133858</p>
                 </div>
               </a>
 

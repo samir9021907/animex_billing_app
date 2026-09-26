@@ -209,7 +209,14 @@ export const App: React.FC = () => {
       const storeMap = new Map<string, MedicalStore>();
       for (const cs of cloudStores) {
         if (!deletedStoreIds.has(cs.id)) {
-          storeMap.set(cs.id, cs);
+          const existingLocal = storesRef.current.find(
+            ls => ls.id === cs.id || ls.firmName.trim().toLowerCase() === cs.firmName.trim().toLowerCase()
+          );
+          const finalType = cs.customerType || existingLocal?.customerType || 'store';
+          storeMap.set(cs.id, {
+            ...cs,
+            customerType: finalType,
+          });
         }
       }
       for (const ns of newlyUploadedStores) {

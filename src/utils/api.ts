@@ -54,6 +54,7 @@ export const mapBackendStore = (s: any) => ({
   district: s.district || 'Maharashtra',
   address: s.address || '',
   state: 'Maharashtra',
+  customerType: (s.customer_type === 'customer' || s.customerType === 'customer') ? 'customer' : 'store',
 });
 
 export const mapBackendInvoice = (inv: any) => {
@@ -224,6 +225,7 @@ export const syncStoreToBackend = async (store: any): Promise<any> => {
       district: store.district ? String(store.district).trim() : 'Maharashtra',
       address: store.address ? String(store.address).trim() : '',
       status: true,
+      customer_type: store.customerType || 'store',
     };
 
     let res = await fetch(url, {

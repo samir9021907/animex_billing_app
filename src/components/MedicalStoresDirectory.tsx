@@ -496,7 +496,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                     <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <h4 className="font-black text-xs text-amber-950 dark:text-amber-200 uppercase tracking-wider">
-                        {isMr ? 'माहिती भरणे अपूर्ण आहे (There was a problem)' : isHi ? 'समस्या आई है (There was a problem)' : 'There was a problem'}
+                        {isMr ? 'माहिती भरणे अपूर्ण आहे:' : isHi ? 'आवश्यक जानकारी अधूरी है:' : 'There was a problem:'}
                       </h4>
                       <ul className="list-disc list-inside text-[11px] font-bold text-amber-900 dark:text-amber-300 space-y-0.5">
                         {Object.values(fieldErrors).map((msg, i) => (
@@ -519,8 +519,8 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">
                   {modalType === 'customer'
-                    ? (isMr ? 'ग्राहकाचे / शेतकऱ्याचे पूर्ण नाव *' : isHi ? 'ग्राहक / किसान का नाम *' : 'Customer / Farmer Full Name *')
-                    : (isMr ? 'मेडिकल स्टोअरचे नाव (Firm Name) *' : isHi ? 'मेडिकल स्टोर का नाम *' : 'Firm Name (Medical Store Name) *')}
+                    ? (isMr ? 'ग्राहकाचे नाव *' : isHi ? 'ग्राहक का नाम *' : 'Customer Name *')
+                    : (isMr ? 'मेडिकल स्टोअरचे नाव *' : isHi ? 'मेडिकल स्टोर का नाम *' : 'Medical Store Name *')}
                 </label>
                 <div className="relative">
                   <input
@@ -664,9 +664,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
               {/* Field 4: Village / Address */}
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                  {modalType === 'customer'
-                    ? (isMr ? 'गाव / सविस्तर पत्ता *' : 'Village / Full Address *')
-                    : (isMr ? 'पत्ता *' : 'Address *')}
+                  {isMr ? 'पत्ता *' : isHi ? 'पता *' : 'Address *'}
                 </label>
                 <div className="relative">
                   <textarea

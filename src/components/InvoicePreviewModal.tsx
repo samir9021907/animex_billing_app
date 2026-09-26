@@ -632,7 +632,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   {invoice.discount !== undefined && invoice.discount > 0 && (
                     <div className="flex justify-between p-2 text-red-600 bg-red-50/50">
-                      <span>{isMr ? 'सूट (Discount)' : 'Trade Discount'}</span>
+                      <span>{isMr ? 'सूट' : 'Trade Discount'}</span>
                       <span className="font-bold">: - ₹ {invoice.discount.toFixed(2)}</span>
                     </div>
                   )}
@@ -658,7 +658,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   </div>
 
                   <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700">
-                    <span>{isMr ? 'बाकी रक्कम (Balance Due)' : 'Balance Due'}</span>
+                    <span>{isMr ? 'बाकी रक्कम' : 'Balance Due'}</span>
                     <span>: ₹ {invoice.balanceAmount.toFixed(2)}</span>
                   </div>
                 </div>

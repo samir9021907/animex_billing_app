@@ -458,7 +458,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder={modalType === 'customer' ? (isMr ? 'उदा. रमेश पाटील / गोकुळ डेअरी' : 'e.g. Ramesh Patil / Dairy Farm') : (isMr ? 'उदा. श्री समर्थ मेडिकल' : 'Medical Name')}
+                  placeholder={modalType === 'customer' ? (isMr ? 'ग्राहकाचे नाव' : isHi ? 'ग्राहक का नाम' : 'Customer Name') : (isMr ? 'मेडिकल स्टोअरचे नाव' : isHi ? 'मेडिकल स्टोर का नाम' : 'Medical Store Name')}
                   value={firmName}
                   onChange={(e) => {
                     setFirmName(e.target.value);
@@ -476,7 +476,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Person Name"
+                    placeholder={isMr ? 'संपर्क व्यक्तीचे नाव' : isHi ? 'संपर्क व्यक्ति का नाम' : 'Contact Person Name'}
                     value={contactName}
                     onChange={(e) => {
                       setContactName(e.target.value);
@@ -498,7 +498,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                     inputMode="numeric"
                     maxLength={10}
                     required
-                    placeholder="10 Digits"
+                    placeholder={isMr ? 'मोबाईल नंबर' : isHi ? 'मोबाइल नंबर' : 'Phone Number'}
                     value={phone}
                     onChange={(e) => {
                       setPhone(cleanPhoneNumber(e.target.value));
@@ -513,7 +513,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder={isMr ? 'उदा. सातारा' : 'District'}
+                    placeholder={isMr ? 'जिल्हा' : isHi ? 'जिला' : 'District'}
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
@@ -530,7 +530,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder={modalType === 'customer' ? (isMr ? 'उदा. मु. पो. कराड, ता. कराड' : 'Village, Landmark, Taluka') : 'Address'}
+                  placeholder={isMr ? 'पत्ता' : isHi ? 'पता' : 'Address'}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"

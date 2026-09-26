@@ -656,7 +656,7 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateStore = async (updatedStore: MedicalStore) => {
-    setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
+    setStores(prev => prev.map(s => s.id === updatedStore.id ? updatedStore : s));
     await syncStoreToBackend(updatedStore);
     try {
       const bc = new BroadcastChannel('animex_live_sync');
@@ -668,7 +668,7 @@ export const App: React.FC = () => {
 
   const handleDeleteStore = async (storeId: string) => {
     addDeletedStoreId(storeId);
-    setStores(stores.filter(s => s.id !== storeId));
+    setStores(prev => prev.filter(s => s.id !== storeId));
     await deleteStoreFromBackend(storeId);
     try {
       const bc = new BroadcastChannel('animex_live_sync');

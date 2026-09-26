@@ -167,27 +167,37 @@ export const App: React.FC = () => {
         }
       }
 
+      // Preserve all current local stores in memory so none are lost
       const currentStores = storesRef.current;
+      for (const ls of currentStores) {
+        const key = ls.firmName?.trim().toLowerCase();
+        if (key && !storeMap.has(key)) {
+          storeMap.set(key, ls);
+        }
+      }
+
+      // Identify stores that need to be pushed to cloud
       const unsyncedStores = currentStores.filter(
-        (ls) => !uuidRegex.test(ls.id) &&
-                !storeMap.has(ls.firmName.trim().toLowerCase())
+        (ls) => !uuidRegex.test(ls.id) || !cloudStores.some(cs => cs.id === ls.id || cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
       );
 
       if (unsyncedStores.length > 0) {
         const storeUploads = await Promise.allSettled(
           unsyncedStores.map(unsynced => syncStoreToBackend(unsynced))
         );
-        storeUploads.forEach(res => {
+        storeUploads.forEach((res, idx) => {
           if (res.status === 'fulfilled' && res.value && res.value.id) {
             const created = res.value;
+            const original = unsyncedStores[idx];
             const syncedStore: MedicalStore = {
               id: created.id,
-              firmName: created.firm_name,
-              contactName: created.contact_person_name || '',
-              phone: created.phone_number || '',
-              district: created.district || 'Maharashtra',
-              address: created.address || '',
+              firmName: created.firm_name || original.firmName,
+              contactName: created.contact_person_name || original.contactName || '',
+              phone: created.phone_number || original.phone || '',
+              district: created.district || original.district || 'Maharashtra',
+              address: created.address || original.address || '',
               state: 'Maharashtra',
+              customerType: original.customerType || 'store',
             };
             storeMap.set(syncedStore.firmName.trim().toLowerCase(), syncedStore);
           }
@@ -196,15 +206,47 @@ export const App: React.FC = () => {
       const finalStores = Array.from(storeMap.values());
 
       // 3. PROCESS INVOICES (Local-First Merge + Parallel Upload)
+      const invoiceMap = new Map<string, Invoice>();
+      for (const ci of cloudInvoices) {
+        invoiceMap.set(ci.id, ci);
+      }
+
       const currentInvoices = invoicesRef.current;
+      // Preserve any local invoice so none are lost
+      for (const li of currentInvoices) {
+        const existsInCloud = cloudInvoices.some(
+          ci => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId))
+        );
+        if (!existsInCloud) {
+          invoiceMap.set(li.id, li);
+        }
+      }
+
+      // Find unsynced invoices that need to be uploaded to cloud
       const unsyncedInvoices = currentInvoices.filter(
         (li) => !uuidRegex.test(li.id) &&
-                !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && ci.globalBillId === li.globalBillId))
+                !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId)))
       );
 
       if (unsyncedInvoices.length > 0) {
+        // Pre-link medical store UUID from storeMap before uploading invoice!
+        const preppedInvoices = unsyncedInvoices.map(unsynced => {
+          const storeNameKey = unsynced.billTo?.firmName?.trim().toLowerCase();
+          const matchedStore = storeNameKey ? storeMap.get(storeNameKey) : undefined;
+          if (matchedStore && uuidRegex.test(matchedStore.id)) {
+            return {
+              ...unsynced,
+              billTo: {
+                ...unsynced.billTo,
+                id: matchedStore.id,
+              }
+            };
+          }
+          return unsynced;
+        });
+
         const invoiceUploads = await Promise.allSettled(
-          unsyncedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
+          preppedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
         );
         invoiceUploads.forEach((res, idx) => {
           if (res.status === 'fulfilled' && res.value && res.value.id) {
@@ -224,7 +266,7 @@ export const App: React.FC = () => {
               isScheme: Boolean(it.is_free),
             }));
             const storeData = created.medical_store || unsynced.billTo || {};
-            cloudInvoices.unshift({
+            const syncedInvoice: Invoice = {
               id: created.id,
               invoiceNo: created.company_invoice_number || unsynced.invoiceNo,
               invoiceNumber: created.invoice_number || unsynced.invoiceNumber,
@@ -239,22 +281,25 @@ export const App: React.FC = () => {
                 address: storeData.address || '',
                 state: 'Maharashtra',
               },
-              items,
-              subTotal: Number(created.subtotal || 0),
-              discount: Number(created.discount || 0),
-              totalAmount: Number(created.grand_total || 0),
+              items: items.length > 0 ? items : unsynced.items,
+              subTotal: Number(created.subtotal || unsynced.subTotal || 0),
+              discount: Number(created.discount || unsynced.discount || 0),
+              totalAmount: Number(created.grand_total || unsynced.totalAmount || 0),
               amountInWords: unsynced.amountInWords || convertNumberToWords(Number(created.grand_total || unsynced.totalAmount || 0)),
-              paymentType: created.payment_type || 'UPI',
-              receivedAmount: Number(created.received_amount || 0),
-              balanceAmount: Number(created.balance_due || 0),
-              status: created.status?.toUpperCase() || 'PENDING',
-              notes: created.notes || '',
-              termsAndConditions: created.notes || 'Goods once sold will not be taken back.',
-              createdAt: created.created_at || new Date().toISOString(),
-            });
+              paymentType: created.payment_type || unsynced.paymentType || 'UPI',
+              receivedAmount: Number(created.received_amount ?? unsynced.receivedAmount ?? 0),
+              balanceAmount: Number(created.balance_due ?? unsynced.balanceAmount ?? 0),
+              status: created.status?.toUpperCase() || unsynced.status || 'PENDING',
+              notes: created.notes || unsynced.notes || '',
+              termsAndConditions: created.notes || unsynced.termsAndConditions || 'Goods once sold will not be taken back.',
+              createdAt: created.created_at || unsynced.createdAt || new Date().toISOString(),
+            };
+            invoiceMap.delete(unsynced.id);
+            invoiceMap.set(syncedInvoice.id, syncedInvoice);
           }
         });
       }
+      const finalInvoices = Array.from(invoiceMap.values()).sort((a, b) => (Number(b.globalBillId) || 0) - (Number(a.globalBillId) || 0));
 
       // 4. PROCESS PRODUCTS (Local-First Merge + Parallel Upload)
       const prodMap = new Map<string, Product>();
@@ -298,7 +343,7 @@ export const App: React.FC = () => {
 
       // 5. BATCH SINGLE STATE UPDATE (prevents UI re-render jitter)
       if (finalStores.length > 0) setStores(finalStores);
-      if (cloudInvoices.length > 0) setInvoices(cloudInvoices);
+      if (finalInvoices.length > 0) setInvoices(finalInvoices);
       if (finalProducts.length > 0) setProducts(finalProducts);
       setLastSyncTime(new Date());
 
@@ -329,24 +374,24 @@ export const App: React.FC = () => {
 
     let lastAutoSync = Date.now();
 
-    // 1. Initial mount sync
+    // 1. Initial mount sync (immediate!)
     syncCloudData();
 
-    // 2. Tab / Window focus (with 30-second cooldown to prevent repeated calls)
+    // 2. Tab / Window focus (immediate sync when user switches to app on phone or laptop)
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastAutoSync > 30000) {
+      if (now - lastAutoSync > 2000) {
         lastAutoSync = now;
         syncCloudData();
       }
     };
     window.addEventListener('focus', handleFocus);
 
-    // 3. Screen visibility change (un-minimizing app on phone or laptop)
+    // 3. Screen visibility change (un-minimizing app or unlocking phone)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        if (now - lastAutoSync > 30000) {
+        if (now - lastAutoSync > 2000) {
           lastAutoSync = now;
           syncCloudData();
         }
@@ -354,15 +399,34 @@ export const App: React.FC = () => {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 4. Gentle background auto-sync interval every 45 seconds
+    // 4. Online event (when device reconnects to Wi-Fi/cellular)
+    const handleOnline = () => {
+      syncCloudData();
+    };
+    window.addEventListener('online', handleOnline);
+
+    // 5. Cross-tab Broadcast Channel for instant sync across tabs on same device
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('animex_live_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'FORCE_SYNC') {
+          syncCloudData();
+        }
+      };
+    } catch {}
+
+    // 6. Fast background auto-sync interval every 10 seconds for live multi-device sync
     const intervalId = setInterval(() => {
       lastAutoSync = Date.now();
       syncCloudData();
-    }, 45000);
+    }, 10000);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      if (channel) channel.close();
       clearInterval(intervalId);
     };
   }, [currentUser, syncCloudData]);
@@ -501,6 +565,12 @@ export const App: React.FC = () => {
           invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
         } : inv));
       }
+      try {
+        const bc = new BroadcastChannel('animex_live_sync');
+        bc.postMessage({ type: 'FORCE_SYNC' });
+        bc.close();
+      } catch {}
+      syncCloudData();
     });
 
     if (newlyLowStock.length > 0) {
@@ -555,10 +625,14 @@ export const App: React.FC = () => {
 
     // 3. Delete invoice from cloud backend (backend also automatically restores stock in PostgreSQL DB)
     deleteInvoiceFromBackend(invoiceId).then(() => {
-      // Refresh cloud data after a short breath
+      try {
+        const bc = new BroadcastChannel('animex_live_sync');
+        bc.postMessage({ type: 'FORCE_SYNC' });
+        bc.close();
+      } catch {}
       setTimeout(() => {
         syncCloudData();
-      }, 1000);
+      }, 500);
     });
   };
 
@@ -618,19 +692,37 @@ export const App: React.FC = () => {
           return updatedList;
         });
       }
+      try {
+        const bc = new BroadcastChannel('animex_live_sync');
+        bc.postMessage({ type: 'FORCE_SYNC' });
+        bc.close();
+      } catch {}
+      syncCloudData();
     } catch (e) {
       console.error('Failed to sync store to backend:', e);
     }
   };
 
-  const handleUpdateStore = (updatedStore: MedicalStore) => {
+  const handleUpdateStore = async (updatedStore: MedicalStore) => {
     setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
-    syncStoreToBackend(updatedStore);
+    await syncStoreToBackend(updatedStore);
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+    syncCloudData();
   };
 
-  const handleDeleteStore = (storeId: string) => {
+  const handleDeleteStore = async (storeId: string) => {
     setStores(stores.filter(s => s.id !== storeId));
-    deleteStoreFromBackend(storeId);
+    await deleteStoreFromBackend(storeId);
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+    syncCloudData();
   };
 
   const handleAddProduct = async (newProduct: Product) => {

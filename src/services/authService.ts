@@ -20,7 +20,7 @@ export interface LoginResponse {
   user: UserSession;
 }
 
-export const PERMANENT_CLIENT_ID = 'c1111111-1111-1111-1111-111111111111';
+export const PERMANENT_CLIENT_ID = 'bad7c837-6d5d-4dc0-b704-ef8b7735240b';
 export const PERMANENT_JWT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImMxMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsIm5hbWUiOiJBTklNRVggQW5pbWFsIEhlYWx0aCBDYXJlIiwiZW1haWwiOiJhZG1pbkBhbmltZXguY29tIiwicm9sZSI6ImJ1c2luZXNzb3duZXIiLCJpYXQiOjE3ODkyMTQwODYsImV4cCI6MjEwNDU3NDA4Nn0.zvJzszksQr9T48Gkww0orH90HP5Sp6jClpYHY-WvSt8';
 
 export const authService = {
@@ -207,9 +207,12 @@ export const authService = {
       if (savedUser && token) {
         const user = JSON.parse(savedUser);
         if (
+          !user.clientId ||
+          user.clientId === 'c1111111-1111-1111-1111-111111111111' ||
           user.clientId === 'client-demo-01' ||
           user.clientId === 'demo-client' ||
-          !user.clientId ||
+          user.clientId.startsWith('client-') ||
+          user.id === 'c1111111-1111-1111-1111-111111111111' ||
           token === 'demo_jwt_token_animex' ||
           token.startsWith('offline_jwt')
         ) {

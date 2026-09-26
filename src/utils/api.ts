@@ -124,6 +124,7 @@ export const fetchUnifiedSyncFromBackend = async (): Promise<{ stores: any[]; in
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    if (!res.ok) return null;
     const json = await res.json();
     const durationMs = Math.round(performance.now() - t0);
     if (json.success && json.data) {
@@ -147,6 +148,7 @@ export const fetchStoresFromBackend = async (): Promise<any[]> => {
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    if (!res.ok) return [];
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
       return json.data.map(mapBackendStore);
@@ -166,6 +168,7 @@ export const fetchInvoicesFromBackend = async (): Promise<any[]> => {
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    if (!res.ok) return [];
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
       return json.data.map(mapBackendInvoice);
@@ -185,6 +188,7 @@ export const fetchProductsFromBackend = async (): Promise<any[]> => {
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    if (!res.ok) return [];
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
       return json.data.map(mapBackendProduct);

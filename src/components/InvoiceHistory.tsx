@@ -411,7 +411,10 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
 
                 {onDeleteInvoice && (
                   <button
-                    onClick={() => onDeleteInvoice(inv.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteInvoice(inv.id);
+                    }}
                     className="px-3.5 py-1.5 rounded-full border border-red-200 hover:border-red-300 bg-white dark:bg-slate-800 hover:bg-red-50 text-red-600 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                     title="Delete Bill"
                   >
@@ -561,7 +564,10 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
 
                       {onDeleteInvoice && (
                         <button
-                          onClick={() => onDeleteInvoice(inv.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteInvoice(inv.id);
+                          }}
                           className="px-2.5 py-1 rounded-full border border-red-200 hover:border-red-300 bg-white dark:bg-slate-800 hover:bg-red-50 text-red-600 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                           title="Delete Bill"
                         >

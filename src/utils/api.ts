@@ -257,15 +257,21 @@ export const syncStoreToBackend = async (store: any): Promise<any> => {
 // ─── Delete Medical Store from Neon DB ─────────────────────────────────────────
 export const deleteStoreFromBackend = async (id: string) => {
   try {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) {
+      return false;
+    }
     const clientId = getClientId();
-    await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores/${id}`, {
+    const res = await fetch(`${API_BASE}/medical-store/client/${clientId}/medical-stores/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    return res.ok;
   } catch (e) {
     console.warn('Store delete failed, saved locally:', e);
+    return false;
   }
 };
 
@@ -368,15 +374,21 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
 // ─── Delete Invoice from Neon DB ──────────────────────────────────────────────
 export const deleteInvoiceFromBackend = async (id: string) => {
   try {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) {
+      return false;
+    }
     const clientId = getClientId();
-    await fetch(`${API_BASE}/client/${clientId}/invoices/${id}`, {
+    const res = await fetch(`${API_BASE}/client/${clientId}/invoices/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
+    return res.ok;
   } catch (e) {
     console.warn('Backend delete failed, saved locally:', e);
+    return false;
   }
 };
 

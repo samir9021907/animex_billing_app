@@ -21,6 +21,7 @@ export interface MedicalStore {
   state: string;
   address: string;
   customerType?: 'store' | 'customer';
+  _pendingCloudSync?: boolean;
 }
 
 export type BillStatus = 'PAID' | 'PENDING' | 'PARTIALLY PAID' | 'CANCELLED';
@@ -58,6 +59,7 @@ export interface Invoice {
   notes?: string;
   termsAndConditions: string;
   createdAt: string;
+  _pendingCloudSync?: boolean;
 }
 
 export interface CompanyProfile {

@@ -12,22 +12,60 @@ import { LoginScreen } from './components/LoginScreen';
 import { PurchasesManager } from './components/PurchasesManager';
 import { Invoice, MedicalStore, Product, PurchaseInvoice } from './types';
 import { INITIAL_INVOICES, INITIAL_PRODUCTS, INITIAL_STORES, INITIAL_PURCHASES } from './data/seedData';
-import { convertNumberToWords } from './utils/numberToWords';
 import {
   syncInvoiceToBackend,
   deleteInvoiceFromBackend,
   syncStoreToBackend,
   deleteStoreFromBackend,
-  fetchStoresFromBackend,
-  fetchInvoicesFromBackend,
-  fetchProductsFromBackend,
   syncProductToBackend,
   deleteProductFromBackend,
   fetchUnifiedSyncFromBackend,
   warmupBackendConnection,
+  mapBackendStore,
+  mapBackendInvoice,
 } from './utils/api';
 import { authService, UserSession } from './services/authService';
 import { useLanguage } from './context/LanguageContext';
+
+const getDeletedInvoiceIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('animex_deleted_invoices');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+const addDeletedInvoiceId = (id: string) => {
+  try {
+    const set = getDeletedInvoiceIds();
+    set.add(id);
+    const arr = Array.from(set).slice(-100);
+    localStorage.setItem('animex_deleted_invoices', JSON.stringify(arr));
+  } catch {}
+};
+
+const getDeletedStoreIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('animex_deleted_stores');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+const addDeletedStoreId = (id: string) => {
+  try {
+    const set = getDeletedStoreIds();
+    set.add(id);
+    const arr = Array.from(set).slice(-100);
+    localStorage.setItem('animex_deleted_stores', JSON.stringify(arr));
+  } catch {}
+};
 
 export const App: React.FC = () => {
   const { language } = useLanguage();
@@ -36,13 +74,11 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
-  // One-time clean-up migration to remove old dummy medical stores and bills
-  // Ensures fresh start without deleting product inventory or purchases
-  const CLEAN_SLATE_KEY = 'animex_clean_slate_v2';
+  // One-time clean-up migration: purge old offline orphan ghost bills so all devices match Neon Cloud DB
+  const CLEAN_SLATE_KEY = 'animex_clean_slate_v4';
   try {
     if (localStorage.getItem(CLEAN_SLATE_KEY) !== 'true') {
       localStorage.removeItem('animex_invoices');
-      localStorage.removeItem('animex_medical_stores');
       localStorage.setItem(CLEAN_SLATE_KEY, 'true');
     }
   } catch (e) {
@@ -135,104 +171,68 @@ export const App: React.FC = () => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
       // 1. FAST FETCH: Try unified single-request sync first
-      let cloudStores: MedicalStore[] = [];
-      let cloudInvoices: Invoice[] = [];
-      let cloudProducts: Product[] = [];
-      let fastSyncDuration: number | null = null;
-
       const unifiedResult = await fetchUnifiedSyncFromBackend();
-      if (unifiedResult) {
-        cloudStores = unifiedResult.stores;
-        cloudInvoices = unifiedResult.invoices;
-        cloudProducts = unifiedResult.products;
-        fastSyncDuration = unifiedResult.durationMs;
-      } else {
-        // Fallback only if unified endpoint was unavailable
-        const [storesData, invoicesData, productsData] = await Promise.all([
-          fetchStoresFromBackend(),
-          fetchInvoicesFromBackend(),
-          fetchProductsFromBackend(),
-        ]);
-        cloudStores = storesData;
-        cloudInvoices = invoicesData;
-        cloudProducts = productsData;
+      if (!unifiedResult) {
+        // Backend offline or unreachable: keep local data safely without wiping
+        return;
       }
 
-      // 2. PROCESS STORES (Local-First Merge + Parallel Upload)
-      const storeMap = new Map<string, MedicalStore>();
-      for (const s of cloudStores) {
-        const key = s.firmName?.trim().toLowerCase();
-        if (key && !storeMap.has(key)) {
-          storeMap.set(key, s);
-        }
-      }
+      const { stores: cloudStores, invoices: cloudInvoices, products: cloudProducts, durationMs: fastSyncDuration } = unifiedResult;
+      const deletedInvoiceIds = getDeletedInvoiceIds();
+      const deletedStoreIds = getDeletedStoreIds();
 
-      // Preserve all current local stores in memory so none are lost
-      const currentStores = storesRef.current;
-      for (const ls of currentStores) {
-        const key = ls.firmName?.trim().toLowerCase();
-        if (key && !storeMap.has(key)) {
-          storeMap.set(key, ls);
-        }
-      }
-
-      // Identify stores that need to be pushed to cloud
-      const unsyncedStores = currentStores.filter(
-        (ls) => !uuidRegex.test(ls.id) || !cloudStores.some(cs => cs.id === ls.id || cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
+      // 2. PROCESS STORES (Cloud SSOT + Upload Unsynced Local Stores)
+      const unsyncedStores = storesRef.current.filter(
+        ls => !uuidRegex.test(ls.id) &&
+              !deletedStoreIds.has(ls.id) &&
+              !cloudStores.some(cs => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
       );
 
+      let newlyUploadedStores: MedicalStore[] = [];
       if (unsyncedStores.length > 0) {
         const storeUploads = await Promise.allSettled(
           unsyncedStores.map(unsynced => syncStoreToBackend(unsynced))
         );
         storeUploads.forEach((res, idx) => {
           if (res.status === 'fulfilled' && res.value && res.value.id) {
-            const created = res.value;
             const original = unsyncedStores[idx];
-            const syncedStore: MedicalStore = {
-              id: created.id,
-              firmName: created.firm_name || original.firmName,
-              contactName: created.contact_person_name || original.contactName || '',
-              phone: created.phone_number || original.phone || '',
-              district: created.district || original.district || 'Maharashtra',
-              address: created.address || original.address || '',
-              state: 'Maharashtra',
+            newlyUploadedStores.push({
+              ...mapBackendStore(res.value),
               customerType: original.customerType || 'store',
-            };
-            storeMap.set(syncedStore.firmName.trim().toLowerCase(), syncedStore);
+            });
           }
         });
       }
-      const finalStores = Array.from(storeMap.values());
 
-      // 3. PROCESS INVOICES (Local-First Merge + Parallel Upload)
-      const invoiceMap = new Map<string, Invoice>();
-      for (const ci of cloudInvoices) {
-        invoiceMap.set(ci.id, ci);
-      }
-
-      const currentInvoices = invoicesRef.current;
-      // Preserve any local invoice so none are lost
-      for (const li of currentInvoices) {
-        const existsInCloud = cloudInvoices.some(
-          ci => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId))
-        );
-        if (!existsInCloud) {
-          invoiceMap.set(li.id, li);
+      const storeMap = new Map<string, MedicalStore>();
+      for (const cs of cloudStores) {
+        if (!deletedStoreIds.has(cs.id)) {
+          storeMap.set(cs.id, cs);
         }
       }
+      for (const ns of newlyUploadedStores) {
+        if (!deletedStoreIds.has(ns.id)) {
+          storeMap.set(ns.id, ns);
+        }
+      }
+      const finalStores = Array.from(storeMap.values());
+      setStores(finalStores);
 
-      // Find unsynced invoices that need to be uploaded to cloud
-      const unsyncedInvoices = currentInvoices.filter(
-        (li) => !uuidRegex.test(li.id) &&
-                !cloudInvoices.some((ci) => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId)))
+      // 3. PROCESS INVOICES (Cloud SSOT + Upload Unsynced Local Invoices)
+      // An invoice is truly pending upload ONLY if it was newly created locally with _pendingCloudSync: true
+      const unsyncedInvoices = invoicesRef.current.filter(
+        li => Boolean((li as any)._pendingCloudSync) &&
+              !uuidRegex.test(li.id) &&
+              !deletedInvoiceIds.has(li.id) &&
+              (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`)) &&
+              !cloudInvoices.some(ci => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId)))
       );
 
+      let newlyUploadedInvoices: Invoice[] = [];
       if (unsyncedInvoices.length > 0) {
-        // Pre-link medical store UUID from storeMap before uploading invoice!
         const preppedInvoices = unsyncedInvoices.map(unsynced => {
           const storeNameKey = unsynced.billTo?.firmName?.trim().toLowerCase();
-          const matchedStore = storeNameKey ? storeMap.get(storeNameKey) : undefined;
+          const matchedStore = storeNameKey ? finalStores.find(s => s.firmName.trim().toLowerCase() === storeNameKey) : undefined;
           if (matchedStore && uuidRegex.test(matchedStore.id)) {
             return {
               ...unsynced,
@@ -248,60 +248,35 @@ export const App: React.FC = () => {
         const invoiceUploads = await Promise.allSettled(
           preppedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
         );
-        invoiceUploads.forEach((res, idx) => {
+        invoiceUploads.forEach((res) => {
           if (res.status === 'fulfilled' && res.value && res.value.id) {
-            const created = res.value;
-            const unsynced = unsyncedInvoices[idx];
-            const rawItems = Array.isArray(created.items) ? created.items : [];
-            const items = rawItems.map((it: any, i: number) => ({
-              id: `item-${i}-${Date.now()}`,
-              productId: it.productId || `p-${i}`,
-              itemName: it.product_title || it.itemName || 'Product',
-              quantity: Number(it.quantity || 1),
-              unit: it.unit || 'Ltr',
-              mrp: Number(it.mrp || 0),
-              pricePerUnit: Number(it.selling_price || it.pricePerUnit || 0),
-              amount: Number(it.amount || 0),
-              isFree: Boolean(it.is_free),
-              isScheme: Boolean(it.is_free),
-            }));
-            const storeData = created.medical_store || unsynced.billTo || {};
-            const syncedInvoice: Invoice = {
-              id: created.id,
-              invoiceNo: created.company_invoice_number || unsynced.invoiceNo,
-              invoiceNumber: created.invoice_number || unsynced.invoiceNumber,
-              globalBillId: created.global_bill_id ? Number(created.global_bill_id) : unsynced.globalBillId,
-              date: created.date ? created.date.split('T')[0] : unsynced.date,
-              billTo: {
-                id: storeData.id || created.medical_store_id,
-                firmName: storeData.firm_name || storeData.firmName || 'Medical Store',
-                contactName: storeData.contact_person_name || storeData.contactName || '',
-                phone: storeData.phone_number || storeData.phone || '',
-                district: storeData.district || '',
-                address: storeData.address || '',
-                state: 'Maharashtra',
-              },
-              items: items.length > 0 ? items : unsynced.items,
-              subTotal: Number(created.subtotal || unsynced.subTotal || 0),
-              discount: Number(created.discount || unsynced.discount || 0),
-              totalAmount: Number(created.grand_total || unsynced.totalAmount || 0),
-              amountInWords: unsynced.amountInWords || convertNumberToWords(Number(created.grand_total || unsynced.totalAmount || 0)),
-              paymentType: created.payment_type || unsynced.paymentType || 'UPI',
-              receivedAmount: Number(created.received_amount ?? unsynced.receivedAmount ?? 0),
-              balanceAmount: Number(created.balance_due ?? unsynced.balanceAmount ?? 0),
-              status: created.status?.toUpperCase() || unsynced.status || 'PENDING',
-              notes: created.notes || unsynced.notes || '',
-              termsAndConditions: created.notes || unsynced.termsAndConditions || 'Goods once sold will not be taken back.',
-              createdAt: created.created_at || unsynced.createdAt || new Date().toISOString(),
-            };
-            invoiceMap.delete(unsynced.id);
-            invoiceMap.set(syncedInvoice.id, syncedInvoice);
+            newlyUploadedInvoices.push(mapBackendInvoice(res.value));
           }
         });
       }
-      const finalInvoices = Array.from(invoiceMap.values()).sort((a, b) => (Number(b.globalBillId) || 0) - (Number(a.globalBillId) || 0));
 
-      // 4. PROCESS PRODUCTS (Local-First Merge + Parallel Upload)
+      // Valid active invoices: ground truth from Neon DB (excluding any local delete)
+      // plus any newly uploaded invoices
+      const invoiceMap = new Map<string, Invoice>();
+      for (const ci of cloudInvoices) {
+        if (!deletedInvoiceIds.has(ci.id) && (!ci.globalBillId || !deletedInvoiceIds.has(`gbid-${ci.globalBillId}`))) {
+          invoiceMap.set(ci.id, ci);
+        }
+      }
+      for (const ni of newlyUploadedInvoices) {
+        if (!deletedInvoiceIds.has(ni.id) && (!ni.globalBillId || !deletedInvoiceIds.has(`gbid-${ni.globalBillId}`))) {
+          invoiceMap.set(ni.id, ni);
+        }
+      }
+
+      const finalInvoices = Array.from(invoiceMap.values()).sort(
+        (a, b) => (Number(b.globalBillId) || 0) - (Number(a.globalBillId) || 0)
+      );
+
+      // Unconditionally set ground truth from cloud (if DB has 0 invoices, this properly sets 0 invoices!)
+      setInvoices(finalInvoices);
+
+      // 4. PROCESS PRODUCTS
       const prodMap = new Map<string, Product>();
       for (const p of cloudProducts) {
         const key = p.name?.trim().toLowerCase();
@@ -309,42 +284,9 @@ export const App: React.FC = () => {
           prodMap.set(key, p);
         }
       }
-
-      const currentProducts = productsRef.current;
-      const unsyncedProducts = currentProducts.filter(
-        (lp) => !uuidRegex.test(lp.id) &&
-                !prodMap.has(lp.name.trim().toLowerCase())
-      );
-
-      if (unsyncedProducts.length > 0) {
-        const productUploads = await Promise.allSettled(
-          unsyncedProducts.map(unsynced => syncProductToBackend(unsynced))
-        );
-        productUploads.forEach((res, idx) => {
-          if (res.status === 'fulfilled' && res.value && res.value.id) {
-            const created = res.value;
-            const unsynced = unsyncedProducts[idx];
-            const syncedProduct: Product = {
-              id: created.id,
-              name: created.product_title || unsynced.name,
-              category: created.category?.category_name || unsynced.category || 'General',
-              defaultUnit: created.unit || unsynced.defaultUnit || 'Ltr',
-              defaultPrice: Number(created.selling_price ?? unsynced.defaultPrice ?? 0),
-              mrp: Number(created.mrp ?? unsynced.mrp ?? 0),
-              stockQuantity: Number(created.quantity ?? unsynced.stockQuantity ?? 100),
-              boxCapacity: Number(created.box_capacity ?? unsynced.boxCapacity ?? 50),
-              minStockAlert: Number(created.min_stock_alert ?? unsynced.minStockAlert ?? 50),
-            };
-            prodMap.set(syncedProduct.name.trim().toLowerCase(), syncedProduct);
-          }
-        });
-      }
       const finalProducts = Array.from(prodMap.values());
-
-      // 5. BATCH SINGLE STATE UPDATE (prevents UI re-render jitter)
-      if (finalStores.length > 0) setStores(finalStores);
-      if (finalInvoices.length > 0) setInvoices(finalInvoices);
       if (finalProducts.length > 0) setProducts(finalProducts);
+
       setLastSyncTime(new Date());
 
       const totalDuration = Math.round(performance.now() - syncStart);
@@ -515,7 +457,8 @@ export const App: React.FC = () => {
     const nextGlobal = invoices.length > 0 ? Math.max(...invoices.map(i => i.globalBillId || 0)) + 1 : 1;
     const finalInvoice: Invoice = {
       ...newInvoice,
-      globalBillId: newInvoice.globalBillId || nextGlobal
+      globalBillId: newInvoice.globalBillId || nextGlobal,
+      _pendingCloudSync: true,
     };
 
     // 1. Add invoice to history & open preview immediately (0ms UI latency!)
@@ -557,12 +500,13 @@ export const App: React.FC = () => {
     // (Note: Backend's createInvoice automatically deducts stock in PostgreSQL DB)
     syncInvoiceToBackend(finalInvoice).then(cloudInv => {
       if (cloudInv && cloudInv.id) {
-        setInvoices(prev => prev.map(inv => inv.id === finalInvoice.id ? {
+        setInvoices(prev => prev.map(inv => (inv.id === finalInvoice.id || (inv.globalBillId && inv.globalBillId === finalInvoice.globalBillId)) ? {
           ...inv,
           id: cloudInv.id,
           globalBillId: cloudInv.global_bill_id ? Number(cloudInv.global_bill_id) : inv.globalBillId,
           companyInvoiceNumber: cloudInv.company_invoice_number || inv.companyInvoiceNumber,
           invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
+          _pendingCloudSync: false,
         } : inv));
       }
       try {
@@ -596,10 +540,16 @@ export const App: React.FC = () => {
       return;
     }
 
-    // 1. Remove from invoices state immediately (0ms UI latency!)
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    // 1. Mark as deleted in storage immediately so background sync never resurrects it
+    addDeletedInvoiceId(invoiceId);
+    if (invToDelete?.globalBillId) {
+      addDeletedInvoiceId(`gbid-${invToDelete.globalBillId}`);
+    }
 
-    // 2. Automatic stock restoration back to products
+    // 2. Remove from invoices state immediately (0ms UI latency!)
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId && (!invToDelete?.globalBillId || inv.globalBillId !== invToDelete.globalBillId)));
+
+    // 3. Automatic stock restoration back to products
     if (invToDelete && Array.isArray(invToDelete.items)) {
       const restoreMap = new Map<string, number>();
       for (const item of invToDelete.items) {
@@ -623,17 +573,18 @@ export const App: React.FC = () => {
       });
     }
 
-    // 3. Delete invoice from cloud backend (backend also automatically restores stock in PostgreSQL DB)
-    deleteInvoiceFromBackend(invoiceId).then(() => {
-      try {
-        const bc = new BroadcastChannel('animex_live_sync');
-        bc.postMessage({ type: 'FORCE_SYNC' });
-        bc.close();
-      } catch {}
-      setTimeout(() => {
-        syncCloudData();
-      }, 500);
-    });
+    // 4. Await backend deletion so database has committed before any sync can read it!
+    await deleteInvoiceFromBackend(invoiceId);
+
+    // 5. Broadcast to other tabs & devices
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+
+    // 6. Refresh cloud data
+    await syncCloudData();
   };
 
   // Add inward stock entry (Boxes * UnitsPerBox + LooseUnits)
@@ -681,9 +632,10 @@ export const App: React.FC = () => {
               district: cloudStore.district || s.district,
               address: cloudStore.address || s.address,
               state: 'Maharashtra',
+              customerType: newStore.customerType || 'store',
             } : s;
 
-            const key = item.firmName.trim().toLowerCase();
+            const key = item.id;
             if (!seen.has(key)) {
               seen.add(key);
               updatedList.push(item);
@@ -715,6 +667,7 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteStore = async (storeId: string) => {
+    addDeletedStoreId(storeId);
     setStores(stores.filter(s => s.id !== storeId));
     await deleteStoreFromBackend(storeId);
     try {
@@ -722,7 +675,7 @@ export const App: React.FC = () => {
       bc.postMessage({ type: 'FORCE_SYNC' });
       bc.close();
     } catch {}
-    syncCloudData();
+    await syncCloudData();
   };
 
   const handleAddProduct = async (newProduct: Product) => {

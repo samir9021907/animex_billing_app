@@ -674,14 +674,28 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </p>
               </div>
 
-              {/* 6. Authorized Signatory Footer */}
-              <div className="border-t-2 border-[#1e293b] flex justify-end bg-white">
-                <div className="w-full sm:w-80 sm:border-l-2 border-[#1e293b] p-2.5 sm:p-3 text-center min-h-[90px] sm:min-h-[110px] flex flex-col justify-between bg-slate-50/40">
+              {/* 6. Dual Signatory Footer: Left = Receiver's Signature, Right = Authorized Signatory */}
+              <div className="border-t-2 border-[#1e293b] grid grid-cols-2 divide-x-2 divide-[#1e293b] bg-white">
+                {/* Left: Receiver's Signature */}
+                <div className="p-2.5 sm:p-3 text-center min-h-[90px] sm:min-h-[110px] flex flex-col justify-between bg-slate-50/20">
+                  <div className="font-black text-[11px] sm:text-xs text-[#0F4C81]">
+                    Receiver's Signature:
+                  </div>
+                  <div className="pt-6 sm:pt-8">
+                    <div className="w-28 sm:w-36 mx-auto border-b border-slate-400 mb-1"></div>
+                    <div className="font-extrabold text-[10px] sm:text-[11px] text-slate-600">
+                      Customer Signature
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Company Authorized Signatory */}
+                <div className="p-2.5 sm:p-3 text-center min-h-[90px] sm:min-h-[110px] flex flex-col justify-between bg-slate-50/40">
                   <div className="font-black text-[11px] sm:text-xs text-[#0F4C81]">
                     For ANIMEX ANIMAL HEALTH CARE PVT LTD:
                   </div>
                   <div className="pt-6 sm:pt-8">
-                    <div className="w-28 sm:w-32 mx-auto border-b border-slate-400 mb-1"></div>
+                    <div className="w-28 sm:w-36 mx-auto border-b border-slate-400 mb-1"></div>
                     <div className="font-extrabold text-[10px] sm:text-[11px] text-slate-700">
                       Authorized Signatory
                     </div>

@@ -521,10 +521,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-center">
-                    <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase border shadow-sm ${statusBadge.badgeClass}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                      <span>{statusBadge.label} {invoice.balanceAmount > 0 && invoice.receivedAmount > 0 ? `(₹${invoice.receivedAmount.toFixed(0)} Paid)` : ''}</span>
+                  <div className="pt-2">
+                    <span className={`px-2.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase border ${statusBadge.badgeClass}`}>
+                      ● {statusBadge.label} {invoice.balanceAmount > 0 && invoice.receivedAmount > 0 ? `(₹${invoice.receivedAmount.toFixed(0)} Paid)` : ''}
                     </span>
                   </div>
                 </div>

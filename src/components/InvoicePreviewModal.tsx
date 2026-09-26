@@ -438,21 +438,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-r from-[#0F4C81] via-[#F97316] to-[#166534]"></div>
 
             {/* Main Title Banner */}
-            <div className="flex items-center justify-between border-b-2 border-[#0F4C81] pb-2.5 mb-3 pt-2">
-              <div>
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-[#F97316] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
-                  OFFICIAL TAX INVOICE / BILL OF SUPPLY
-                </span>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#0F4C81] uppercase mt-0.5">
-                  Bill of Supply
-                </h1>
-              </div>
-
-              <div className="text-right">
-                <span className="bg-[#f0fdf4] text-[#166534] border border-[#bbf7d0] px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider inline-block">
-                  ISO 9001:2015 & GMP CERTIFIED
-                </span>
-              </div>
+            <div className="border-b-2 border-[#0F4C81] pb-2 mb-3 pt-1 text-center">
+              <h1 className="text-xl sm:text-2xl font-black tracking-wider text-[#0F4C81] uppercase">
+                Bill of Supply
+              </h1>
             </div>
 
             {/* Master Outer Container Box */}
@@ -532,9 +521,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="pt-2">
-                    <span className={`px-2.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase border ${statusBadge.badgeClass}`}>
-                      ● {statusBadge.label} {invoice.balanceAmount > 0 && invoice.receivedAmount > 0 ? `(₹${invoice.receivedAmount.toFixed(0)} Paid)` : ''}
+                  <div className="pt-2 flex justify-center">
+                    <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase border shadow-sm ${statusBadge.badgeClass}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                      <span>{statusBadge.label} {invoice.balanceAmount > 0 && invoice.receivedAmount > 0 ? `(₹${invoice.receivedAmount.toFixed(0)} Paid)` : ''}</span>
                     </span>
                   </div>
                 </div>

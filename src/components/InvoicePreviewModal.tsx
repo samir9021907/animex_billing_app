@@ -539,7 +539,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <th className="p-1.5 sm:p-2 border-r border-[#cbd5e1] text-right w-16 sm:w-20">Quantity</th>
                       <th className="p-1.5 sm:p-2 border-r border-[#cbd5e1] text-center w-14 sm:w-16">Unit</th>
                       <th className="p-1.5 sm:p-2 border-r border-[#cbd5e1] text-right w-20 sm:w-24">MRP (₹)</th>
-                      <th className="p-1.5 sm:p-2 border-r border-[#cbd5e1] text-right w-24 sm:w-28">Rate / Unit (₹)</th>
+                      <th className="p-1.5 sm:p-2 border-r border-[#cbd5e1] text-right w-24 sm:w-28">Price / Unit (₹)</th>
                       <th className="p-1.5 sm:p-2 text-right w-24 sm:w-28">Amount (₹)</th>
                     </tr>
                   </thead>

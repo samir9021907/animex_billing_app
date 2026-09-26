@@ -13,6 +13,8 @@ import { PurchasesManager } from './components/PurchasesManager';
 import { Invoice, MedicalStore, Product, PurchaseInvoice } from './types';
 import { INITIAL_INVOICES, INITIAL_PRODUCTS, INITIAL_STORES, INITIAL_PURCHASES } from './data/seedData';
 import {
+  API_BASE,
+  getClientId,
   syncInvoiceToBackend,
   deleteInvoiceFromBackend,
   syncStoreToBackend,
@@ -358,18 +360,66 @@ export const App: React.FC = () => {
       };
     } catch {}
 
-    // 6. Fast background auto-sync interval every 10 seconds for live multi-device sync
-    const intervalId = setInterval(() => {
-      lastAutoSync = Date.now();
-      syncCloudData();
-    }, 10000);
+    // 6. Adaptive background auto-sync: 3.5s when app is active/visible, 12s when backgrounded
+    const activeIntervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        lastAutoSync = Date.now();
+        syncCloudData();
+      }
+    }, 3500);
+
+    const idleIntervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        lastAutoSync = Date.now();
+        syncCloudData();
+      }
+    }, 12000);
+
+    // 7. Live Real-Time Server-Sent Events (SSE) for sub-second cross-device push
+    let eventSource: EventSource | null = null;
+    let sseRetryTimer: any = null;
+
+    const connectSSE = () => {
+      try {
+        if (typeof EventSource === 'undefined') return;
+        const clientId = getClientId();
+        const sseUrl = `${API_BASE}/client/${clientId}/realtime-stream`;
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data?.type === 'DATA_CHANGED') {
+              console.log('⚡ Realtime SSE instant sync triggered:', data);
+              syncCloudData();
+            }
+          } catch {}
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          clearTimeout(sseRetryTimer);
+          sseRetryTimer = setTimeout(connectSSE, 4000);
+        };
+      } catch (err) {
+        console.warn('Realtime SSE notice:', err);
+      }
+    };
+
+    connectSSE();
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
       if (channel) channel.close();
-      clearInterval(intervalId);
+      if (eventSource) eventSource.close();
+      clearTimeout(sseRetryTimer);
+      clearInterval(activeIntervalId);
+      clearInterval(idleIntervalId);
     };
   }, [currentUser, syncCloudData]);
 

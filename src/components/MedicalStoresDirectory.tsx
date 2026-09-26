@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MedicalStore } from '../types';
-import { Store, Plus, Phone, MapPin, Search, Edit2, Trash2, AlertCircle, User, UserPlus } from 'lucide-react';
-import { cleanPhoneNumber, validatePhone, validateName } from '../utils/validators';
+import { Store, Plus, Phone, MapPin, Search, Edit2, Trash2, AlertCircle, User, UserPlus, AlertTriangle } from 'lucide-react';
+import { cleanPhoneNumber, validatePhone } from '../utils/validators';
 import { useLanguage } from '../context/LanguageContext';
 
 interface MedicalStoresDirectoryProps {
@@ -28,6 +28,18 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const copy = { ...prev };
+        delete copy[field];
+        return copy;
+      });
+    }
+    if (formError) setFormError(null);
+  };
 
   // Form states
   const [firmName, setFirmName] = useState('');
@@ -48,6 +60,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setDistrict('');
     setAddress('');
     setFormError(null);
+    setFieldErrors({});
     setIsSubmitting(false);
     setShowModal(true);
   };
@@ -62,6 +75,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setDistrict('');
     setAddress('');
     setFormError(null);
+    setFieldErrors({});
     setIsSubmitting(false);
     setShowModal(true);
   };
@@ -76,6 +90,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     setDistrict(st.district || '');
     setAddress(st.address || '');
     setFormError(null);
+    setFieldErrors({});
     setIsSubmitting(false);
     setShowModal(true);
   };
@@ -101,52 +116,85 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
     if (isSubmitting) return;
 
     const isCustomer = modalType === 'customer';
+    const errors: Record<string, string> = {};
 
-    // 1. Validate Name / Title
-    const nameLabel = isCustomer
-      ? (isMr ? 'ग्राहकाचे नाव' : isHi ? 'ग्राहक का नाम' : 'Customer Name')
-      : (isMr ? 'मेडिकल स्टोअरचे नाव' : isHi ? 'मेडिकल स्टोर का नाम' : 'Store / Firm Name');
-
-    const nameErr = validateName(firmName, nameLabel, 2);
-    if (nameErr) {
-      setFormError(nameErr);
-      return;
-    }
-
-    // Duplicate check
-    const cleanFirm = firmName.trim().toLowerCase();
-    const isDuplicate = stores.some(s => 
-      s.firmName.trim().toLowerCase() === cleanFirm && (!editingStore || s.id !== editingStore.id)
-    );
-    if (isDuplicate) {
-      setFormError(
-        isCustomer
+    // 1. Validate Name / Title (Mandatory)
+    if (!firmName.trim()) {
+      errors.firmName = isCustomer
+        ? (isMr ? 'कृपया ग्राहकाचे नाव टाका' : isHi ? 'कृपया ग्राहक का नाम दर्ज करें' : 'Enter customer name')
+        : (isMr ? 'कृपया मेडिकल स्टोअरचे नाव टाका' : isHi ? 'कृपया मेडिकल स्टोर का नाम दर्ज करें' : 'Enter medical store name');
+    } else if (firmName.trim().length < 2) {
+      errors.firmName = isMr
+        ? 'नाव किमान २ अक्षरांचे असणे आवश्यक आहे'
+        : isHi
+        ? 'नाम कम से कम 2 अक्षरों का होना चाहिए'
+        : 'Name must be at least 2 characters';
+    } else {
+      // Duplicate check
+      const cleanFirm = firmName.trim().toLowerCase();
+      const isDuplicate = stores.some(s => 
+        s.firmName.trim().toLowerCase() === cleanFirm && (!editingStore || s.id !== editingStore.id)
+      );
+      if (isDuplicate) {
+        errors.firmName = isCustomer
           ? (isMr ? `'${firmName.trim()}' नावाचा ग्राहक आधीपासून जोडलेला आहे.` : `Customer '${firmName.trim()}' already exists.`)
-          : (isMr ? `'${firmName.trim()}' नावाचे मेडिकल स्टोअर आधीपासून जोडलेले आहे. कृपया वेगळे नाव द्या.` : `Store '${firmName.trim()}' already exists. Please enter a different name.`)
-      );
-      return;
+          : (isMr ? `'${firmName.trim()}' नावाचे मेडिकल स्टोअर आधीपासून जोडलेले आहे. कृपया वेगळे नाव द्या.` : `Store '${firmName.trim()}' already exists. Please enter a different name.`);
+      }
     }
 
-    // 2. Validate Phone (must be strictly 10 digits starting with 6, 7, 8, 9)
-    const phoneLabel = isMr ? 'मोबाईल नंबर' : isHi ? 'मोबाइल नंबर' : 'Phone Number';
-    const phoneErr = validatePhone(phone, phoneLabel);
-    if (phoneErr) {
-      setFormError(phoneErr);
-      return;
-    }
-
-    // 3. Validate Contact Person (only for stores, if entered)
+    // 2. Validate Contact Person (for store, if entered)
     if (!isCustomer && contactName.trim() && contactName.trim().length < 2) {
-      setFormError(
-        isMr
-          ? 'कॉन्टॅक्ट पर्सनचे नाव किमान २ अक्षरांचे असणे आवश्यक आहे.'
+      errors.contactName = isMr
+        ? 'संपर्क व्यक्तीचे नाव किमान २ अक्षरांचे असणे आवश्यक आहे'
+        : isHi
+        ? 'संपर्क व्यक्ति का नाम कम से कम 2 अक्षरों का होना चाहिए'
+        : 'Contact person name must be at least 2 characters';
+    }
+
+    // 3. Validate Phone (Mandatory, 10 digits starting with 6-9)
+    if (!phone.trim()) {
+      errors.phone = isMr ? 'कृपया १० अंकी मोबाईल नंबर टाका' : isHi ? 'कृपया 10 अंकों का मोबाइल नंबर दर्ज करें' : 'Enter mobile phone number';
+    } else {
+      const phoneErr = validatePhone(phone, isMr ? 'मोबाईल नंबर' : 'Phone Number');
+      if (phoneErr) {
+        errors.phone = isMr
+          ? 'कृपया वैध १० अंकी मोबाईल नंबर टाका (६, ७, ८, ९ ने सुरू होणारा)'
           : isHi
-          ? 'संपर्क व्यक्ति का नाम कम से कम 2 अक्षरों का होना चाहिए।'
-          : 'Contact person name must be at least 2 characters.'
-      );
+          ? 'कृपया मान्य 10 अंकों का मोबाइल नंबर दर्ज करें (6, 7, 8, 9 से शुरू)'
+          : 'Enter a valid 10-digit mobile number starting with 6, 7, 8, or 9';
+      }
+    }
+
+    // 4. Validate District (Mandatory)
+    if (!district.trim()) {
+      errors.district = isMr ? 'कृपया जिल्हा टाका' : isHi ? 'कृपया जिला दर्ज करें' : 'Enter district';
+    }
+
+    // 5. Validate Address (Mandatory)
+    if (!address.trim()) {
+      errors.address = isMr ? 'कृपया पत्ता टाका' : isHi ? 'कृपया पता दर्ज करें' : 'Enter address';
+    } else if (address.trim().length < 3) {
+      errors.address = isMr
+        ? 'कृपया पूर्ण पत्ता टाका (किमान ३ अक्षरे)'
+        : isHi
+        ? 'कृपया पूरा पता दर्ज करें'
+        : 'Enter a valid address (at least 3 characters)';
+    }
+
+    // If any validation errors exist, display them Amazon style and focus first invalid field
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstKey = Object.keys(errors)[0];
+      setTimeout(() => {
+        const el = document.getElementById(`store-field-${firstKey}`);
+        if (el) {
+          el.focus();
+        }
+      }, 50);
       return;
     }
 
+    setFieldErrors({});
     setFormError(null);
     setIsSubmitting(true);
     try {
@@ -440,7 +488,26 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs font-bold">
+            <form onSubmit={handleSubmit} noValidate className="space-y-3 text-xs font-bold">
+              {/* Amazon-style Warning Alert Banner */}
+              {Object.keys(fieldErrors).length > 0 && (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 rounded-xl text-amber-950 dark:text-amber-100 shadow-sm animate-in fade-in duration-200">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-black text-xs text-amber-950 dark:text-amber-200 uppercase tracking-wider">
+                        {isMr ? 'माहिती भरणे अपूर्ण आहे (There was a problem)' : isHi ? 'समस्या आई है (There was a problem)' : 'There was a problem'}
+                      </h4>
+                      <ul className="list-disc list-inside text-[11px] font-bold text-amber-900 dark:text-amber-300 space-y-0.5">
+                        {Object.values(fieldErrors).map((msg, i) => (
+                          <li key={i}>{msg}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {formError && (
                 <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-bold">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -455,17 +522,34 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                     ? (isMr ? 'ग्राहकाचे / शेतकऱ्याचे पूर्ण नाव *' : isHi ? 'ग्राहक / किसान का नाम *' : 'Customer / Farmer Full Name *')
                     : (isMr ? 'मेडिकल स्टोअरचे नाव (Firm Name) *' : isHi ? 'मेडिकल स्टोर का नाम *' : 'Firm Name (Medical Store Name) *')}
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={modalType === 'customer' ? (isMr ? 'ग्राहकाचे नाव' : isHi ? 'ग्राहक का नाम' : 'Customer Name') : (isMr ? 'मेडिकल स्टोअरचे नाव' : isHi ? 'मेडिकल स्टोर का नाम' : 'Medical Store Name')}
-                  value={firmName}
-                  onChange={(e) => {
-                    setFirmName(e.target.value);
-                    if (formError) setFormError(null);
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
-                />
+                <div className="relative">
+                  <input
+                    id="store-field-firmName"
+                    type="text"
+                    placeholder={modalType === 'customer' ? (isMr ? 'ग्राहकाचे नाव' : isHi ? 'ग्राहक का नाम' : 'Customer Name') : (isMr ? 'मेडिकल स्टोअरचे नाव' : isHi ? 'मेडिकल स्टोर का नाम' : 'Medical Store Name')}
+                    value={firmName}
+                    onChange={(e) => {
+                      setFirmName(e.target.value);
+                      clearFieldError('firmName');
+                    }}
+                    className={`w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white transition-all outline-none ${
+                      fieldErrors.firmName
+                        ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/20 ring-2 ring-red-200 dark:ring-red-900/40 pr-9'
+                        : 'border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-animex-orange-500'
+                    }`}
+                  />
+                  {fieldErrors.firmName && (
+                    <div className="absolute right-3 top-2.5 text-red-500 pointer-events-none">
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white font-black text-xs">!</span>
+                    </div>
+                  )}
+                </div>
+                {fieldErrors.firmName && (
+                  <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                    <span className="text-red-500 font-black">!</span>
+                    <span>{fieldErrors.firmName}</span>
+                  </div>
+                )}
               </div>
 
               {/* Field 2: Contact Person Name (Only for Medical Store) */}
@@ -474,50 +558,106 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">
                     {isMr ? 'प्रोप्रायटर / संपर्क व्यक्तीचे नाव' : 'Contact Person / Proprietor Name'}
                   </label>
-                  <input
-                    type="text"
-                    placeholder={isMr ? 'संपर्क व्यक्तीचे नाव' : isHi ? 'संपर्क व्यक्ति का नाम' : 'Contact Person Name'}
-                    value={contactName}
-                    onChange={(e) => {
-                      setContactName(e.target.value);
-                      if (formError) setFormError(null);
-                    }}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
-                  />
+                  <div className="relative">
+                    <input
+                      id="store-field-contactName"
+                      type="text"
+                      placeholder={isMr ? 'संपर्क व्यक्तीचे नाव' : isHi ? 'संपर्क व्यक्ति का नाम' : 'Contact Person Name'}
+                      value={contactName}
+                      onChange={(e) => {
+                        setContactName(e.target.value);
+                        clearFieldError('contactName');
+                      }}
+                      className={`w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white transition-all outline-none ${
+                        fieldErrors.contactName
+                          ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/20 ring-2 ring-red-200 dark:ring-red-900/40 pr-9'
+                          : 'border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-animex-orange-500'
+                      }`}
+                    />
+                    {fieldErrors.contactName && (
+                      <div className="absolute right-3 top-2.5 text-red-500 pointer-events-none">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white font-black text-xs">!</span>
+                      </div>
+                    )}
+                  </div>
+                  {fieldErrors.contactName && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                      <span className="text-red-500 font-black">!</span>
+                      <span>{fieldErrors.contactName}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Field 3: Phone & District */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">
                     {isMr ? 'मोबाईल नंबर *' : 'Phone Number *'}
                   </label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    required
-                    placeholder={isMr ? 'मोबाईल नंबर' : isHi ? 'मोबाइल नंबर' : 'Phone Number'}
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(cleanPhoneNumber(e.target.value));
-                      if (formError) setFormError(null);
-                    }}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-mono"
-                  />
+                  <div className="relative">
+                    <input
+                      id="store-field-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      placeholder={isMr ? 'मोबाईल नंबर' : isHi ? 'मोबाइल नंबर' : 'Phone Number'}
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(cleanPhoneNumber(e.target.value));
+                        clearFieldError('phone');
+                      }}
+                      className={`w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white font-mono transition-all outline-none ${
+                        fieldErrors.phone
+                          ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/20 ring-2 ring-red-200 dark:ring-red-900/40 pr-9'
+                          : 'border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-animex-orange-500'
+                      }`}
+                    />
+                    {fieldErrors.phone && (
+                      <div className="absolute right-3 top-2.5 text-red-500 pointer-events-none">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white font-black text-xs">!</span>
+                      </div>
+                    )}
+                  </div>
+                  {fieldErrors.phone && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                      <span className="text-red-500 font-black">!</span>
+                      <span>{fieldErrors.phone}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                    {isMr ? 'जिल्हा' : 'District'}
+                    {isMr ? 'जिल्हा *' : 'District *'}
                   </label>
-                  <input
-                    type="text"
-                    placeholder={isMr ? 'जिल्हा' : isHi ? 'जिला' : 'District'}
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
-                  />
+                  <div className="relative">
+                    <input
+                      id="store-field-district"
+                      type="text"
+                      placeholder={isMr ? 'जिल्हा' : isHi ? 'जिला' : 'District'}
+                      value={district}
+                      onChange={(e) => {
+                        setDistrict(e.target.value);
+                        clearFieldError('district');
+                      }}
+                      className={`w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white transition-all outline-none ${
+                        fieldErrors.district
+                          ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/20 ring-2 ring-red-200 dark:ring-red-900/40 pr-9'
+                          : 'border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-animex-orange-500'
+                      }`}
+                    />
+                    {fieldErrors.district && (
+                      <div className="absolute right-3 top-2.5 text-red-500 pointer-events-none">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white font-black text-xs">!</span>
+                      </div>
+                    )}
+                  </div>
+                  {fieldErrors.district && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                      <span className="text-red-500 font-black">!</span>
+                      <span>{fieldErrors.district}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -525,16 +665,32 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">
                   {modalType === 'customer'
-                    ? (isMr ? 'गाव / सविस्तर पत्ता' : 'Village / Full Address')
-                    : (isMr ? 'पत्ता' : 'Address')}
+                    ? (isMr ? 'गाव / सविस्तर पत्ता *' : 'Village / Full Address *')
+                    : (isMr ? 'पत्ता *' : 'Address *')}
                 </label>
-                <textarea
-                  rows={2}
-                  placeholder={isMr ? 'पत्ता' : isHi ? 'पता' : 'Address'}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
-                />
+                <div className="relative">
+                  <textarea
+                    id="store-field-address"
+                    rows={2}
+                    placeholder={isMr ? 'पत्ता' : isHi ? 'पता' : 'Address'}
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      clearFieldError('address');
+                    }}
+                    className={`w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 text-slate-900 dark:text-white transition-all outline-none ${
+                      fieldErrors.address
+                        ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/20 ring-2 ring-red-200 dark:ring-red-900/40'
+                        : 'border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-animex-orange-500'
+                    }`}
+                  />
+                </div>
+                {fieldErrors.address && (
+                  <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                    <span className="text-red-500 font-black">!</span>
+                    <span>{fieldErrors.address}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

@@ -210,7 +210,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
           address: address.trim(),
           customerType: modalType,
         };
-        await onUpdateStore(updated);
+        onUpdateStore(updated);
       } else {
         const created: MedicalStore = {
           id: isCustomer ? `cust-${Date.now()}` : `store-${Date.now()}`,
@@ -223,9 +223,10 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
           address: address.trim(),
           customerType: modalType,
         };
-        await onAddStore(created);
+        onAddStore(created);
       }
-      setFilterType(modalType === 'customer' ? 'CUSTOMER' : 'STORE');
+      setSearchQuery('');
+      setFilterType('ALL');
       setShowModal(false);
     } finally {
       setIsSubmitting(false);

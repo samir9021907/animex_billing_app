@@ -270,7 +270,7 @@ export const App: React.FC = () => {
       for (const ls of storesRef.current) {
         if (!deletedStoreIds.has(ls.id)) {
           const key = ls.firmName.trim().toLowerCase();
-          if (!storeMapByName.has(key) && uploadingStoreKeys.current.has(key)) {
+          if (!storeMapByName.has(key) && (uploadingStoreKeys.current.has(key) || !uuidRegex.test(ls.id))) {
             storeMapByName.set(key, ls);
           }
         }
@@ -342,7 +342,7 @@ export const App: React.FC = () => {
       for (const li of invoicesRef.current) {
         if (!deletedInvoiceIds.has(li.id) && (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`))) {
           const key = li.globalBillId ? `gbid-${li.globalBillId}` : li.id;
-          if (!invoiceMap.has(key) && uploadingInvoiceKeys.current.has(li.id)) {
+          if (!invoiceMap.has(key) && (uploadingInvoiceKeys.current.has(li.id) || !uuidRegex.test(li.id))) {
             invoiceMap.set(key, li);
           }
         }

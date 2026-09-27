@@ -73,12 +73,27 @@ export const mapBackendInvoice = (inv: any) => {
   }));
 
   const storeData = inv.medical_store || {};
+  const grandTotal = Math.round(Number(inv.grand_total || 0));
+  let receivedAmount = Number(inv.received_amount || 0);
+  let balanceAmount = Number(inv.balance_due || 0);
+  let status = (inv.status || '').toUpperCase();
+
+  // Indian Invoicing Round-off tolerance:
+  // If balance is <= 1 rupee or rounded balance is 0, consider it 100% PAID!
+  if ((balanceAmount <= 1.0 || Math.round(balanceAmount) === 0) && receivedAmount > 0) {
+    balanceAmount = 0;
+    receivedAmount = grandTotal;
+    status = 'PAID';
+  } else if (!status) {
+    status = balanceAmount === 0 ? 'PAID' : (receivedAmount === 0 ? 'PENDING' : 'PARTIALLY PAID');
+  }
+
   return {
     id: inv.id,
     invoiceNo: inv.company_invoice_number || (inv.invoice_number ? Number(inv.invoice_number.replace(/\D/g, '')) : 1),
     invoiceNumber: inv.invoice_number || `#${inv.company_invoice_number || 1}`,
     globalBillId: inv.global_bill_id ? Number(inv.global_bill_id) : undefined,
-    date: inv.date ? inv.date.split('T')[0] : new Date().toISOString().split('T')[0],
+    date: inv.date ? (inv.date.includes('T') ? inv.date.split('T')[0] : inv.date) : new Date().toISOString().split('T')[0],
     billTo: {
       id: storeData.id || inv.medical_store_id,
       firmName: storeData.firm_name || 'Medical Store',
@@ -91,12 +106,12 @@ export const mapBackendInvoice = (inv: any) => {
     items,
     subTotal: Number(inv.subtotal || 0),
     discount: Number(inv.discount || 0),
-    totalAmount: Number(inv.grand_total || 0),
-    amountInWords: inv.amountInWords || convertNumberToWords(Number(inv.grand_total || 0)),
+    totalAmount: grandTotal,
+    amountInWords: inv.amountInWords || convertNumberToWords(grandTotal),
     paymentType: inv.payment_type || 'UPI',
-    receivedAmount: Number(inv.received_amount || 0),
-    balanceAmount: Number(inv.balance_due || 0),
-    status: inv.status?.toUpperCase() || 'PENDING',
+    receivedAmount,
+    balanceAmount,
+    status,
     notes: inv.notes || '',
     termsAndConditions: inv.notes || 'Goods once sold will not be taken back.',
     createdAt: inv.created_at || new Date().toISOString(),
@@ -304,9 +319,16 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
     }
 
     let isoDate = invoice.date;
-    if (invoice.date && /^\d{2}-\d{2}-\d{4}$/.test(invoice.date)) {
-      const [d, m, y] = invoice.date.split('-');
-      isoDate = `${y}-${m}-${d}`;
+    if (invoice.date) {
+      if (/^\d{2}-\d{2}-\d{4}$/.test(invoice.date.trim())) {
+        const [d, m, y] = invoice.date.trim().split('-');
+        isoDate = `${y}-${m}-${d}`;
+      } else {
+        const parsed = new Date(invoice.date);
+        if (!isNaN(parsed.getTime())) {
+          isoDate = parsed.toISOString().split('T')[0];
+        }
+      }
     }
 
     // Ensure medical_store_id is a valid UUID
@@ -331,6 +353,14 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
       : `${API_BASE}/client/${clientId}/invoices`;
     const method = isExistingUuid ? 'PUT' : 'POST';
 
+    const grandTotal = Math.round(Number(invoice.totalAmount || 0));
+    const isFullPaid = (invoice.status?.toUpperCase() === 'PAID') ||
+                       (Number(invoice.balanceAmount || 0) <= 1.0) ||
+                       (Math.round(Number(invoice.balanceAmount || 0)) === 0);
+    const syncReceivedAmount = isFullPaid
+      ? grandTotal
+      : Number(invoice.receivedAmount || 0);
+
     const reqBody = {
       medical_store_id: storeId,
       date: isoDate,
@@ -339,7 +369,7 @@ export const syncInvoiceToBackend = async (invoice: any): Promise<any> => {
       global_bill_id: invoice.globalBillId || undefined,
       discount: Number(invoice.discount || 0),
       gst_rate: 0,
-      received_amount: Number(invoice.receivedAmount || 0),
+      received_amount: syncReceivedAmount,
       payment_type: invoice.paymentType || 'UPI',
       notes: invoice.termsAndConditions || invoice.notes || 'Invoice generated via ANIMEX Billing',
       items: itemsPayload,

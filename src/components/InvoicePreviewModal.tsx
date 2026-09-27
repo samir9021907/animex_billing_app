@@ -36,9 +36,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   // Master continuous Bill Number matching animex_frontend
   const masterInvoiceNo = invoice.companyInvoiceNumber || invoice.invoiceNo;
-  const statusBadge = getStatusBadgeConfig(
-    invoice.status || (invoice.balanceAmount === 0 ? 'PAID' : invoice.receivedAmount === 0 ? 'PENDING' : 'PARTIALLY PAID')
-  );
+  const rawBal = Number(invoice.balanceAmount ?? 0);
+  const isPaid = rawBal <= 1.0 || Math.round(rawBal) === 0;
+  const resolvedStatus = invoice.status?.toUpperCase() === 'CANCELLED'
+    ? 'CANCELLED'
+    : isPaid
+    ? 'PAID'
+    : (Number(invoice.receivedAmount || 0) === 0 ? 'PENDING' : 'PARTIALLY PAID');
+  const statusBadge = getStatusBadgeConfig(resolvedStatus);
+  const effectiveBalance = isPaid ? 0 : rawBal;
+  const effectiveReceived = isPaid ? Number(invoice.totalAmount || 0) : Number(invoice.receivedAmount || 0);
 
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
@@ -105,13 +112,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       itemsList += `${index + 1}. *${item.itemName || 'Item'}*${freeTag}\n   ${item.quantity || 1} ${item.unit || 'pcs'} x ${priceStr} = *${amountStr}*\n`;
     });
 
-    const balanceAmt = safeNum(invoice?.balanceAmount);
-    const receivedAmt = safeNum(invoice?.receivedAmount);
+    const rawBal = safeNum(invoice?.balanceAmount);
+    const isPaidInFull = rawBal <= 1.0 || Math.round(rawBal) === 0;
+    const balanceAmt = isPaidInFull ? 0 : rawBal;
+    const receivedAmt = isPaidInFull ? safeNum(invoice?.totalAmount) : safeNum(invoice?.receivedAmount);
     const totalAmt = safeNum(invoice?.totalAmount);
     const subTotalAmt = safeNum(invoice?.subTotal);
     const discountAmt = safeNum(invoice?.discount);
 
-    const balanceStatus = balanceAmt <= 0
+    const balanceStatus = isPaidInFull
       ? (isMr ? '🟢 *पूर्ण भरले (PAID)*' : isHi ? '🟢 *पूर्ण भुगतान (PAID)*' : '🟢 *PAID*')
       : receivedAmt > 0
         ? (isMr ? `🟠 *अंशतः भरले* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🟠 *आंशिक भुगतान* - शेष: ₹${balanceAmt.toFixed(2)}` : `🟠 *PARTIALLY PAID* - Balance: ₹${balanceAmt.toFixed(2)}`)
@@ -195,7 +204,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const customerLabel = isMr ? 'ग्राहक:' : isHi ? 'ग्राहक:' : 'Customer:';
       const totalLabel = isMr ? 'एकूण रक्कम:' : isHi ? 'कुल राशि:' : 'Total:';
       const balanceLabel = isMr ? 'बाकी रक्कम:' : isHi ? 'बकाया:' : 'Balance:';
-      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ₹${safeNum(invoice?.balanceAmount).toFixed(2)}`;
+      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : (isMr ? '✓ पूर्ण भरले (PAID)' : '✓ PAID')}`;
 
       // Generate the REAL COLORFUL ORIGINAL BILL canvas image
       const canvas = await generateBillCanvas();
@@ -523,7 +532,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   <div className="pt-2">
                     <span className={`px-2.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase border ${statusBadge.badgeClass}`}>
-                      ● {statusBadge.label} {invoice.balanceAmount > 0 && invoice.receivedAmount > 0 ? `(₹${invoice.receivedAmount.toFixed(0)} Paid)` : ''}
+                      ● {statusBadge.label} {effectiveBalance > 0 && effectiveReceived > 0 ? `(₹${effectiveReceived.toFixed(0)} Paid)` : ''}
                     </span>
                   </div>
                 </div>
@@ -654,13 +663,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   <div className="flex justify-between p-2 text-slate-700">
                     <span>Received Amount ({invoice.paymentType || 'UPI'})</span>
-                    <span>: ₹ {invoice.receivedAmount.toFixed(2)}</span>
+                    <span>: ₹ {effectiveReceived.toFixed(2)}</span>
                   </div>
 
-                  <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700">
-                    <span>{isMr ? 'बाकी रक्कम' : 'Balance Due'}</span>
-                    <span>: ₹ {invoice.balanceAmount.toFixed(2)}</span>
-                  </div>
+                  {effectiveBalance > 0 ? (
+                    <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700">
+                      <span>{isMr ? 'बाकी रक्कम' : 'Balance Due'}</span>
+                      <span>: ₹ {effectiveBalance.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between p-2 font-black text-xs bg-[#ecfdf5] text-emerald-700">
+                      <span>{isMr ? 'पेमेंट स्थिती' : 'Payment Status'}</span>
+                      <span>: ✓ {isMr ? 'पूर्ण जमा (PAID)' : 'PAID IN FULL'}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

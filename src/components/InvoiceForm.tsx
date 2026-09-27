@@ -211,9 +211,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
   // Calculate totals matching animex_frontend logic
   const subTotal = items.reduce((sum, i) => sum + i.amount, 0);
-  const totalAmount = Math.max(0, subTotal - discount);
+  const totalAmount = Math.round(Math.max(0, subTotal - discount));
   const amountInWords = convertNumberToWords(totalAmount);
-  const balanceAmount = Math.max(0, totalAmount - receivedAmount);
+  const rawBalance = Math.max(0, totalAmount - receivedAmount);
+  const balanceAmount = (rawBalance <= 1.0 || Math.round(rawBalance) === 0) ? 0 : rawBalance;
   const status: BillStatus = balanceAmount === 0 ? 'PAID' : (receivedAmount === 0 ? 'PENDING' : 'PARTIALLY PAID');
   const invoiceCode = formatInvoiceNumber(invoiceNo, date);
 
@@ -398,7 +399,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       paymentType,
       status,
       amountInWords,
-      receivedAmount,
+      receivedAmount: balanceAmount === 0 ? totalAmount : receivedAmount,
       balanceAmount,
       termsAndConditions,
       createdAt: new Date().toISOString()

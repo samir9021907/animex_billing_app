@@ -51,14 +51,13 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
     (dateFilter ? 1 : 0);
 
   const getResolvedStatus = (inv: Invoice): BillStatus => {
-    if (inv.status) {
-      const s = inv.status.toUpperCase();
-      if (s === 'PAID') return 'PAID';
-      if (s === 'PENDING' || s === 'DUE') return 'PENDING';
-      if (s === 'PARTIALLY PAID' || s === 'PARTIAL' || s === 'PARTIALLYPAID') return 'PARTIALLY PAID';
-      if (s === 'CANCELLED') return 'CANCELLED';
-    }
-    return inv.balanceAmount === 0 ? 'PAID' : (inv.receivedAmount === 0 ? 'PENDING' : 'PARTIALLY PAID');
+    if (inv.status?.toUpperCase() === 'CANCELLED') return 'CANCELLED';
+    const bal = Number(inv.balanceAmount ?? 0);
+    const rec = Number(inv.receivedAmount ?? 0);
+    // If balance is 0 or less than or equal to 1 rupee (due to round-off fraction), it is 100% PAID!
+    if (bal <= 1.0 || Math.round(bal) === 0) return 'PAID';
+    if (rec === 0) return 'PENDING';
+    return 'PARTIALLY PAID';
   };
 
   const countAll = invoices.length;
@@ -517,14 +516,14 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                             <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor}`}></span>
                             <span>{statusBadge.label}</span>
                           </span>
-                          {inv.balanceAmount > 0 && inv.receivedAmount > 0 && (
+                          {statusBadge.label !== 'PAID' && inv.balanceAmount > 1.0 && Math.round(inv.balanceAmount) > 0 && inv.receivedAmount > 0 && (
                             <span className="text-[9px] text-slate-500 font-bold">
-                              Paid: ₹{inv.receivedAmount.toFixed(0)}
+                              Paid: ₹{Math.round(inv.receivedAmount)}
                             </span>
                           )}
-                          {inv.balanceAmount > 0 && (
+                          {statusBadge.label !== 'PAID' && inv.balanceAmount > 1.0 && Math.round(inv.balanceAmount) > 0 && (
                             <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">
-                              Due: ₹{inv.balanceAmount.toFixed(0)}
+                              Due: ₹{Math.round(inv.balanceAmount)}
                             </span>
                           )}
                         </div>

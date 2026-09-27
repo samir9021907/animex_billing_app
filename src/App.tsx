@@ -362,15 +362,39 @@ export const App: React.FC = () => {
       setInvoices(finalInvoices);
 
       // 4. PROCESS PRODUCTS
+      // Track any pending deductions for invoices not yet confirmed in cloud DB
+      const pendingBilledMap = new Map<string, number>();
+      for (const li of finalInvoices) {
+        if (Boolean((li as any)._pendingCloudSync) || !uuidRegex.test(li.id)) {
+          for (const item of (li.items || [])) {
+            const id = item.productId;
+            const name = item.itemName?.trim().toLowerCase();
+            const qty = Number(item.quantity || 0);
+            if (id) pendingBilledMap.set(id, (pendingBilledMap.get(id) || 0) + qty);
+            if (name) pendingBilledMap.set(name, (pendingBilledMap.get(name) || 0) + qty);
+          }
+        }
+      }
+
       const prodMap = new Map<string, Product>();
       for (const p of cloudProducts) {
         const key = p.name?.trim().toLowerCase();
         if (key && !prodMap.has(key)) {
-          prodMap.set(key, p);
+          const pendingDeduction = pendingBilledMap.get(p.id) || pendingBilledMap.get(key) || 0;
+          const adjustedStock = Math.max(0, (p.stockQuantity ?? 0) - pendingDeduction);
+          prodMap.set(key, {
+            ...p,
+            stockQuantity: adjustedStock,
+          });
         }
       }
       const finalProducts = Array.from(prodMap.values());
-      if (finalProducts.length > 0) setProducts(finalProducts);
+      if (finalProducts.length > 0) {
+        setProducts(finalProducts);
+        try {
+          localStorage.setItem('animex_billing_products', JSON.stringify(finalProducts));
+        } catch {}
+      }
 
       setLastSyncTime(new Date());
 
@@ -595,8 +619,12 @@ export const App: React.FC = () => {
     };
 
     // 1. Add invoice to history & open preview immediately (0ms UI latency!)
-    setInvoices([finalInvoice, ...invoices]);
+    const updatedInvoices = [finalInvoice, ...invoices];
+    setInvoices(updatedInvoices);
     setSelectedPreviewInvoice(finalInvoice);
+    try {
+      localStorage.setItem('animex_invoices', JSON.stringify(updatedInvoices));
+    } catch {}
 
     // 2. Immediate local stock deduction for each billed product & check low stock
     const newlyLowStock: string[] = [];
@@ -610,7 +638,7 @@ export const App: React.FC = () => {
     }
 
     setProducts(prevProducts => {
-      return prevProducts.map(prod => {
+      const nextProds = prevProducts.map(prod => {
         const billedQty = billedMap.get(prod.id) || billedMap.get(prod.name.trim().toLowerCase()) || 0;
         if (billedQty === 0) return prod;
 
@@ -627,6 +655,10 @@ export const App: React.FC = () => {
           stockQuantity: newStock,
         };
       });
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(nextProds));
+      } catch {}
+      return nextProds;
     });
 
     // 3. Sync invoice to cloud Neon DB in the background with mutex protection

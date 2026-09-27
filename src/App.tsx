@@ -160,6 +160,8 @@ export const App: React.FC = () => {
   const productsRef = useRef(products);
   productsRef.current = products;
   const isSyncingRef = useRef(false);
+  const uploadingStoreKeys = useRef<Set<string>>(new Set());
+  const uploadingInvoiceKeys = useRef<Set<string>>(new Set());
 
   // ─── ⚡ Ultra-Fast Bidirectional Cloud Neon Database Sync ────────────────────
   const syncCloudData = useCallback(async (isManual: boolean = false) => {
@@ -184,48 +186,97 @@ export const App: React.FC = () => {
       const deletedStoreIds = getDeletedStoreIds();
 
       // 2. PROCESS STORES (Cloud SSOT + Upload Unsynced Local Stores)
+      // Never attempt to re-upload any store that is currently in-flight
       const unsyncedStores = storesRef.current.filter(
         ls => !uuidRegex.test(ls.id) &&
               !deletedStoreIds.has(ls.id) &&
+              !uploadingStoreKeys.current.has(ls.firmName.trim().toLowerCase()) &&
               !cloudStores.some(cs => cs.firmName.trim().toLowerCase() === ls.firmName.trim().toLowerCase())
       );
 
       let newlyUploadedStores: MedicalStore[] = [];
       if (unsyncedStores.length > 0) {
-        const storeUploads = await Promise.allSettled(
-          unsyncedStores.map(unsynced => syncStoreToBackend(unsynced))
-        );
-        storeUploads.forEach((res, idx) => {
-          if (res.status === 'fulfilled' && res.value && res.value.id) {
-            const original = unsyncedStores[idx];
-            newlyUploadedStores.push({
-              ...mapBackendStore(res.value),
-              customerType: original.customerType || 'store',
-            });
-          }
-        });
+        unsyncedStores.forEach(s => uploadingStoreKeys.current.add(s.firmName.trim().toLowerCase()));
+        try {
+          const storeUploads = await Promise.allSettled(
+            unsyncedStores.map(unsynced => syncStoreToBackend(unsynced))
+          );
+          storeUploads.forEach((res, idx) => {
+            if (res.status === 'fulfilled' && res.value && res.value.id) {
+              const original = unsyncedStores[idx];
+              newlyUploadedStores.push({
+                ...mapBackendStore(res.value),
+                customerType: original.customerType || 'store',
+              });
+            }
+          });
+        } finally {
+          unsyncedStores.forEach(s => uploadingStoreKeys.current.delete(s.firmName.trim().toLowerCase()));
+        }
       }
 
-      const storeMap = new Map<string, MedicalStore>();
+      // Deduplicate stores strictly by normalized firmName AND preserve customerType
+      const storeMapByName = new Map<string, MedicalStore>();
+
+      // 2a. Add cloud stores (primary source of truth from Neon DB)
       for (const cs of cloudStores) {
         if (!deletedStoreIds.has(cs.id)) {
+          const key = cs.firmName.trim().toLowerCase();
           const existingLocal = storesRef.current.find(
-            ls => ls.id === cs.id || ls.firmName.trim().toLowerCase() === cs.firmName.trim().toLowerCase()
+            ls => ls.id === cs.id || ls.firmName.trim().toLowerCase() === key
           );
           const isCustomer = cs.customerType === 'customer' || existingLocal?.customerType === 'customer';
           const finalType: 'customer' | 'store' = isCustomer ? 'customer' : 'store';
-          storeMap.set(cs.id, {
+          
+          const normalizedStore: MedicalStore = {
             ...cs,
             customerType: finalType,
-          });
+          };
+
+          if (!storeMapByName.has(key)) {
+            storeMapByName.set(key, normalizedStore);
+          } else {
+            const existing = storeMapByName.get(key)!;
+            // Always prefer valid UUID over non-UUID
+            if (uuidRegex.test(cs.id) && !uuidRegex.test(existing.id)) {
+              storeMapByName.set(key, {
+                ...cs,
+                customerType: (existing.customerType === 'customer' || finalType === 'customer') ? 'customer' : 'store',
+              });
+            }
+          }
         }
       }
+
+      // 2b. Add newly uploaded stores
       for (const ns of newlyUploadedStores) {
         if (!deletedStoreIds.has(ns.id)) {
-          storeMap.set(ns.id, ns);
+          const key = ns.firmName.trim().toLowerCase();
+          if (!storeMapByName.has(key)) {
+            storeMapByName.set(key, ns);
+          } else {
+            const existing = storeMapByName.get(key)!;
+            if (uuidRegex.test(ns.id) && !uuidRegex.test(existing.id)) {
+              storeMapByName.set(key, {
+                ...ns,
+                customerType: (existing.customerType === 'customer' || ns.customerType === 'customer') ? 'customer' : 'store',
+              });
+            }
+          }
         }
       }
-      const finalStores = Array.from(storeMap.values());
+
+      // 2c. Retain in-flight local stores that are currently uploading so UI doesn't flicker
+      for (const ls of storesRef.current) {
+        if (!deletedStoreIds.has(ls.id)) {
+          const key = ls.firmName.trim().toLowerCase();
+          if (!storeMapByName.has(key) && uploadingStoreKeys.current.has(key)) {
+            storeMapByName.set(key, ls);
+          }
+        }
+      }
+
+      const finalStores = Array.from(storeMapByName.values());
       setStores(finalStores);
 
       // 3. PROCESS INVOICES (Cloud SSOT + Upload Unsynced Local Invoices)
@@ -234,48 +285,66 @@ export const App: React.FC = () => {
         li => Boolean((li as any)._pendingCloudSync) &&
               !uuidRegex.test(li.id) &&
               !deletedInvoiceIds.has(li.id) &&
+              !uploadingInvoiceKeys.current.has(li.id) &&
               (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`)) &&
               !cloudInvoices.some(ci => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId)))
       );
 
       let newlyUploadedInvoices: Invoice[] = [];
       if (unsyncedInvoices.length > 0) {
-        const preppedInvoices = unsyncedInvoices.map(unsynced => {
-          const storeNameKey = unsynced.billTo?.firmName?.trim().toLowerCase();
-          const matchedStore = storeNameKey ? finalStores.find(s => s.firmName.trim().toLowerCase() === storeNameKey) : undefined;
-          if (matchedStore && uuidRegex.test(matchedStore.id)) {
-            return {
-              ...unsynced,
-              billTo: {
-                ...unsynced.billTo,
-                id: matchedStore.id,
-              }
-            };
-          }
-          return unsynced;
-        });
+        unsyncedInvoices.forEach(i => uploadingInvoiceKeys.current.add(i.id));
+        try {
+          const preppedInvoices = unsyncedInvoices.map(unsynced => {
+            const storeNameKey = unsynced.billTo?.firmName?.trim().toLowerCase();
+            const matchedStore = storeNameKey ? finalStores.find(s => s.firmName.trim().toLowerCase() === storeNameKey) : undefined;
+            if (matchedStore && uuidRegex.test(matchedStore.id)) {
+              return {
+                ...unsynced,
+                billTo: {
+                  ...unsynced.billTo,
+                  id: matchedStore.id,
+                }
+              };
+            }
+            return unsynced;
+          });
 
-        const invoiceUploads = await Promise.allSettled(
-          preppedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
-        );
-        invoiceUploads.forEach((res) => {
-          if (res.status === 'fulfilled' && res.value && res.value.id) {
-            newlyUploadedInvoices.push(mapBackendInvoice(res.value));
-          }
-        });
+          const invoiceUploads = await Promise.allSettled(
+            preppedInvoices.map(unsynced => syncInvoiceToBackend(unsynced))
+          );
+          invoiceUploads.forEach((res) => {
+            if (res.status === 'fulfilled' && res.value && res.value.id) {
+              newlyUploadedInvoices.push(mapBackendInvoice(res.value));
+            }
+          });
+        } finally {
+          unsyncedInvoices.forEach(i => uploadingInvoiceKeys.current.delete(i.id));
+        }
       }
 
       // Valid active invoices: ground truth from Neon DB (excluding any local delete)
-      // plus any newly uploaded invoices
+      // plus any newly uploaded invoices, deduplicated by globalBillId or id
       const invoiceMap = new Map<string, Invoice>();
       for (const ci of cloudInvoices) {
         if (!deletedInvoiceIds.has(ci.id) && (!ci.globalBillId || !deletedInvoiceIds.has(`gbid-${ci.globalBillId}`))) {
-          invoiceMap.set(ci.id, ci);
+          const key = ci.globalBillId ? `gbid-${ci.globalBillId}` : ci.id;
+          invoiceMap.set(key, ci);
         }
       }
       for (const ni of newlyUploadedInvoices) {
         if (!deletedInvoiceIds.has(ni.id) && (!ni.globalBillId || !deletedInvoiceIds.has(`gbid-${ni.globalBillId}`))) {
-          invoiceMap.set(ni.id, ni);
+          const key = ni.globalBillId ? `gbid-${ni.globalBillId}` : ni.id;
+          invoiceMap.set(key, ni);
+        }
+      }
+
+      // Retain in-flight invoices
+      for (const li of invoicesRef.current) {
+        if (!deletedInvoiceIds.has(li.id) && (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`))) {
+          const key = li.globalBillId ? `gbid-${li.globalBillId}` : li.id;
+          if (!invoiceMap.has(key) && uploadingInvoiceKeys.current.has(li.id)) {
+            invoiceMap.set(key, li);
+          }
         }
       }
 
@@ -554,26 +623,32 @@ export const App: React.FC = () => {
       });
     });
 
-    // 3. Sync invoice to cloud Neon DB in the background
+    // 3. Sync invoice to cloud Neon DB in the background with mutex protection
     // (Note: Backend's createInvoice automatically deducts stock in PostgreSQL DB)
-    syncInvoiceToBackend(finalInvoice).then(cloudInv => {
-      if (cloudInv && cloudInv.id) {
-        setInvoices(prev => prev.map(inv => (inv.id === finalInvoice.id || (inv.globalBillId && inv.globalBillId === finalInvoice.globalBillId)) ? {
-          ...inv,
-          id: cloudInv.id,
-          globalBillId: cloudInv.global_bill_id ? Number(cloudInv.global_bill_id) : inv.globalBillId,
-          companyInvoiceNumber: cloudInv.company_invoice_number || inv.companyInvoiceNumber,
-          invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
-          _pendingCloudSync: false,
-        } : inv));
-      }
-      try {
-        const bc = new BroadcastChannel('animex_live_sync');
-        bc.postMessage({ type: 'FORCE_SYNC' });
-        bc.close();
-      } catch {}
-      syncCloudData();
-    });
+    const invKey = finalInvoice.id;
+    if (!uploadingInvoiceKeys.current.has(invKey)) {
+      uploadingInvoiceKeys.current.add(invKey);
+      syncInvoiceToBackend(finalInvoice).then(cloudInv => {
+        if (cloudInv && cloudInv.id) {
+          setInvoices(prev => prev.map(inv => (inv.id === finalInvoice.id || (inv.globalBillId && inv.globalBillId === finalInvoice.globalBillId)) ? {
+            ...inv,
+            id: cloudInv.id,
+            globalBillId: cloudInv.global_bill_id ? Number(cloudInv.global_bill_id) : inv.globalBillId,
+            companyInvoiceNumber: cloudInv.company_invoice_number || inv.companyInvoiceNumber,
+            invoiceNo: cloudInv.company_invoice_number || inv.invoiceNo,
+            _pendingCloudSync: false,
+          } : inv));
+        }
+        try {
+          const bc = new BroadcastChannel('animex_live_sync');
+          bc.postMessage({ type: 'FORCE_SYNC' });
+          bc.close();
+        } catch {}
+        syncCloudData();
+      }).finally(() => {
+        uploadingInvoiceKeys.current.delete(invKey);
+      });
+    }
 
     if (newlyLowStock.length > 0) {
       setTimeout(() => {
@@ -665,6 +740,11 @@ export const App: React.FC = () => {
 
   const handleAddStore = async (newStore: MedicalStore) => {
     const cleanName = newStore.firmName.trim().toLowerCase();
+    if (uploadingStoreKeys.current.has(cleanName)) {
+      return;
+    }
+    uploadingStoreKeys.current.add(cleanName);
+
     setStores(prev => {
       if (prev.some(s => s.firmName.trim().toLowerCase() === cleanName)) {
         return prev;
@@ -693,9 +773,10 @@ export const App: React.FC = () => {
               customerType: newStore.customerType || 'store',
             } : s;
 
-            const key = item.id;
-            if (!seen.has(key)) {
-              seen.add(key);
+            const nameKey = item.firmName.trim().toLowerCase();
+            if (!seen.has(item.id) && !seen.has(nameKey)) {
+              seen.add(item.id);
+              seen.add(nameKey);
               updatedList.push(item);
             }
           }
@@ -707,9 +788,11 @@ export const App: React.FC = () => {
         bc.postMessage({ type: 'FORCE_SYNC' });
         bc.close();
       } catch {}
-      syncCloudData();
+      await syncCloudData();
     } catch (e) {
       console.error('Failed to sync store to backend:', e);
+    } finally {
+      uploadingStoreKeys.current.delete(cleanName);
     }
   };
 

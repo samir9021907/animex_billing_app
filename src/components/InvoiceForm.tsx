@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Invoice, InvoiceItem, MedicalStore, Product, BillStatus } from '../types';
 import { convertNumberToWords } from '../utils/numberToWords';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
-import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check, User } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check, User, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 // Custom Touch-Friendly Scrollable Unit Selector
@@ -142,22 +142,66 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   }, [stores, selectedStoreId]);
 
   const createInitialItems = (): InvoiceItem[] => {
-    const firstProd = products[0];
-    const initialPrice = firstProd?.defaultPrice || 300;
+    const inStockProd = products.find(p => (p.stockQuantity ?? 0) > 0) || products[0];
+    const initialPrice = inStockProd?.defaultPrice || 300;
     return [
       {
         id: `item-${Date.now()}`,
-        productId: firstProd?.id || '',
-        itemName: firstProd?.name || '',
+        productId: inStockProd?.id || '',
+        itemName: inStockProd?.name || '',
         quantity: 1,
-        unit: firstProd?.defaultUnit || 'Ltr',
-        mrp: firstProd?.mrp || 0,
+        unit: inStockProd?.defaultUnit || 'Ltr',
+        mrp: inStockProd?.mrp || 0,
         pricePerUnit: initialPrice,
         amount: initialPrice * 1,
         isFree: false,
         isScheme: false
       }
     ];
+  };
+
+  // Helper to validate available godown stock for all products in invoice
+  const getStockErrors = () => {
+    const qtyByProduct = new Map<string, { product: Product; totalQty: number }>();
+
+    for (const it of items) {
+      if (!it.productId && !it.itemName) continue;
+      const p = products.find(
+        (prod) =>
+          prod.id === it.productId ||
+          prod.name.trim().toLowerCase() === it.itemName?.trim().toLowerCase()
+      );
+      if (p) {
+        const entry = qtyByProduct.get(p.id) || { product: p, totalQty: 0 };
+        entry.totalQty += Number(it.quantity) || 0;
+        qtyByProduct.set(p.id, entry);
+      }
+    }
+
+    const errors: {
+      productId: string;
+      name: string;
+      requested: number;
+      available: number;
+      unit: string;
+      isZero: boolean;
+    }[] = [];
+
+    for (const [prodId, { product, totalQty }] of qtyByProduct.entries()) {
+      const avail = product.stockQuantity ?? 0;
+      if (avail <= 0 || totalQty > avail) {
+        errors.push({
+          productId: prodId,
+          name: product.name,
+          requested: totalQty,
+          available: avail,
+          unit: product.defaultUnit || '',
+          isZero: avail <= 0,
+        });
+      }
+    }
+
+    return errors;
   };
 
   // Billing line items
@@ -347,28 +391,34 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       return;
     }
 
-    // Check if any product quantity exceeds available stock
-    const overStockItems = items.filter((it) => {
-      const p = products.find((prod) => prod.id === it.productId);
-      return p && it.quantity > (p.stockQuantity ?? 0);
-    });
-
-    if (overStockItems.length > 0) {
-      const warningDetails = overStockItems
+    // HARD BLOCK: Condition preventing invoice creation when stock is exhausted or insufficient
+    const stockErrors = getStockErrors();
+    if (stockErrors.length > 0) {
+      const warningDetails = stockErrors
         .map((it) => {
-          const p = products.find((prod) => prod.id === it.productId);
-          return `• ${it.itemName}: Requested ${it.quantity}, Available: ${p?.stockQuantity ?? 0}`;
+          if (it.isZero) {
+            return isMr
+              ? `• ${it.name}: गोदामात साठा संपला आहे (उपलब्ध: ० ${it.unit} | मागणी: ${it.requested} ${it.unit})`
+              : isHi
+              ? `• ${it.name}: स्टॉक समाप्त हो चुका है (उपलब्ध: 0 ${it.unit} | मांग: ${it.requested} ${it.unit})`
+              : `• ${it.name}: Out of Stock (Available: 0 ${it.unit} | Requested: ${it.requested} ${it.unit})`;
+          }
+          return isMr
+            ? `• ${it.name}: मागणी ${it.requested} ${it.unit} (गोदामात फक्त ${it.available} ${it.unit} शिल्लक)`
+            : isHi
+            ? `• ${it.name}: मांग ${it.requested} ${it.unit} (गोदाम में केवल ${it.available} ${it.unit} शेष)`
+            : `• ${it.name}: Requested ${it.requested} ${it.unit} (Only ${it.available} ${it.unit} available)`;
         })
         .join('\n');
 
-      const confirmProceed = window.confirm(
+      alert(
         isMr
-          ? `⚠️ सावधान! खालील उत्पादनांचा गोदामातील साठा कमी आहे:\n\n${warningDetails}\n\nतरीही बिल तयार करून गोदामातून साठा वजा करायचा आहे का?`
+          ? `❌ बिल तयार करता येणार नाही!\n\nखालील उत्पादनांचा गोदामातील साठा संपला आहे किंवा अपुरा आहे:\n\n${warningDetails}\n\n⚠️ गोदामात पुरेसा साठा उपलब्ध नसल्यामुळे हे बिल बनवणे शक्य नाही.\nकृपया आधी गोदामात साठा जमा (Purchases / Stock Inward) करा किंवा बिलातील संख्या कमी करा.`
           : isHi
-          ? `⚠️ चेतावनी! निम्नलिखित उत्पादों का स्टॉक कम है:\n\n${warningDetails}\n\nक्या आप बिल जारी रखना चाहते हैं?`
-          : `⚠️ Warning! Low godown stock for the following items:\n\n${warningDetails}\n\nDo you want to proceed and deduct from godown stock?`
+          ? `❌ बिल नहीं बन सकता!\n\nनिम्नलिखित उत्पादों का गोदाम में स्टॉक समाप्त या अपर्याप्त है:\n\n${warningDetails}\n\n⚠️ गोदाम में पर्याप्त स्टॉक न होने के कारण यह बिल नहीं बनाया जा सकता।\nकृपया पहले स्टॉक इनवर्ड करें या बिल में मात्रा कम करें।`
+          : `❌ Cannot generate bill!\n\nInsufficient godown stock for the following items:\n\n${warningDetails}\n\n⚠️ This bill cannot be created because there is not enough stock in the godown.\nPlease inward stock first or reduce the quantity in the bill.`
       );
-      if (!confirmProceed) return;
+      return; // ⛔ STRICT STOP: Condition blocks bill creation completely
     }
 
     const selectedStore = stores.find((s) => s.id === selectedStoreId) || stores[0];
@@ -416,6 +466,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     const freshTotal = freshItems.reduce((sum, i) => sum + i.amount, 0);
     setReceivedAmount(freshTotal);
   };
+
+  const stockErrors = getStockErrors();
 
   return (
     <form onSubmit={handleSubmitInvoice} className="max-w-6xl mx-auto space-y-6 pb-24 md:pb-6">
@@ -620,31 +672,46 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   onChange={(e) => handleProductSelect(idx, e.target.value)}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs font-black text-slate-900 dark:text-white"
                 >
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Default: ₹{p.defaultPrice.toFixed(2)})
-                    </option>
-                  ))}
+                  {products.map(p => {
+                    const st = p.stockQuantity ?? 0;
+                    const isOut = st <= 0;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {isOut ? `[❌ साठा संपला: 0 ${p.defaultUnit}]` : `(शिल्लक: ${st} ${p.defaultUnit})`}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {(() => {
-                  const sel = products.find(p => p.id === item.productId);
+                  const sel = products.find(p => p.id === item.productId || p.name.trim().toLowerCase() === item.itemName?.trim().toLowerCase());
                   const stock = sel?.stockQuantity ?? 0;
                   const cap = sel?.boxCapacity || 50;
                   const b = Math.floor(stock / cap);
                   const l = stock % cap;
+                  const isZero = stock <= 0;
                   const isOver = item.quantity > stock;
 
                   return (
                     <div className="flex items-center justify-between mt-1 text-[11px] px-1">
-                      <span className={isOver ? 'text-red-600 font-black' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                        📦 In Stock: {stock} {item.unit}{cap > 1 ? ` (${b} Boxes${l > 0 ? ` + ${l} loose` : ''})` : ''}
-                      </span>
-                      {isOver && (
-                        <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black text-[10px]">
-                          Low Stock!
+                      {isZero ? (
+                        <span className="text-red-600 dark:text-red-400 font-black flex items-center gap-1">
+                          🚫 {isMr ? 'साठा संपला आहे (० शिल्लक)' : isHi ? 'स्टॉक खत्म है (0 शेष)' : 'Out of Stock (0 Left)'}
+                        </span>
+                      ) : (
+                        <span className={isOver ? 'text-red-600 dark:text-red-400 font-black' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
+                          📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'In Stock:'} {stock} {item.unit}{cap > 1 ? ` (${b} Boxes${l > 0 ? ` + ${l} loose` : ''})` : ''}
                         </span>
                       )}
+                      {isZero ? (
+                        <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded font-black text-[10px] border border-red-300">
+                          {isMr ? 'साठा नाही!' : 'No Stock!'}
+                        </span>
+                      ) : isOver ? (
+                        <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded font-black text-[10px] border border-red-300">
+                          {isMr ? `कमी साठा! (कमाल: ${stock})` : `Low! (Max: ${stock})`}
+                        </span>
+                      ) : null}
                     </div>
                   );
                 })()}
@@ -652,18 +719,37 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
               {/* Controls Grid */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Quantity:</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={item.quantity === 0 ? '' : item.quantity}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-black text-slate-900 dark:text-white"
-                  />
-                </div>
+                {(() => {
+                  const sel = products.find(p => p.id === item.productId || p.name.trim().toLowerCase() === item.itemName?.trim().toLowerCase());
+                  const stock = sel?.stockQuantity ?? 0;
+                  const isRowInvalid = stock <= 0 || item.quantity > stock;
+
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="block text-[10px] text-slate-500 font-bold">Quantity:</label>
+                        {isRowInvalid && (
+                          <span className="text-[10px] font-black text-red-600">
+                            {stock <= 0 ? (isMr ? 'शिल्लक: ०' : 'Stock: 0') : `${isMr ? 'कमाल:' : 'Max:'} ${stock}`}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={item.quantity === 0 ? '' : item.quantity}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
+                        className={`w-full rounded-lg p-2 font-black transition-colors ${
+                          isRowInvalid
+                            ? 'bg-red-50 dark:bg-red-950/40 border-2 border-red-500 text-red-600 dark:text-red-400 ring-1 ring-red-400'
+                            : 'bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'
+                        }`}
+                      />
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Unit:</label>
@@ -741,32 +827,47 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       onChange={(e) => handleProductSelect(idx, e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-bold text-slate-900 dark:text-white"
                     >
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} (Default: ₹{p.defaultPrice.toFixed(2)})
-                        </option>
-                      ))}
+                      {products.map((p) => {
+                        const st = p.stockQuantity ?? 0;
+                        const isOut = st <= 0;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} {isOut ? `[❌ साठा संपला: 0 ${p.defaultUnit}]` : `(शिल्लक: ${st} ${p.defaultUnit})`}
+                          </option>
+                        );
+                      })}
                     </select>
 
                     {(() => {
-                      const sel = products.find((p) => p.id === item.productId);
+                      const sel = products.find((p) => p.id === item.productId || p.name.trim().toLowerCase() === item.itemName?.trim().toLowerCase());
                       const stock = sel?.stockQuantity ?? 0;
                       const cap = sel?.boxCapacity || 50;
                       const b = Math.floor(stock / cap);
                       const l = stock % cap;
+                      const isZero = stock <= 0;
                       const isOver = item.quantity > stock;
 
                       return (
                         <div className="mt-1 text-[10px] flex items-center justify-between">
-                          <span className={isOver ? 'text-red-600 font-extrabold' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                            📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'Stock:'} {stock} {item.unit}
-                            {cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l}` : ''})` : ''}
-                          </span>
-                          {isOver && (
-                            <span className="bg-red-100 text-red-700 px-1 py-0.2 rounded font-black text-[9px]">
-                              {isMr ? 'कमी!' : isHi ? 'कम!' : 'Low!'}
+                          {isZero ? (
+                            <span className="text-red-600 dark:text-red-400 font-extrabold flex items-center gap-1">
+                              🚫 {isMr ? 'साठा संपला (० शिल्लक)' : isHi ? 'स्टॉक खत्म (0)' : 'Out of Stock (0)'}
+                            </span>
+                          ) : (
+                            <span className={isOver ? 'text-red-600 dark:text-red-400 font-extrabold' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
+                              📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'Stock:'} {stock} {item.unit}
+                              {cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l}` : ''})` : ''}
                             </span>
                           )}
+                          {isZero ? (
+                            <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-1 py-0.2 rounded font-black text-[9px] border border-red-300">
+                              {isMr ? 'साठा नाही!' : 'No Stock!'}
+                            </span>
+                          ) : isOver ? (
+                            <span className="bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-1 py-0.2 rounded font-black text-[9px] border border-red-300">
+                              {isMr ? `अपुरा! (कमाल: ${stock})` : isHi ? 'कम!' : 'Low!'}
+                            </span>
+                          ) : null}
                         </div>
                       );
                     })()}
@@ -787,15 +888,34 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
                   {/* Quantity */}
                   <td className="p-2.5">
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="1"
-                      value={item.quantity === 0 ? '' : item.quantity}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-black text-slate-900 dark:text-white"
-                    />
+                    {(() => {
+                      const sel = products.find((p) => p.id === item.productId || p.name.trim().toLowerCase() === item.itemName?.trim().toLowerCase());
+                      const stock = sel?.stockQuantity ?? 0;
+                      const isRowInvalid = stock <= 0 || item.quantity > stock;
+
+                      return (
+                        <div>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={item.quantity === 0 ? '' : item.quantity}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => handleQuantityChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
+                            className={`w-full rounded-lg p-2 text-xs font-black transition-colors ${
+                              isRowInvalid
+                                ? 'bg-red-50 dark:bg-red-950/40 border-2 border-red-500 text-red-600 dark:text-red-400 ring-1 ring-red-400'
+                                : 'bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'
+                            }`}
+                          />
+                          {isRowInvalid && (
+                            <div className="text-[9px] font-black text-red-600 mt-0.5 whitespace-nowrap">
+                              {stock <= 0 ? (isMr ? 'साठा संपला' : '0 stock') : `${isMr ? 'कमाल:' : 'Max:'} ${stock}`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* Unit */}
@@ -1065,6 +1185,49 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
       </div>
 
+      {/* Insufficient Stock Warning Card */}
+      {stockErrors.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-950/50 border-2 border-red-500/70 rounded-2xl p-4 text-red-700 dark:text-red-300 text-xs font-bold shadow-md space-y-2">
+          <div className="flex items-center gap-2 text-sm font-black text-red-800 dark:text-red-200">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <span>
+              {isMr
+                ? '🚫 साठा संपल्यामुळे / अपुरा असल्यामुळे बिल थांबवले आहे'
+                : isHi
+                ? '🚫 स्टॉक समाप्त/अपूर्ण होने के कारण बिल रोका गया है'
+                : '🚫 Bill Blocked: Insufficient Godown Stock'}
+            </span>
+          </div>
+          <div className="pl-7 space-y-1">
+            <p className="text-[11px] text-red-700 dark:text-red-300 font-semibold">
+              {isMr
+                ? 'खालील उत्पादनांचा गोदामात पुरेसा साठा नाही, त्यामुळे बिल तयार करता येणार नाही:'
+                : isHi
+                ? 'निम्नलिखित उत्पादों का गोदाम में पर्याप्त स्टॉक नहीं है:'
+                : 'The following products do not have sufficient godown stock:'}
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              {stockErrors.map((err) => (
+                <li key={err.productId} className="font-extrabold text-red-900 dark:text-red-100">
+                  {err.name}:{' '}
+                  <span className="font-normal">
+                    {err.isZero
+                      ? (isMr ? 'साठा संपला (० शिल्लक)' : isHi ? 'स्टॉक खत्म (0)' : 'Out of Stock (0)')
+                      : `${isMr ? 'गोदामात शिल्लक:' : 'Available:'} ${err.available} ${err.unit}`}{' '}
+                    | <span className="font-bold text-red-600 dark:text-red-400">{isMr ? 'बिलातील मागणी:' : 'Billed:'} {err.requested} {err.unit}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-red-600 dark:text-red-400 font-bold pt-1">
+              {isMr
+                ? '👉 तोडगा: गोदामात साठा जमा (Purchases / Stock Inward) करा किंवा बिलातील संख्या कमी करा.'
+                : '👉 Solution: Inward stock to godown or reduce quantity in bill.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Action Submit Buttons */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
         <div className="flex items-center gap-2">
@@ -1076,10 +1239,23 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
         <button
           type="submit"
-          className="w-full sm:w-auto justify-center bg-gradient-to-r from-animex-orange-500 to-animex-orange-600 hover:from-animex-orange-600 hover:to-animex-orange-700 text-white font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm tracking-wide shadow-md flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          className={`w-full sm:w-auto justify-center font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm tracking-wide shadow-md flex items-center gap-2 transition-all ${
+            stockErrors.length > 0
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20 cursor-not-allowed'
+              : 'bg-gradient-to-r from-animex-orange-500 to-animex-orange-600 hover:from-animex-orange-600 hover:to-animex-orange-700 text-white hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+          }`}
         >
-          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span>Generate & Preview Official Bill</span>
+          {stockErrors.length > 0 ? (
+            <>
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 animate-bounce" />
+              <span>{isMr ? '❌ साठा अपुरा — बिल बंद केले' : isHi ? '❌ स्टॉक अपर्याप्त — बिल अवरुद्ध' : '❌ Insufficient Stock — Bill Blocked'}</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Generate & Preview Official Bill</span>
+            </>
+          )}
         </button>
       </div>
 

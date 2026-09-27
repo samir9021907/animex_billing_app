@@ -225,6 +225,7 @@ export const MedicalStoresDirectory: React.FC<MedicalStoresDirectoryProps> = ({
         };
         await onAddStore(created);
       }
+      setFilterType(modalType === 'customer' ? 'CUSTOMER' : 'STORE');
       setShowModal(false);
     } finally {
       setIsSubmitting(false);

@@ -212,7 +212,8 @@ export const App: React.FC = () => {
           const existingLocal = storesRef.current.find(
             ls => ls.id === cs.id || ls.firmName.trim().toLowerCase() === cs.firmName.trim().toLowerCase()
           );
-          const finalType = cs.customerType || existingLocal?.customerType || 'store';
+          const isCustomer = cs.customerType === 'customer' || existingLocal?.customerType === 'customer';
+          const finalType: 'customer' | 'store' = isCustomer ? 'customer' : 'store';
           storeMap.set(cs.id, {
             ...cs,
             customerType: finalType,

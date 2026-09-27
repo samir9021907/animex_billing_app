@@ -34,7 +34,11 @@ const getDeletedInvoiceIds = (): Set<string> => {
     const raw = localStorage.getItem('animex_deleted_invoices');
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (Array.isArray(arr)) {
+        // Strictly filter to valid UUIDs only! Never block sequential numbers (gbid-*)
+        return new Set(arr.filter(id => typeof id === 'string' && uuidRegex.test(id)));
+      }
     }
   } catch {}
   return new Set();
@@ -42,6 +46,8 @@ const getDeletedInvoiceIds = (): Set<string> => {
 
 const addDeletedInvoiceId = (id: string) => {
   try {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) return; // Only store unique invoice UUIDs!
     const set = getDeletedInvoiceIds();
     set.add(id);
     const arr = Array.from(set).slice(-100);
@@ -76,11 +82,12 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => authService.getCurrentUser());
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
-  // One-time clean-up migration: purge old offline orphan ghost bills so all devices match Neon Cloud DB
-  const CLEAN_SLATE_KEY = 'animex_clean_slate_v4';
+  // One-time clean-up migration: purge old offline orphan ghost bills and legacy deleted tokens
+  const CLEAN_SLATE_KEY = 'animex_clean_slate_v5';
   try {
     if (localStorage.getItem(CLEAN_SLATE_KEY) !== 'true') {
       localStorage.removeItem('animex_invoices');
+      localStorage.removeItem('animex_deleted_invoices');
       localStorage.setItem(CLEAN_SLATE_KEY, 'true');
     }
   } catch (e) {
@@ -286,7 +293,6 @@ export const App: React.FC = () => {
               !uuidRegex.test(li.id) &&
               !deletedInvoiceIds.has(li.id) &&
               !uploadingInvoiceKeys.current.has(li.id) &&
-              (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`)) &&
               !cloudInvoices.some(ci => ci.id === li.id || (ci.globalBillId && li.globalBillId && Number(ci.globalBillId) === Number(li.globalBillId)))
       );
 
@@ -326,13 +332,13 @@ export const App: React.FC = () => {
       // plus any newly uploaded invoices, deduplicated by globalBillId or id
       const invoiceMap = new Map<string, Invoice>();
       for (const ci of cloudInvoices) {
-        if (!deletedInvoiceIds.has(ci.id) && (!ci.globalBillId || !deletedInvoiceIds.has(`gbid-${ci.globalBillId}`))) {
+        if (!deletedInvoiceIds.has(ci.id)) {
           const key = ci.globalBillId ? `gbid-${ci.globalBillId}` : ci.id;
           invoiceMap.set(key, ci);
         }
       }
       for (const ni of newlyUploadedInvoices) {
-        if (!deletedInvoiceIds.has(ni.id) && (!ni.globalBillId || !deletedInvoiceIds.has(`gbid-${ni.globalBillId}`))) {
+        if (!deletedInvoiceIds.has(ni.id)) {
           const key = ni.globalBillId ? `gbid-${ni.globalBillId}` : ni.id;
           invoiceMap.set(key, ni);
         }
@@ -340,7 +346,7 @@ export const App: React.FC = () => {
 
       // Retain in-flight invoices
       for (const li of invoicesRef.current) {
-        if (!deletedInvoiceIds.has(li.id) && (!li.globalBillId || !deletedInvoiceIds.has(`gbid-${li.globalBillId}`))) {
+        if (!deletedInvoiceIds.has(li.id)) {
           const key = li.globalBillId ? `gbid-${li.globalBillId}` : li.id;
           if (!invoiceMap.has(key) && (uploadingInvoiceKeys.current.has(li.id) || !uuidRegex.test(li.id))) {
             invoiceMap.set(key, li);
@@ -675,12 +681,9 @@ export const App: React.FC = () => {
 
     // 1. Mark as deleted in storage immediately so background sync never resurrects it
     addDeletedInvoiceId(invoiceId);
-    if (invToDelete?.globalBillId) {
-      addDeletedInvoiceId(`gbid-${invToDelete.globalBillId}`);
-    }
 
     // 2. Remove from invoices state immediately (0ms UI latency!)
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId && (!invToDelete?.globalBillId || inv.globalBillId !== invToDelete.globalBillId)));
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
 
     // 3. Automatic stock restoration back to products
     if (invToDelete && Array.isArray(invToDelete.items)) {

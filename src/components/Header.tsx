@@ -196,18 +196,22 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onSyncCloud}
                 disabled={isSyncingCloud}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer border border-white/15 shadow-sm text-xs font-bold"
+                className="p-2 sm:p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer flex items-center justify-center border border-white/15 shadow-sm"
                 title={
-                  lastSyncTime
+                  syncNotice ||
+                  (lastSyncTime
                     ? (isMr ? `क्लाउड सिंक (शेवटचे: ${lastSyncTime.toLocaleTimeString()})` : `Neon Cloud Sync (Last: ${lastSyncTime.toLocaleTimeString()})`)
-                    : (isMr ? 'क्लाउड सिंक करा' : 'Sync with Neon Cloud')
+                    : (isMr ? 'क्लाउड सिंक करा' : 'Sync with Neon Cloud'))
                 }
                 aria-label="Neon Cloud PostgreSQL Live Sync"
               >
-                <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 ${isSyncingCloud ? 'animate-spin text-amber-300' : ''}`} />
-                <span className="text-[11px] font-extrabold text-emerald-300 whitespace-nowrap">
-                  {syncNotice || (isSyncingCloud ? (isMr ? 'सिंक...' : isHi ? 'सिंक...' : 'Syncing...') : (isMr ? 'सिंक' : isHi ? 'सिंक' : 'Sync'))}
-                </span>
+                <RefreshCw
+                  className={`w-4 h-4 sm:w-5 sm:h-5 transition-all duration-300 ${
+                    isSyncingCloud
+                      ? 'animate-spin text-amber-300'
+                      : 'text-emerald-400 hover:text-emerald-300'
+                  }`}
+                />
               </button>
             )}
 

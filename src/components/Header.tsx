@@ -55,9 +55,13 @@ export const Header: React.FC<HeaderProps> = ({
   const isMr = language === 'mr';
   const isHi = language === 'hi';
 
-  const lowStockProducts = (products || []).filter(
-    (p) => (p.stockQuantity ?? 0) <= (p.minStockAlert || p.boxCapacity || 50)
-  );
+  const lowStockProducts = (products || []).filter((p) => {
+    const stock = p.stockQuantity ?? 0;
+    const capacity = p.boxCapacity || 1;
+    const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+    const limit = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
+    return stock > 0 && stock <= limit;
+  });
 
   const handleTabClick = (tab: string) => {
     setActiveTab(tab);
@@ -276,7 +280,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="space-y-2.5">
                     {lowStockProducts.map((p) => {
                       const stock = p.stockQuantity ?? 0;
-                      const limit = p.minStockAlert || p.boxCapacity || 50;
+                      const capacity = p.boxCapacity || 1;
+                      const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+                      const limit = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
                       return (
                         <div
                           key={p.id}
@@ -347,7 +353,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {(products || []).map((p) => {
                         const stock = p.stockQuantity ?? 0;
-                        const limit = p.minStockAlert || p.boxCapacity || 50;
+                        const capacity = p.boxCapacity || 1;
+                        const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+                        const limit = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
                         return (
                           <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-800">
                             <span className="truncate max-w-[190px] font-bold text-slate-700 dark:text-slate-300">{p.name}</span>

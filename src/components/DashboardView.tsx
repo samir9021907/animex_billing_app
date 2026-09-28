@@ -239,10 +239,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {products.slice(0, 6).map((p) => {
             const stock = p.stockQuantity ?? 0;
-            const cap = p.boxCapacity || 50;
+            const cap = p.boxCapacity || 1;
             const boxes = Math.floor(stock / cap);
             const loose = stock % cap;
-            const isLow = stock <= (p.minStockAlert || cap);
+            const defaultMinAlert = cap > 1 ? cap : (p.defaultUnit === 'Bucket' ? 2 : 10);
+            const minAlert = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
+            const isOutOfStock = stock <= 0;
+            const isLow = !isOutOfStock && stock <= minAlert;
 
             const boxWord = language === 'en' ? 'Boxes' : language === 'hi' ? 'बॉक्स' : 'खोके';
             const perBoxWord = language === 'en' ? 'Box' : language === 'hi' ? 'बॉक्स' : 'खोका';
@@ -267,11 +270,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         `📦 ${cap} ${p.defaultUnit}/${perBoxWord}`
                       )}
                     </span>
-                    {isLow && (
-                      <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                    {isOutOfStock ? (
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                        {language === 'en' ? 'Out of Stock' : language === 'hi' ? 'स्टॉक समाप्त' : 'स्टॉक संपला'}
+                      </span>
+                    ) : isLow ? (
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                         {t('dash.lowStock')}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   <h4 className="font-extrabold text-xs text-slate-900 dark:text-white line-clamp-1">
                     {p.name}
@@ -280,7 +287,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <div className="pt-2 mt-2 border-t border-slate-200/60 dark:border-slate-700 flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">{stockWord}</span>
-                  <span className={`font-black ${isLow ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  <span className={`font-black ${isOutOfStock ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400'}`}>
                     {cap <= 1
                       ? `${stock} ${p.defaultUnit}`
                       : `${boxes} ${boxWord}${loose > 0 ? ` + ${loose}` : ''} (${stock} ${p.defaultUnit})`}

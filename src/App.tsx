@@ -107,61 +107,63 @@ export const App: React.FC = () => {
     }
   });
 
-  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v2';
+  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v3';
   const [products, setProducts] = useState<Product[]>(() => {
     try {
-      const alreadyMigrated = localStorage.getItem(PRODUCTS_8ITEMS_MIGRATION_KEY) === 'true';
       const saved = localStorage.getItem('animex_billing_products');
-
-      if (!alreadyMigrated || !saved) {
-        let existingMap = new Map<string, Product>();
-        if (saved) {
-          try {
-            const oldList: Product[] = JSON.parse(saved);
-            oldList.forEach(p => {
-              const cleanName = p.name?.trim().toLowerCase();
-              if (cleanName) existingMap.set(cleanName, p);
-            });
-          } catch {}
-        }
-
-        const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
-          const cleanName = seed.name.trim().toLowerCase();
-          const existing = existingMap.get(cleanName);
-          let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
-          // Set Milkymex DS 25kg to 9 buckets as confirmed by user
-          if (seed.name.includes('25kg')) {
-            stock = 9;
-          }
-          return {
-            ...seed,
-            stockQuantity: stock ?? 0,
-            boxCapacity: seed.boxCapacity,
-            minStockAlert: seed.minStockAlert,
-          };
-        });
-
-        localStorage.setItem('animex_billing_products', JSON.stringify(synced));
-        localStorage.setItem(PRODUCTS_8ITEMS_MIGRATION_KEY, 'true');
-        return synced;
+      let existingMap = new Map<string, Product>();
+      if (saved) {
+        try {
+          const oldList: Product[] = JSON.parse(saved);
+          oldList.forEach(p => {
+            const cleanName = p.name?.trim().toLowerCase();
+            if (cleanName) existingMap.set(cleanName, p);
+          });
+        } catch {}
       }
 
-      const parsed: Product[] = JSON.parse(saved);
-      // Ensure only the 8 products are kept and box capacities match official specs
-      return INITIAL_PRODUCTS.map(seed => {
+      const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
         const cleanName = seed.name.trim().toLowerCase();
-        const found = parsed.find(p => p.id === seed.id || p.name.trim().toLowerCase() === cleanName);
+        const existing = existingMap.get(cleanName);
+        let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
+        if (seed.name.includes('25kg')) {
+          stock = 9;
+        }
         return {
           ...seed,
-          stockQuantity: found?.stockQuantity !== undefined ? found.stockQuantity : (seed.stockQuantity ?? 0),
+          stockQuantity: stock ?? 0,
           boxCapacity: seed.boxCapacity,
           minStockAlert: seed.minStockAlert,
         };
       });
+
+      localStorage.setItem('animex_billing_products', JSON.stringify(synced));
+      localStorage.setItem(PRODUCTS_8ITEMS_MIGRATION_KEY, 'true');
+      return synced;
     } catch {
       return INITIAL_PRODUCTS;
     }
   });
+
+  useEffect(() => {
+    // Ensure products list is strictly the 8 official products on mount
+    setProducts(prev => {
+      if (prev.length === 8 && prev.every(p => INITIAL_PRODUCTS.some(ip => ip.id === p.id))) {
+        return prev;
+      }
+      const synced = INITIAL_PRODUCTS.map(seed => {
+        const found = prev.find(p => p.id === seed.id || p.name.trim().toLowerCase() === seed.name.trim().toLowerCase());
+        return {
+          ...seed,
+          stockQuantity: seed.name.includes('25kg') ? 9 : (found?.stockQuantity ?? seed.stockQuantity ?? 0),
+        };
+      });
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(synced));
+      } catch {}
+      return synced;
+    });
+  }, []);
 
   const [stores, setStores] = useState<MedicalStore[]>(() => {
     try {

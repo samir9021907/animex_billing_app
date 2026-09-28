@@ -194,6 +194,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       onAddProduct(created);
     }
     setShowModal(false);
+    setEditingProduct(null);
   };
 
   const handleConfirmInward = (e: React.FormEvent) => {

@@ -166,9 +166,11 @@ export const App: React.FC = () => {
         return {
           ...seed,
           stockQuantity: stock ?? seed.stockQuantity ?? 0,
-          boxCapacity: seed.boxCapacity,
-          defaultUnit: seed.defaultUnit,
-          minStockAlert: seed.minStockAlert,
+          boxCapacity: existing?.boxCapacity || seed.boxCapacity,
+          defaultUnit: existing?.defaultUnit || seed.defaultUnit,
+          minStockAlert: (existing?.minStockAlert !== undefined && existing?.minStockAlert !== null) ? existing.minStockAlert : seed.minStockAlert,
+          defaultPrice: existing?.defaultPrice || seed.defaultPrice,
+          mrp: existing?.mrp || seed.mrp,
         };
       });
 
@@ -226,6 +228,7 @@ export const App: React.FC = () => {
   const isSyncingRef = useRef(false);
   const uploadingStoreKeys = useRef<Set<string>>(new Set());
   const uploadingInvoiceKeys = useRef<Set<string>>(new Set());
+  const recentProductUpdatesRef = useRef<Map<string, { product: Product; timestamp: number }>>(new Map());
 
   // ─── ⚡ Ultra-Fast Bidirectional Cloud Neon Database Sync ────────────────────
   const syncCloudData = useCallback(async (isManual: boolean = false) => {
@@ -447,6 +450,15 @@ export const App: React.FC = () => {
         }
 
         if (!prodMap.has(key)) {
+          // 🛡️ CRITICAL: Check if this product was updated recently by the user locally
+          const recentEdit = recentProductUpdatesRef.current.get(key) || (p.id ? recentProductUpdatesRef.current.get(p.id) : undefined);
+          const isRecentlyEditedLocally = Boolean(recentEdit && (Date.now() - recentEdit.timestamp < 45000));
+
+          if (isRecentlyEditedLocally && recentEdit) {
+            prodMap.set(key, recentEdit.product);
+            continue;
+          }
+
           const pendingDeduction = pendingBilledMap.get(p.id) || pendingBilledMap.get(key) || 0;
           let adjustedStock = Math.max(0, (p.stockQuantity ?? 0) - pendingDeduction);
           if (key.includes('25kg') && adjustedStock === 0) {
@@ -879,6 +891,10 @@ export const App: React.FC = () => {
           stockQuantity: currentStock + totalAdded,
           boxCapacity: unitsPerBox > 1 ? unitsPerBox : (prod.boxCapacity || 1),
         };
+        const key = updated.name.trim().toLowerCase();
+        const now = Date.now();
+        recentProductUpdatesRef.current.set(key, { product: updated, timestamp: now });
+        if (updated.id) recentProductUpdatesRef.current.set(updated.id, { product: updated, timestamp: now });
         syncProductToBackend(updated).catch(() => {});
         return updated;
       });
@@ -1016,15 +1032,38 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
+    const key = updatedProduct.name.trim().toLowerCase();
+    const idKey = updatedProduct.id;
+    const now = Date.now();
+    recentProductUpdatesRef.current.set(key, { product: updatedProduct, timestamp: now });
+    if (idKey) recentProductUpdatesRef.current.set(idKey, { product: updatedProduct, timestamp: now });
+
+    // ⚡ 1. INSTANT ZERO-MILLISECOND UI & LOCAL STORAGE UPDATE
     setProducts(prev => {
-      const next = prev.map(p => (p.id === updatedProduct.id || p.name.trim().toLowerCase() === updatedProduct.name.trim().toLowerCase()) ? updatedProduct : p);
+      const next = prev.map(p => (
+        p.id === updatedProduct.id ||
+        p.name.trim().toLowerCase() === key
+      ) ? updatedProduct : p);
       try {
         localStorage.setItem('animex_billing_products', JSON.stringify(next));
       } catch {}
       return next;
     });
+
+    // ⚡ 2. BACKGROUND CLOUD SYNC (NEVER BLOCKS OR REVERTS UI)
     try {
-      await syncProductToBackend(updatedProduct);
+      const result = await syncProductToBackend(updatedProduct);
+      if (result) {
+        const confirmed: Product = {
+          ...updatedProduct,
+          id: result.id || updatedProduct.id,
+          minStockAlert: result.min_stock_alert !== undefined ? Number(result.min_stock_alert) : updatedProduct.minStockAlert,
+          stockQuantity: result.quantity !== undefined ? Number(result.quantity) : updatedProduct.stockQuantity,
+        };
+        const updateNow = Date.now();
+        recentProductUpdatesRef.current.set(key, { product: confirmed, timestamp: updateNow });
+        if (confirmed.id) recentProductUpdatesRef.current.set(confirmed.id, { product: confirmed, timestamp: updateNow });
+      }
     } catch (e) {
       console.warn('Update product backend sync warning:', e);
     }

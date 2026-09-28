@@ -675,9 +675,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   {products.map(p => {
                     const st = p.stockQuantity ?? 0;
                     const isOut = st <= 0;
+                    const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
+                    const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} {isOut ? `[❌ साठा संपला: 0 ${p.defaultUnit}]` : `(शिल्लक: ${st} ${p.defaultUnit})`}
+                        {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit})`}
                       </option>
                     );
                   })}
@@ -700,7 +702,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         </span>
                       ) : (
                         <span className={isOver ? 'text-red-600 dark:text-red-400 font-black' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                          📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'In Stock:'} {stock} {item.unit}{cap > 1 ? ` (${b} Boxes${l > 0 ? ` + ${l} loose` : ''})` : ''}
+                          📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'In Stock:'} {stock} {item.unit}{cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l} ${isMr ? 'सुटे' : isHi ? 'खुले' : 'loose'}` : ''})` : ''}
                         </span>
                       )}
                       {isZero ? (
@@ -730,7 +732,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         <label className="block text-[10px] text-slate-500 font-bold">Quantity:</label>
                         {isRowInvalid && (
                           <span className="text-[10px] font-black text-red-600">
-                            {stock <= 0 ? (isMr ? 'शिल्लक: ०' : 'Stock: 0') : `${isMr ? 'कमाल:' : 'Max:'} ${stock}`}
+                            {stock <= 0 ? (isMr ? 'शिल्लक: ०' : isHi ? 'स्टॉक: 0' : 'Stock: 0') : `${isMr ? 'कमाल:' : isHi ? 'अधिकतम:' : 'Max:'} ${stock}`}
                           </span>
                         )}
                       </div>
@@ -830,9 +832,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       {products.map((p) => {
                         const st = p.stockQuantity ?? 0;
                         const isOut = st <= 0;
+                        const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
+                        const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
                         return (
                           <option key={p.id} value={p.id}>
-                            {p.name} {isOut ? `[❌ साठा संपला: 0 ${p.defaultUnit}]` : `(शिल्लक: ${st} ${p.defaultUnit})`}
+                            {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit})`}
                           </option>
                         );
                       })}
@@ -910,7 +914,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                           />
                           {isRowInvalid && (
                             <div className="text-[9px] font-black text-red-600 mt-0.5 whitespace-nowrap">
-                              {stock <= 0 ? (isMr ? 'साठा संपला' : '0 stock') : `${isMr ? 'कमाल:' : 'Max:'} ${stock}`}
+                              {stock <= 0 ? (isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock') : `${isMr ? 'कमाल:' : isHi ? 'अधिकतम:' : 'Max:'} ${stock}`}
                             </div>
                           )}
                         </div>

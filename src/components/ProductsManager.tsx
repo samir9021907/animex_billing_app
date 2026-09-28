@@ -984,7 +984,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 <div className="space-y-2">
                   {products.map((p) => {
                     const stock = p.stockQuantity ?? 0;
-                    const limit = p.minStockAlert || p.boxCapacity || 50;
+                    const capacity = p.boxCapacity || 1;
+                    const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+                    const limit = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
                     const isLow = stock <= limit;
                     const deficit = Math.max(0, limit - stock);
 

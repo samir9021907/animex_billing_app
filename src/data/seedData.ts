@@ -1,15 +1,14 @@
 import { MedicalStore, Product, Invoice, PurchaseInvoice } from '../types';
 
 export const INITIAL_PRODUCTS: Product[] = [
-  { id: 'p1', name: 'Animex Liv 1lit', category: 'Liver Tonics', defaultUnit: 'Ltr', mrp: 350.00, defaultPrice: 312.80, boxCapacity: 20, stockQuantity: 500, minStockAlert: 50 },
-  { id: 'p2', name: 'Calcimex Gold 1lit', category: 'Calcium Supplements', defaultUnit: 'Ltr', mrp: 290.00, defaultPrice: 255.00, boxCapacity: 20, stockQuantity: 600, minStockAlert: 50 },
-  { id: 'p3', name: 'Calcimex gel advance (300ml)', category: 'Calcium Supplements', defaultUnit: 'Ml', mrp: 275.00, defaultPrice: 243.00, boxCapacity: 50, stockQuantity: 1000, minStockAlert: 100 },
-  { id: 'p4', name: 'Milkymex DS (10kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 1850.00, defaultPrice: 1632.00, boxCapacity: 4, stockQuantity: 80, minStockAlert: 10 },
-  { id: 'p5', name: 'Rumen mex (300ml)', category: 'Rumen & Gut Health', defaultUnit: 'Ml', mrp: 240.00, defaultPrice: 210.80, boxCapacity: 100, stockQuantity: 1500, minStockAlert: 100 },
-  { id: 'p6', name: 'Utrimex (500ml)', category: 'Uterine & Fertility Boosters', defaultUnit: 'Ml', mrp: 165.00, defaultPrice: 142.10, boxCapacity: 70, stockQuantity: 700, minStockAlert: 70 },
-  { id: 'p7', name: 'Calcimex Gold (5 lit)', category: 'Calcium Supplements', defaultUnit: 'Can', mrp: 1050.00, defaultPrice: 918.00, boxCapacity: 4, stockQuantity: 60, minStockAlert: 10 },
-  { id: 'p8', name: 'Milkymex DS (25kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 3700.00, defaultPrice: 3264.00, boxCapacity: 1, stockQuantity: 40, minStockAlert: 10 },
-  { id: 'p9', name: 'Milkymex DS (1kg)', category: 'Mineral Mixtures', defaultUnit: 'Pack', mrp: 210.00, defaultPrice: 180.00, boxCapacity: 25, stockQuantity: 500, minStockAlert: 50 },
+  { id: 'p1', name: 'Animex Liv 1lit', category: 'Liver Tonics', defaultUnit: 'Ltr', mrp: 350.00, defaultPrice: 312.80, boxCapacity: 20, stockQuantity: 500, minStockAlert: 40 },
+  { id: 'p2', name: 'Calcimex Gold 1lit', category: 'Calcium Supplements', defaultUnit: 'Ltr', mrp: 290.00, defaultPrice: 255.00, boxCapacity: 20, stockQuantity: 600, minStockAlert: 40 },
+  { id: 'p3', name: 'Calcimex Gold (5 lit)', category: 'Calcium Supplements', defaultUnit: 'Can', mrp: 1050.00, defaultPrice: 918.00, boxCapacity: 4, stockQuantity: 60, minStockAlert: 8 },
+  { id: 'p4', name: 'Calcimex gel advance (300ml)', category: 'Calcium Supplements', defaultUnit: 'Bottle', mrp: 275.00, defaultPrice: 243.00, boxCapacity: 40, stockQuantity: 800, minStockAlert: 80 },
+  { id: 'p5', name: 'Utrimex (500ml)', category: 'Uterine & Fertility Boosters', defaultUnit: 'Bottle', mrp: 165.00, defaultPrice: 142.10, boxCapacity: 24, stockQuantity: 720, minStockAlert: 48 },
+  { id: 'p6', name: 'Rumen mex (300ml)', category: 'Rumen & Gut Health', defaultUnit: 'Bottle', mrp: 240.00, defaultPrice: 210.80, boxCapacity: 40, stockQuantity: 800, minStockAlert: 80 },
+  { id: 'p7', name: 'Milkymex DS (10kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 1850.00, defaultPrice: 1632.00, boxCapacity: 2, stockQuantity: 80, minStockAlert: 10 },
+  { id: 'p8', name: 'Milkymex DS (25kg)', category: 'Mineral Mixtures', defaultUnit: 'Bucket', mrp: 3700.00, defaultPrice: 3264.00, boxCapacity: 1, stockQuantity: 9, minStockAlert: 2 },
 ];
 
 export const INITIAL_STORES: MedicalStore[] = [];

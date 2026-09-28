@@ -107,28 +107,57 @@ export const App: React.FC = () => {
     }
   });
 
+  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v2';
   const [products, setProducts] = useState<Product[]>(() => {
     try {
+      const alreadyMigrated = localStorage.getItem(PRODUCTS_8ITEMS_MIGRATION_KEY) === 'true';
       const saved = localStorage.getItem('animex_billing_products');
-      if (saved !== null) {
-        const parsed: Product[] = JSON.parse(saved);
-        // Ensure every product has stockQuantity and boxCapacity from defaults
-        return parsed.map(p => {
-          const defaultSeed = INITIAL_PRODUCTS.find(sp => sp.id === p.id);
-          let boxCap = p.boxCapacity !== undefined ? p.boxCapacity : (defaultSeed?.boxCapacity ?? 50);
-          // Large 25kg buckets do not come in boxes; they are loose buckets
-          if (p.name.includes('25kg') || (p.defaultUnit === 'Bucket' && (boxCap === 2 || p.id === 'p8'))) {
-            boxCap = 1;
+
+      if (!alreadyMigrated || !saved) {
+        let existingMap = new Map<string, Product>();
+        if (saved) {
+          try {
+            const oldList: Product[] = JSON.parse(saved);
+            oldList.forEach(p => {
+              const cleanName = p.name?.trim().toLowerCase();
+              if (cleanName) existingMap.set(cleanName, p);
+            });
+          } catch {}
+        }
+
+        const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
+          const cleanName = seed.name.trim().toLowerCase();
+          const existing = existingMap.get(cleanName);
+          let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
+          // Set Milkymex DS 25kg to 9 buckets as confirmed by user
+          if (seed.name.includes('25kg')) {
+            stock = 9;
           }
           return {
-            ...p,
-            stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : (defaultSeed?.stockQuantity ?? 100),
-            boxCapacity: boxCap,
-            minStockAlert: p.minStockAlert !== undefined ? p.minStockAlert : (defaultSeed?.minStockAlert ?? 50),
+            ...seed,
+            stockQuantity: stock ?? 0,
+            boxCapacity: seed.boxCapacity,
+            minStockAlert: seed.minStockAlert,
           };
         });
+
+        localStorage.setItem('animex_billing_products', JSON.stringify(synced));
+        localStorage.setItem(PRODUCTS_8ITEMS_MIGRATION_KEY, 'true');
+        return synced;
       }
-      return INITIAL_PRODUCTS;
+
+      const parsed: Product[] = JSON.parse(saved);
+      // Ensure only the 8 products are kept and box capacities match official specs
+      return INITIAL_PRODUCTS.map(seed => {
+        const cleanName = seed.name.trim().toLowerCase();
+        const found = parsed.find(p => p.id === seed.id || p.name.trim().toLowerCase() === cleanName);
+        return {
+          ...seed,
+          stockQuantity: found?.stockQuantity !== undefined ? found.stockQuantity : (seed.stockQuantity ?? 0),
+          boxCapacity: seed.boxCapacity,
+          minStockAlert: seed.minStockAlert,
+        };
+      });
     } catch {
       return INITIAL_PRODUCTS;
     }

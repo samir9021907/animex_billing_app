@@ -284,7 +284,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
             onClick={() => handleOpenInwardModal()}
             className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"
           >
-            <ArrowDownToLine className="w-4 h-4" />
+            <Boxes className="w-4 h-4" />
             <span>{isMr ? 'माल जमा करा (+ खोके)' : isHi ? 'माल जमा करें (+ बॉक्स)' : 'Inward Stock (+ Boxes)'}</span>
           </button>
 
@@ -377,13 +377,6 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenInwardModal(p)}
-                        className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors"
-                        title={isMr ? 'माल जमा करा (+ खोके)' : isHi ? 'स्टॉक आवक (+ बॉक्सेस)' : 'Inward Stock (+ Boxes)'}
-                      >
-                        <ArrowDownToLine className="w-3.5 h-3.5" />
-                      </button>
-                      <button
                         onClick={() => handleOpenEditModal(p)}
                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-animex-blue-50 text-slate-600 hover:text-animex-blue-600 transition-colors"
                         title="Edit Product"
@@ -474,9 +467,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
                     <button
                       onClick={() => handleOpenInwardModal(p)}
-                      className="text-[11px] font-black text-animex-blue-600 hover:text-animex-blue-800 underline cursor-pointer"
+                      className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs"
+                      title={isMr ? `${p.name} चा माल गोदामात जमा करा` : `Inward stock for ${p.name}`}
                     >
-                      {isMr ? '+ माल भरा' : isHi ? '+ माल भरें' : '+ Inward Stock'}
+                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{isMr ? 'माल जमा करा' : isHi ? 'माल भरें' : '+ Inward'}</span>
                     </button>
                   </div>
                 </div>

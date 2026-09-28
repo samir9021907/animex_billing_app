@@ -471,7 +471,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       title={isMr ? `${p.name} चा माल गोदामात जमा करा` : `Inward stock for ${p.name}`}
                     >
                       <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{isMr ? 'माल जमा करा' : isHi ? 'माल भरें' : '+ Inward'}</span>
+                      <span>{isMr ? 'माल जमा करा' : isHi ? 'माल भरें' : 'Inward Stock'}</span>
                     </button>
                   </div>
                 </div>

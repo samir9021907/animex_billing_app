@@ -118,17 +118,31 @@ export const mapBackendInvoice = (inv: any) => {
   };
 };
 
-export const mapBackendProduct = (p: any) => ({
-  id: p.id,
-  name: p.product_title,
-  category: p.category?.category_name || 'General',
-  defaultUnit: p.unit || 'Ltr',
-  defaultPrice: Number(p.selling_price || 0),
-  mrp: Number(p.mrp || 0),
-  stockQuantity: Number(p.quantity ?? 100),
-  boxCapacity: Number(p.box_capacity ?? (p.product_title?.includes('25kg') ? 1 : 50)),
-  minStockAlert: Number(p.min_stock_alert ?? 50),
-});
+export const mapBackendProduct = (p: any) => {
+  const title = (p.product_title || '').toLowerCase();
+  let boxCap = Number(p.box_capacity);
+  let unit = p.unit;
+  if (title.includes('25kg')) { boxCap = 1; unit = 'Bucket'; }
+  else if (title.includes('10kg')) { boxCap = 2; unit = 'Bucket'; }
+  else if (title.includes('5 lit') || title.includes('5lit') || title.includes('5')) { boxCap = 4; unit = 'Can'; }
+  else if (title.includes('utrimex')) { boxCap = 24; unit = 'Bottle'; }
+  else if (title.includes('rumen') || title.includes('gel')) { boxCap = 40; unit = 'Bottle'; }
+  else if (title.includes('1lit') || title.includes('1 lit') || title.includes('1ltr')) { boxCap = 20; unit = 'Ltr'; }
+
+  if (!boxCap || boxCap <= 0) boxCap = 20;
+
+  return {
+    id: p.id,
+    name: p.product_title,
+    category: p.category?.category_name || (title.includes('calcium') || title.includes('calcimex') ? 'Calcium Supplements' : title.includes('liv') ? 'Liver Tonics' : title.includes('milky') ? 'Mineral Mixtures' : 'General'),
+    defaultUnit: unit || 'Ltr',
+    defaultPrice: Number(p.selling_price || 0),
+    mrp: Number(p.mrp || 0),
+    stockQuantity: Number(p.quantity ?? 100),
+    boxCapacity: boxCap,
+    minStockAlert: Number(p.min_stock_alert ?? 50),
+  };
+};
 
 // ─── ⚡ Unified Fast Sync (Single 1-Shot HTTP Request) ─────────────────────────
 export const fetchUnifiedSyncFromBackend = async (): Promise<{ stores: any[]; invoices: any[]; products: any[]; durationMs: number } | null> => {

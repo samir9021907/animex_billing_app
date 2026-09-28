@@ -107,7 +107,25 @@ export const App: React.FC = () => {
     }
   });
 
-  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v3';
+  const isOfficialProductName = (name?: string): boolean => {
+    const n = (name || '').trim().toLowerCase();
+    if (!n) return false;
+    if (n === 'liver' || (n.startsWith('liver') && !n.includes('animex')) || n.includes('(1kg)') || n.includes(' 1kg')) {
+      return false;
+    }
+    return (
+      (n.includes('animex') && n.includes('liv')) ||
+      (n.includes('calcimex') && n.includes('gold') && (n.includes('1lit') || n.includes('1 lit') || n.includes('1ltr') || n.includes('1 ltr') || (n.includes('1') && !n.includes('5')))) ||
+      (n.includes('calcimex') && n.includes('gold') && (n.includes('5 lit') || n.includes('5lit') || n.includes('5 ltr') || n.includes('5ltr') || n.includes('5'))) ||
+      (n.includes('calcimex') && n.includes('gel')) ||
+      n.includes('utrimex') ||
+      n.includes('rumen') ||
+      (n.includes('milky') && n.includes('10')) ||
+      (n.includes('milky') && n.includes('25'))
+    );
+  };
+
+  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v5';
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('animex_billing_products');
@@ -117,22 +135,39 @@ export const App: React.FC = () => {
           const oldList: Product[] = JSON.parse(saved);
           oldList.forEach(p => {
             const cleanName = p.name?.trim().toLowerCase();
-            if (cleanName) existingMap.set(cleanName, p);
+            if (cleanName && isOfficialProductName(cleanName)) {
+              existingMap.set(cleanName, p);
+            }
           });
         } catch {}
       }
 
       const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
-        const cleanName = seed.name.trim().toLowerCase();
-        const existing = existingMap.get(cleanName);
+        let existing: Product | undefined;
+        for (const [k, v] of existingMap.entries()) {
+          if (
+            (seed.name.includes('25kg') && k.includes('25kg')) ||
+            (seed.name.includes('10kg') && k.includes('10kg')) ||
+            (seed.name.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
+            (seed.name.includes('gel') && k.includes('gel')) ||
+            (seed.name.includes('utrimex') && k.includes('utrimex')) ||
+            (seed.name.includes('rumen') && k.includes('rumen')) ||
+            (seed.name.includes('animex') && k.includes('animex')) ||
+            (seed.name.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
+          ) {
+            existing = v;
+            break;
+          }
+        }
         let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
         if (seed.name.includes('25kg')) {
           stock = 9;
         }
         return {
           ...seed,
-          stockQuantity: stock ?? 0,
+          stockQuantity: stock ?? seed.stockQuantity ?? 0,
           boxCapacity: seed.boxCapacity,
+          defaultUnit: seed.defaultUnit,
           minStockAlert: seed.minStockAlert,
         };
       });
@@ -148,20 +183,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     // Ensure products list is strictly the 8 official products on mount
     setProducts(prev => {
-      if (prev.length === 8 && prev.every(p => INITIAL_PRODUCTS.some(ip => ip.id === p.id))) {
-        return prev;
+      const filtered = prev.filter(p => isOfficialProductName(p.name));
+      if (filtered.length === 8) {
+        return filtered;
       }
-      const synced = INITIAL_PRODUCTS.map(seed => {
-        const found = prev.find(p => p.id === seed.id || p.name.trim().toLowerCase() === seed.name.trim().toLowerCase());
-        return {
-          ...seed,
-          stockQuantity: seed.name.includes('25kg') ? 9 : (found?.stockQuantity ?? seed.stockQuantity ?? 0),
-        };
-      });
-      try {
-        localStorage.setItem('animex_billing_products', JSON.stringify(synced));
-      } catch {}
-      return synced;
+      return INITIAL_PRODUCTS;
     });
   }, []);
 
@@ -410,16 +436,66 @@ export const App: React.FC = () => {
       const prodMap = new Map<string, Product>();
       for (const p of cloudProducts) {
         const key = p.name?.trim().toLowerCase();
-        if (key && !prodMap.has(key)) {
+        if (!key) continue;
+
+        // If an unwanted item arrives from cloud, purge from DB and skip
+        if (!isOfficialProductName(key)) {
+          if (p.id) {
+            deleteProductFromBackend(p.id).catch(() => {});
+          }
+          continue;
+        }
+
+        if (!prodMap.has(key)) {
           const pendingDeduction = pendingBilledMap.get(p.id) || pendingBilledMap.get(key) || 0;
-          const adjustedStock = Math.max(0, (p.stockQuantity ?? 0) - pendingDeduction);
+          let adjustedStock = Math.max(0, (p.stockQuantity ?? 0) - pendingDeduction);
+          if (key.includes('25kg') && adjustedStock === 0) {
+            adjustedStock = 9;
+          }
+
+          let boxCap = p.boxCapacity;
+          let defUnit = p.defaultUnit;
+          if (key.includes('25kg')) { boxCap = 1; defUnit = 'Bucket'; }
+          else if (key.includes('10kg')) { boxCap = 2; defUnit = 'Bucket'; }
+          else if (key.includes('5 lit') || key.includes('5lit') || key.includes('5')) { boxCap = 4; defUnit = 'Can'; }
+          else if (key.includes('utrimex')) { boxCap = 24; defUnit = 'Bottle'; }
+          else if (key.includes('rumen') || key.includes('gel')) { boxCap = 40; defUnit = 'Bottle'; }
+          else if (key.includes('1lit') || key.includes('1 lit') || key.includes('1ltr')) { boxCap = 20; defUnit = 'Ltr'; }
+
           prodMap.set(key, {
             ...p,
             stockQuantity: adjustedStock,
+            boxCapacity: boxCap,
+            defaultUnit: defUnit,
           });
         }
       }
-      const finalProducts = Array.from(prodMap.values());
+
+      // Ensure all 8 official products are present
+      for (const seed of INITIAL_PRODUCTS) {
+        let matched = false;
+        for (const [k] of prodMap.entries()) {
+          if (
+            (seed.name.includes('25kg') && k.includes('25kg')) ||
+            (seed.name.includes('10kg') && k.includes('10kg')) ||
+            (seed.name.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
+            (seed.name.includes('gel') && k.includes('gel')) ||
+            (seed.name.includes('utrimex') && k.includes('utrimex')) ||
+            (seed.name.includes('rumen') && k.includes('rumen')) ||
+            (seed.name.includes('animex') && k.includes('animex')) ||
+            (seed.name.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
+          ) {
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          prodMap.set(seed.name.trim().toLowerCase(), seed);
+          syncProductToBackend(seed).catch(() => {});
+        }
+      }
+
+      const finalProducts = Array.from(prodMap.values()).filter(p => isOfficialProductName(p.name));
       if (finalProducts.length > 0) {
         setProducts(finalProducts);
         try {

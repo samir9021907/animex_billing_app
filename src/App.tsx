@@ -143,24 +143,25 @@ export const App: React.FC = () => {
       }
 
       const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
+        const sName = seed.name.toLowerCase();
         let existing: Product | undefined;
         for (const [k, v] of existingMap.entries()) {
           if (
-            (seed.name.includes('25kg') && k.includes('25kg')) ||
-            (seed.name.includes('10kg') && k.includes('10kg')) ||
-            (seed.name.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
-            (seed.name.includes('gel') && k.includes('gel')) ||
-            (seed.name.includes('utrimex') && k.includes('utrimex')) ||
-            (seed.name.includes('rumen') && k.includes('rumen')) ||
-            (seed.name.includes('animex') && k.includes('animex')) ||
-            (seed.name.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
+            (sName.includes('25kg') && k.includes('25kg')) ||
+            (sName.includes('10kg') && k.includes('10kg')) ||
+            (sName.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
+            (sName.includes('gel') && k.includes('gel')) ||
+            (sName.includes('utrimex') && k.includes('utrimex')) ||
+            (sName.includes('rumen') && k.includes('rumen')) ||
+            (sName.includes('animex') && k.includes('animex')) ||
+            (sName.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
           ) {
             existing = v;
             break;
           }
         }
         let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
-        if (seed.name.includes('25kg')) {
+        if (sName.includes('25kg')) {
           stock = 9;
         }
         return {
@@ -490,25 +491,28 @@ export const App: React.FC = () => {
 
       // Ensure all 8 official products are present
       for (const seed of INITIAL_PRODUCTS) {
+        const sName = seed.name.toLowerCase();
         let matched = false;
         for (const [k] of prodMap.entries()) {
           if (
-            (seed.name.includes('25kg') && k.includes('25kg')) ||
-            (seed.name.includes('10kg') && k.includes('10kg')) ||
-            (seed.name.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
-            (seed.name.includes('gel') && k.includes('gel')) ||
-            (seed.name.includes('utrimex') && k.includes('utrimex')) ||
-            (seed.name.includes('rumen') && k.includes('rumen')) ||
-            (seed.name.includes('animex') && k.includes('animex')) ||
-            (seed.name.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
+            (sName.includes('25kg') && k.includes('25kg')) ||
+            (sName.includes('10kg') && k.includes('10kg')) ||
+            (sName.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
+            (sName.includes('gel') && k.includes('gel')) ||
+            (sName.includes('utrimex') && k.includes('utrimex')) ||
+            (sName.includes('rumen') && k.includes('rumen')) ||
+            (sName.includes('animex') && k.includes('animex')) ||
+            (sName.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
           ) {
             matched = true;
             break;
           }
         }
         if (!matched) {
-          prodMap.set(seed.name.trim().toLowerCase(), seed);
-          syncProductToBackend(seed).catch(() => {});
+          prodMap.set(sName, seed);
+          if (cloudProducts.length === 0) {
+            syncProductToBackend(seed).catch(() => {});
+          }
         }
       }
 

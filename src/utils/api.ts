@@ -453,7 +453,11 @@ export const syncProductToBackend = async (product: any): Promise<any> => {
       : `${API_BASE}/medical-product/client/${clientId}/medical-products`;
     const method = isExistingUuid ? 'PUT' : 'POST';
 
-    const res = await fetch(url, {
+    const alertVal = product.minStockAlert !== undefined && product.minStockAlert !== null
+      ? Number(product.minStockAlert)
+      : (product.min_stock_alert !== undefined ? Number(product.min_stock_alert) : 50);
+
+    let res = await fetch(url, {
       method,
       headers: getAuthHeaders(),
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
@@ -466,10 +470,31 @@ export const syncProductToBackend = async (product: any): Promise<any> => {
         mrp: Number(product.mrp || 0),
         quantity: Number(product.stockQuantity ?? 0),
         box_capacity: Number(product.boxCapacity ?? 50),
-        min_stock_alert: Number(product.minStockAlert ?? 50),
+        min_stock_alert: alertVal,
         status: true,
       }),
     });
+
+    if (!res.ok && isExistingUuid) {
+      res = await fetch(`${API_BASE}/medical-product/${product.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
+        keepalive: true,
+        body: JSON.stringify({
+          product_title: product.name,
+          category_name: product.category || 'General',
+          unit: product.defaultUnit || 'Ltr',
+          selling_price: Number(product.defaultPrice || 0),
+          mrp: Number(product.mrp || 0),
+          quantity: Number(product.stockQuantity ?? 0),
+          box_capacity: Number(product.boxCapacity ?? 50),
+          min_stock_alert: alertVal,
+          status: true,
+        }),
+      });
+    }
+
     const json = await res.json();
     if (json.success && json.data) {
       return json.data;

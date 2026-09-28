@@ -462,11 +462,16 @@ export const App: React.FC = () => {
           else if (key.includes('rumen') || key.includes('gel')) { boxCap = 40; defUnit = 'Bottle'; }
           else if (key.includes('1lit') || key.includes('1 lit') || key.includes('1ltr')) { boxCap = 20; defUnit = 'Ltr'; }
 
+          // Sensible default minStockAlert per product type
+          const defaultAlert = boxCap > 1 ? boxCap : (defUnit === 'Bucket' ? 2 : 10);
+          const minAlert = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultAlert;
+
           prodMap.set(key, {
             ...p,
             stockQuantity: adjustedStock,
             boxCapacity: boxCap,
             defaultUnit: defUnit,
+            minStockAlert: minAlert,
           });
         }
       }
@@ -866,7 +871,7 @@ export const App: React.FC = () => {
   const handleInwardStock = (productId: string, boxes: number, unitsPerBox: number, looseUnits: number) => {
     const totalAdded = (boxes * unitsPerBox) + looseUnits;
     setProducts(prevProducts => {
-      return prevProducts.map(prod => {
+      const updatedList = prevProducts.map(prod => {
         if (prod.id !== productId) return prod;
         const currentStock = prod.stockQuantity ?? 0;
         const updated = {
@@ -874,9 +879,13 @@ export const App: React.FC = () => {
           stockQuantity: currentStock + totalAdded,
           boxCapacity: unitsPerBox > 1 ? unitsPerBox : (prod.boxCapacity || 1),
         };
-        syncProductToBackend(updated);
+        syncProductToBackend(updated).catch(() => {});
         return updated;
       });
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(updatedList));
+      } catch {}
+      return updatedList;
     });
   };
 
@@ -1006,14 +1015,34 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-    syncProductToBackend(updatedProduct);
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    setProducts(prev => {
+      const next = prev.map(p => (p.id === updatedProduct.id || p.name.trim().toLowerCase() === updatedProduct.name.trim().toLowerCase()) ? updatedProduct : p);
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    try {
+      await syncProductToBackend(updatedProduct);
+    } catch (e) {
+      console.warn('Update product backend sync warning:', e);
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    setProducts(products.filter(p => p.id !== productId));
-    deleteProductFromBackend(productId);
+  const handleDeleteProduct = async (productId: string) => {
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== productId);
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    try {
+      await deleteProductFromBackend(productId);
+    } catch (e) {
+      console.warn('Delete product backend sync warning:', e);
+    }
   };
 
   const handleLogout = () => {

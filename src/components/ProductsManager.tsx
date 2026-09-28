@@ -88,7 +88,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setIsLoosePackaging(isLoose);
     setBoxCapacity(isLoose ? 1 : (p.boxCapacity || 50));
     setStockQuantity(p.stockQuantity ?? 0);
-    setMinStockAlert(p.minStockAlert || 50);
+    const defaultAlert = (p.boxCapacity && p.boxCapacity > 1) ? p.boxCapacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+    setMinStockAlert(p.minStockAlert !== undefined && p.minStockAlert !== null ? p.minStockAlert : defaultAlert);
     setFormError(null);
     setShowModal(true);
   };
@@ -175,7 +176,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         defaultPrice: Number(defaultPrice),
         boxCapacity: finalBoxCap,
         stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-        minStockAlert: Number(minStockAlert) || 50,
+        minStockAlert: Number(minStockAlert) >= 0 ? Number(minStockAlert) : 5,
       };
       onUpdateProduct(updated);
     } else {
@@ -188,7 +189,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         defaultPrice: Number(defaultPrice),
         boxCapacity: finalBoxCap,
         stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-        minStockAlert: Number(minStockAlert) || 50,
+        minStockAlert: Number(minStockAlert) >= 0 ? Number(minStockAlert) : 5,
       };
       onAddProduct(created);
     }
@@ -257,9 +258,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
   // Inventory Overview Stats
   const totalStockUnits = products.reduce((sum, p) => sum + (p.stockQuantity || 0), 0);
-  const lowStockProductsCount = products.filter(
-    (p) => (p.stockQuantity || 0) <= (p.minStockAlert || p.boxCapacity || 50)
-  ).length;
+  const lowStockProductsCount = products.filter((p) => {
+    const stock = p.stockQuantity ?? 0;
+    const capacity = p.boxCapacity || 1;
+    const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+    const minAlert = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
+    return stock > 0 && stock <= minAlert;
+  }).length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 md:pb-6">
@@ -358,8 +363,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((p) => {
             const stock = p.stockQuantity ?? 0;
-            const capacity = p.boxCapacity || 50;
-            const minAlert = p.minStockAlert || capacity;
+            const capacity = p.boxCapacity || 1;
+            const defaultMinAlert = capacity > 1 ? capacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
+            const minAlert = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultMinAlert;
             const isOutOfStock = stock <= 0;
             const isLowStock = !isOutOfStock && stock <= minAlert;
 

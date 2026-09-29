@@ -164,6 +164,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [defaultPrice, setDefaultPrice] = useState<number>(300);
   const [isLoosePackaging, setIsLoosePackaging] = useState<boolean>(false);
   const [boxCapacity, setBoxCapacity] = useState<number>(100);
+  const [initialBoxes, setInitialBoxes] = useState<number>(10);
+  const [initialLooseUnits, setInitialLooseUnits] = useState<number>(0);
   const [stockQuantity, setStockQuantity] = useState<number>(1500);
   const [minStockAlert, setMinStockAlert] = useState<number>(50);
 
@@ -190,6 +192,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setDefaultPrice(300);
     setIsLoosePackaging(false);
     setBoxCapacity(50);
+    setInitialBoxes(10);
+    setInitialLooseUnits(0);
     setStockQuantity(500);
     setMinStockAlert(50);
     setFormError(null);
@@ -205,8 +209,17 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setDefaultPrice(p.defaultPrice || 0);
     const isLoose = (p.boxCapacity || 1) <= 1 || (p.defaultUnit === 'Bucket' && (p.boxCapacity || 1) <= 1);
     setIsLoosePackaging(isLoose);
-    setBoxCapacity(isLoose ? 1 : (p.boxCapacity || 50));
-    setStockQuantity(p.stockQuantity ?? 0);
+    const cap = isLoose ? 1 : (p.boxCapacity || 50);
+    setBoxCapacity(cap);
+    const totalSt = p.stockQuantity ?? 0;
+    setStockQuantity(totalSt);
+    if (!isLoose && cap > 1) {
+      setInitialBoxes(Math.floor(totalSt / cap));
+      setInitialLooseUnits(totalSt % cap);
+    } else {
+      setInitialBoxes(0);
+      setInitialLooseUnits(totalSt);
+    }
     const defaultAlert = (p.boxCapacity && p.boxCapacity > 1) ? p.boxCapacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
     setMinStockAlert(p.minStockAlert !== undefined && p.minStockAlert !== null ? p.minStockAlert : defaultAlert);
     setFormError(null);
@@ -1130,7 +1143,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         type="number"
                         min="1"
                         value={boxCapacity}
-                        onChange={(e) => setBoxCapacity(Number(e.target.value))}
+                        onChange={(e) => {
+                          const cap = Number(e.target.value);
+                          setBoxCapacity(cap);
+                          setStockQuantity((initialBoxes * cap) + initialLooseUnits);
+                        }}
                         className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white text-xs"
                         placeholder={isMr ? 'उदा. 20, 50, 100' : isHi ? 'उदा. 20, 50, 100' : 'e.g. 20, 50, 100'}
                       />
@@ -1142,32 +1159,102 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   )}
                 </div>
 
+                {/* Initial Stock based on Boxes & Loose */}
+                {!isLoosePackaging && (
+                  <div className="p-2.5 bg-white dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-slate-700/80 space-y-1.5">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      {isMr ? '📦 सुरुवातीला गोदामात हजर माल (Opening Stock)' : '📦 Initial Warehouse Stock'}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
+                          {isMr ? 'खोक्यांची संख्या (Boxes)' : 'Boxes'}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={initialBoxes}
+                          onChange={(e) => {
+                            const b = Math.max(0, Number(e.target.value));
+                            setInitialBoxes(b);
+                            setStockQuantity((b * boxCapacity) + initialLooseUnits);
+                          }}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
+                          {isMr ? 'सुटे नग (Loose Units)' : 'Loose Units'}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={initialLooseUnits}
+                          onChange={(e) => {
+                            const l = Math.max(0, Number(e.target.value));
+                            setInitialLooseUnits(l);
+                            setStockQuantity((initialBoxes * boxCapacity) + l);
+                          }}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Auto Calculated Stock & Min Alert */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      {isMr ? 'सध्याचा शिल्लक साठा (Units)' : isHi ? 'वर्तमान स्टॉक (Units)' : 'Initial Stock Quantity (Units)'}
+                      {isMr ? 'एकूण सुरुवातीचा साठा (Auto Total)' : 'Total Initial Stock (Units)'}
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={stockQuantity}
-                      onChange={(e) => setStockQuantity(Number(e.target.value))}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black"
-                      placeholder="e.g. 1500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={stockQuantity}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value));
+                          setStockQuantity(val);
+                          if (!isLoosePackaging && boxCapacity > 0) {
+                            setInitialBoxes(Math.floor(val / boxCapacity));
+                            setInitialLooseUnits(val % boxCapacity);
+                          }
+                        }}
+                        className="w-full bg-white dark:bg-slate-900 border border-emerald-500/50 rounded-lg p-2 pr-10 text-emerald-700 dark:text-emerald-400 font-black text-xs"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold pointer-events-none">
+                        {defaultUnit}
+                      </span>
+                    </div>
+                    {!isLoosePackaging && (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">
+                        = {initialBoxes} {isMr ? 'खोके' : 'Boxes'} ({boxCapacity} {defaultUnit}/box) + {initialLooseUnits} {isMr ? 'सुटे' : 'loose'}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      Min Stock Alert Limit
+                      {isMr ? 'कमी साठा इशारा (Min Alert Limit)' : 'Min Stock Alert Limit'}
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={minStockAlert}
-                      onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white"
-                      placeholder="e.g. 50"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={minStockAlert}
+                        onChange={(e) => setMinStockAlert(Number(e.target.value))}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-10 text-slate-900 dark:text-white text-xs font-bold"
+                        placeholder="e.g. 50"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold pointer-events-none">
+                        {defaultUnit}
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-slate-500 mt-0.5 block">
+                      {isMr ? 'साठा यापेक्षा कमी झाला की लाल इशारा येतो' : 'Low stock warning triggers'}
+                    </span>
                   </div>
                 </div>
               </div>

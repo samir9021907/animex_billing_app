@@ -70,6 +70,24 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     return Array.from(new Set([...defaultList, ...fromProducts]));
   }, [products]);
 
+  // Dynamic list of products for auto-suggestions
+  const availableProductNames = useMemo(() => {
+    const defaultProducts = [
+      'Animex Liv 1lit',
+      'Animex Liv 5lit',
+      'Animex Liv 500ml',
+      'Calcimex Gold 1lit',
+      'Calcimex Gold (5 lit)',
+      'Calcimex gel advance (300ml)',
+      'Utrimex (500ml)',
+      'Rumen mex (300ml)',
+      'Milkymex DS (10kg)',
+      'Milkymex DS (25kg)',
+    ];
+    const fromExisting = products.map((p) => p.name?.trim()).filter(Boolean) as string[];
+    return Array.from(new Set([...fromExisting, ...defaultProducts]));
+  }, [products]);
+
   // Product Form states
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -791,20 +809,40 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               )}
 
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                  {isMr ? 'प्रॉडक्ट नाव (Product Title) *' : isHi ? 'उत्पाद नाम (Product Title) *' : 'Product Title *'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300">
+                    {isMr ? 'प्रॉडक्ट नाव (Product Title) *' : isHi ? 'उत्पाद नाम (Product Title) *' : 'Product Title *'}
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {isMr ? 'निवडा किंवा नवीन नाव टाईप करा' : isHi ? 'चुनें या नया नाम टाइप करें' : 'Select or type custom'}
+                  </span>
+                </div>
                 <input
                   type="text"
+                  list="product-name-suggestions"
                   required
-                  placeholder={isMr ? "उदा. Animex Liv 1 Lit" : "e.g. Animex Liv 1 Lit"}
+                  placeholder={isMr ? "प्रॉडक्ट नाव (Product Name)" : isHi ? "उत्पाद नाम (Product Name)" : "Product Name"}
                   value={name}
                   onChange={(e) => {
-                    setName(e.target.value);
+                    const val = e.target.value;
+                    setName(val);
                     if (formError) setFormError(null);
+                    const matched = products.find((p) => p.name.trim().toLowerCase() === val.trim().toLowerCase());
+                    if (matched) {
+                      if (matched.category) setCategory(matched.category);
+                      if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
+                      if (matched.mrp) setMrp(matched.mrp);
+                      if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
+                      if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
+                    }
                   }}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
                 />
+                <datalist id="product-name-suggestions">
+                  {availableProductNames.map((prodName) => (
+                    <option key={prodName} value={prodName} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
@@ -819,7 +857,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 <input
                   type="text"
                   list="category-suggestions"
-                  placeholder={isMr ? "उदा. Antibiotics, Tonics, Dewormer, Bolus..." : isHi ? "उदा. Antibiotics, Tonics, Dewormer, Bolus..." : "e.g. Antibiotics, Tonics, Dewormer, Bolus..."}
+                  placeholder={isMr ? "कॅटेगरी (Category)" : isHi ? "कैटेगरी (Category)" : "Category"}
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value);

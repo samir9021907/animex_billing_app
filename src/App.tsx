@@ -107,92 +107,29 @@ export const App: React.FC = () => {
     }
   });
 
-  const isOfficialProductName = (name?: string): boolean => {
-    const n = (name || '').trim().toLowerCase();
-    if (!n) return false;
-    if (n === 'liver' || (n.startsWith('liver') && !n.includes('animex')) || n.includes('(1kg)') || n.includes(' 1kg')) {
-      return false;
-    }
-    return (
-      (n.includes('animex') && n.includes('liv')) ||
-      (n.includes('calcimex') && n.includes('gold') && (n.includes('1lit') || n.includes('1 lit') || n.includes('1ltr') || n.includes('1 ltr') || (n.includes('1') && !n.includes('5')))) ||
-      (n.includes('calcimex') && n.includes('gold') && (n.includes('5 lit') || n.includes('5lit') || n.includes('5 ltr') || n.includes('5ltr') || n.includes('5'))) ||
-      (n.includes('calcimex') && n.includes('gel')) ||
-      n.includes('utrimex') ||
-      n.includes('rumen') ||
-      (n.includes('milky') && n.includes('10')) ||
-      (n.includes('milky') && n.includes('25'))
-    );
-  };
 
-  const PRODUCTS_8ITEMS_MIGRATION_KEY = 'animex_products_sync_8items_v5';
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('animex_billing_products');
-      let existingMap = new Map<string, Product>();
       if (saved) {
-        try {
-          const oldList: Product[] = JSON.parse(saved);
-          oldList.forEach(p => {
-            const cleanName = p.name?.trim().toLowerCase();
-            if (cleanName && isOfficialProductName(cleanName)) {
-              existingMap.set(cleanName, p);
-            }
+        const parsed: Product[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map<string, Product>();
+          parsed.forEach((p) => {
+            const k = p.name?.trim().toLowerCase();
+            if (k && k !== 'liver') map.set(k, p);
           });
-        } catch {}
+          // Ensure base seed products exist
+          INITIAL_PRODUCTS.forEach((seed) => {
+            const sk = seed.name.trim().toLowerCase();
+            if (!map.has(sk)) map.set(sk, seed);
+          });
+          return Array.from(map.values());
+        }
       }
-
-      const synced: Product[] = INITIAL_PRODUCTS.map(seed => {
-        const sName = seed.name.toLowerCase();
-        let existing: Product | undefined;
-        for (const [k, v] of existingMap.entries()) {
-          if (
-            (sName.includes('25kg') && k.includes('25kg')) ||
-            (sName.includes('10kg') && k.includes('10kg')) ||
-            (sName.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
-            (sName.includes('gel') && k.includes('gel')) ||
-            (sName.includes('utrimex') && k.includes('utrimex')) ||
-            (sName.includes('rumen') && k.includes('rumen')) ||
-            (sName.includes('animex') && k.includes('animex')) ||
-            (sName.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
-          ) {
-            existing = v;
-            break;
-          }
-        }
-        let stock = existing?.stockQuantity !== undefined ? existing.stockQuantity : seed.stockQuantity;
-        if (sName.includes('25kg')) {
-          stock = 9;
-        }
-        return {
-          ...seed,
-          stockQuantity: stock ?? seed.stockQuantity ?? 0,
-          boxCapacity: existing?.boxCapacity || seed.boxCapacity,
-          defaultUnit: existing?.defaultUnit || seed.defaultUnit,
-          minStockAlert: (existing?.minStockAlert !== undefined && existing?.minStockAlert !== null) ? existing.minStockAlert : seed.minStockAlert,
-          defaultPrice: existing?.defaultPrice || seed.defaultPrice,
-          mrp: existing?.mrp || seed.mrp,
-        };
-      });
-
-      localStorage.setItem('animex_billing_products', JSON.stringify(synced));
-      localStorage.setItem(PRODUCTS_8ITEMS_MIGRATION_KEY, 'true');
-      return synced;
-    } catch {
-      return INITIAL_PRODUCTS;
-    }
+    } catch {}
+    return INITIAL_PRODUCTS;
   });
-
-  useEffect(() => {
-    // Ensure products list is strictly the 8 official products on mount
-    setProducts(prev => {
-      const filtered = prev.filter(p => isOfficialProductName(p.name));
-      if (filtered.length === 8) {
-        return filtered;
-      }
-      return INITIAL_PRODUCTS;
-    });
-  }, []);
 
   const [stores, setStores] = useState<MedicalStore[]>(() => {
     try {
@@ -442,11 +379,8 @@ export const App: React.FC = () => {
         const key = p.name?.trim().toLowerCase();
         if (!key) continue;
 
-        // If an unwanted item arrives from cloud, purge from DB and skip
-        if (!isOfficialProductName(key)) {
-          if (p.id) {
-            deleteProductFromBackend(p.id).catch(() => {});
-          }
+        // Skip ancient test remnant if present
+        if (key === 'liver' && (!p.category || p.category.category_name === 'General')) {
           continue;
         }
 
@@ -466,8 +400,8 @@ export const App: React.FC = () => {
             adjustedStock = 9;
           }
 
-          let boxCap = p.boxCapacity;
-          let defUnit = p.defaultUnit;
+          let boxCap = p.boxCapacity || 50;
+          let defUnit = p.defaultUnit || 'Ltr';
           if (key.includes('25kg')) { boxCap = 1; defUnit = 'Bucket'; }
           else if (key.includes('10kg')) { boxCap = 2; defUnit = 'Bucket'; }
           else if (key.includes('5 lit') || key.includes('5lit') || key.includes('5')) { boxCap = 4; defUnit = 'Can'; }
@@ -516,7 +450,7 @@ export const App: React.FC = () => {
         }
       }
 
-      const finalProducts = Array.from(prodMap.values()).filter(p => isOfficialProductName(p.name));
+      const finalProducts = Array.from(prodMap.values());
       if (finalProducts.length > 0) {
         setProducts(finalProducts);
         try {
@@ -992,11 +926,21 @@ export const App: React.FC = () => {
 
   const handleAddProduct = async (newProduct: Product) => {
     const cleanName = newProduct.name.trim().toLowerCase();
+    const now = Date.now();
+    recentProductUpdatesRef.current.set(cleanName, { product: newProduct, timestamp: now });
+    if (newProduct.id) {
+      recentProductUpdatesRef.current.set(newProduct.id, { product: newProduct, timestamp: now });
+    }
+
     setProducts(prev => {
       if (prev.some(p => p.name.trim().toLowerCase() === cleanName)) {
         return prev;
       }
-      return [newProduct, ...prev];
+      const updated = [newProduct, ...prev];
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
     });
 
     try {
@@ -1027,9 +971,24 @@ export const App: React.FC = () => {
               updatedList.push(item);
             }
           }
+          const updateNow = Date.now();
+          const targetProd = updatedList.find(x => x.id === cloudProd.id) || newProduct;
+          recentProductUpdatesRef.current.set(cleanName, { product: targetProd, timestamp: updateNow });
+          if (cloudProd.id) {
+            recentProductUpdatesRef.current.set(cloudProd.id, { product: targetProd, timestamp: updateNow });
+          }
+          try {
+            localStorage.setItem('animex_billing_products', JSON.stringify(updatedList));
+          } catch {}
           return updatedList;
         });
       }
+
+      try {
+        const bc = new BroadcastChannel('animex_live_sync');
+        bc.postMessage({ type: 'FORCE_SYNC' });
+        bc.close();
+      } catch {}
     } catch (e) {
       console.error('Failed to sync product to backend:', e);
     }

@@ -454,32 +454,23 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   </div>
 
                   {/* Stock Status Badge */}
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="pt-1 flex items-center">
                     {isOutOfStock ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
                         <AlertTriangle className="w-3 h-3" />
                         {isMr ? 'स्टॉक संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock'}
                       </span>
                     ) : isLowStock ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                         <AlertTriangle className="w-3 h-3" />
                         {isMr ? 'कमी स्टॉक' : isHi ? 'कम स्टॉक' : 'Low Stock'}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                         <CheckCircle2 className="w-3 h-3" />
                         {isMr ? 'उपलब्ध' : isHi ? 'स्टॉक में उपलब्ध' : 'In Stock'}
                       </span>
                     )}
-
-                    <button
-                      onClick={() => handleOpenInwardModal(p)}
-                      className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs"
-                      title={isMr ? `${p.name} चा माल गोदामात जमा करा` : `Inward stock for ${p.name}`}
-                    >
-                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{isMr ? 'माल जमा करा' : isHi ? 'माल भरें' : 'Inward Stock'}</span>
-                    </button>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product } from '../types';
 import {
   Package,
@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Layers,
   X,
+  Clock,
 } from 'lucide-react';
 import { validateName } from '../utils/validators';
 import { useLanguage } from '../context/LanguageContext';
@@ -51,6 +52,49 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [inwardLooseUnits, setInwardLooseUnits] = useState<number>(0);
   const [inwardNote, setInwardNote] = useState<string>('');
 
+  // Persistent removal of unwanted suggestions
+  const [hiddenProdSuggestions, setHiddenProdSuggestions] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('animex_hidden_prod_suggestions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [hiddenCatSuggestions, setHiddenCatSuggestions] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('animex_hidden_cat_suggestions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleRemoveProductSuggestion = (itemToRemove: string) => {
+    setHiddenProdSuggestions((prev) => {
+      const updated = Array.from(new Set([...prev, itemToRemove]));
+      try {
+        localStorage.setItem('animex_hidden_prod_suggestions', JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
+      return updated;
+    });
+  };
+
+  const handleRemoveCategorySuggestion = (itemToRemove: string) => {
+    setHiddenCatSuggestions((prev) => {
+      const updated = Array.from(new Set([...prev, itemToRemove]));
+      try {
+        localStorage.setItem('animex_hidden_cat_suggestions', JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
+      return updated;
+    });
+  };
+
   // Dynamic list of categories for auto-suggestions
   const availableCategories = useMemo(() => {
     const defaultList = [
@@ -67,8 +111,10 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       'Wound & Skin Care',
     ];
     const fromProducts = products.map((p) => p.category?.trim()).filter(Boolean) as string[];
-    return Array.from(new Set([...defaultList, ...fromProducts]));
-  }, [products]);
+    const all = Array.from(new Set([...defaultList, ...fromProducts]));
+    const hiddenSet = new Set(hiddenCatSuggestions.map((s) => s.toLowerCase()));
+    return all.filter((c) => !hiddenSet.has(c.toLowerCase()));
+  }, [products, hiddenCatSuggestions]);
 
   // Dynamic list of products for auto-suggestions
   const availableProductNames = useMemo(() => {
@@ -85,8 +131,30 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       'Milkymex DS (25kg)',
     ];
     const fromExisting = products.map((p) => p.name?.trim()).filter(Boolean) as string[];
-    return Array.from(new Set([...fromExisting, ...defaultProducts]));
-  }, [products]);
+    const all = Array.from(new Set([...fromExisting, ...defaultProducts]));
+    const hiddenSet = new Set(hiddenProdSuggestions.map((s) => s.toLowerCase()));
+    return all.filter((p) => !hiddenSet.has(p.toLowerCase()));
+  }, [products, hiddenProdSuggestions]);
+
+  // Suggestion Dropdown States
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const [showCatSuggestions, setShowCatSuggestions] = useState(false);
+
+  const nameInputRef = useRef<HTMLDivElement>(null);
+  const catInputRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (nameInputRef.current && !nameInputRef.current.contains(e.target as Node)) {
+        setShowNameSuggestions(false);
+      }
+      if (catInputRef.current && !catInputRef.current.contains(e.target as Node)) {
+        setShowCatSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Product Form states
   const [name, setName] = useState('');
@@ -98,6 +166,20 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [boxCapacity, setBoxCapacity] = useState<number>(100);
   const [stockQuantity, setStockQuantity] = useState<number>(1500);
   const [minStockAlert, setMinStockAlert] = useState<number>(50);
+
+  const filteredProductNames = useMemo(() => {
+    if (!name.trim()) return availableProductNames;
+    return availableProductNames.filter((p) =>
+      p.toLowerCase().includes(name.trim().toLowerCase())
+    );
+  }, [availableProductNames, name]);
+
+  const filteredCategories = useMemo(() => {
+    if (!category.trim()) return availableCategories;
+    return availableCategories.filter((c) =>
+      c.toLowerCase().includes(category.trim().toLowerCase())
+    );
+  }, [availableCategories, category]);
 
   const handleOpenAddModal = () => {
     setEditingProduct(null);
@@ -808,44 +890,98 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                 </div>
               )}
 
-              <div>
+              {/* Product Title with YouTube-style suggestions */}
+              <div ref={nameInputRef} className="relative">
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-slate-700 dark:text-slate-300">
                     {isMr ? 'प्रॉडक्ट नाव (Product Title) *' : isHi ? 'उत्पाद नाम (Product Title) *' : 'Product Title *'}
                   </label>
                   <span className="text-[10px] text-slate-400 font-normal">
-                    {isMr ? 'निवडा किंवा नवीन नाव टाईप करा' : isHi ? 'चुनें या नया नाम टाइप करें' : 'Select or type custom'}
+                    {isMr ? 'सूचीमधून निवडा किंवा नवीन टाईप करा' : isHi ? 'सूची से चुनें या नया टाइप करें' : 'Select or type custom'}
                   </span>
                 </div>
-                <input
-                  type="text"
-                  list="product-name-suggestions"
-                  required
-                  placeholder={isMr ? "प्रॉडक्ट नाव (Product Name)" : isHi ? "उत्पाद नाम (Product Name)" : "Product Name"}
-                  value={name}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setName(val);
-                    if (formError) setFormError(null);
-                    const matched = products.find((p) => p.name.trim().toLowerCase() === val.trim().toLowerCase());
-                    if (matched) {
-                      if (matched.category) setCategory(matched.category);
-                      if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
-                      if (matched.mrp) setMrp(matched.mrp);
-                      if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
-                      if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
-                    }
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
-                />
-                <datalist id="product-name-suggestions">
-                  {availableProductNames.map((prodName) => (
-                    <option key={prodName} value={prodName} />
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder={isMr ? "प्रॉडक्ट नाव" : isHi ? "उत्पाद नाम" : "Product Name"}
+                    value={name}
+                    onFocus={() => setShowNameSuggestions(true)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setName(val);
+                      setShowNameSuggestions(true);
+                      if (formError) setFormError(null);
+                      const matched = products.find((p) => p.name.trim().toLowerCase() === val.trim().toLowerCase());
+                      if (matched) {
+                        if (matched.category) setCategory(matched.category);
+                        if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
+                        if (matched.mrp) setMrp(matched.mrp);
+                        if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
+                        if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
+                      }
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-8 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
+                  />
+                  {name && (
+                    <button
+                      type="button"
+                      onClick={() => setName('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                      title={isMr ? "साफ करा" : "Clear"}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* YouTube Style Autocomplete Dropdown */}
+                {showNameSuggestions && filteredProductNames.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-100 dark:divide-slate-800">
+                    <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 text-[10px] font-black uppercase text-slate-400 flex items-center justify-between">
+                      <span>{isMr ? 'सुचवलेली प्रॉडक्ट्स (Suggestions)' : 'Product Suggestions'}</span>
+                      <span className="text-[9px] lowercase font-normal">{isMr ? '❌ दाबून सूचीमधून हटवा' : 'click ❌ to remove'}</span>
+                    </div>
+                    {filteredProductNames.map((prodName) => (
+                      <div
+                        key={prodName}
+                        onClick={() => {
+                          setName(prodName);
+                          setShowNameSuggestions(false);
+                          const matched = products.find((p) => p.name.trim().toLowerCase() === prodName.trim().toLowerCase());
+                          if (matched) {
+                            if (matched.category) setCategory(matched.category);
+                            if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
+                            if (matched.mrp) setMrp(matched.mrp);
+                            if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
+                            if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
+                          }
+                        }}
+                        className="flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 text-xs font-semibold truncate">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 group-hover:text-animex-blue-500 shrink-0" />
+                          <span className="truncate">{prodName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          title={isMr ? "सूचीमधून काढून टाका" : "Remove from suggestions"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveProductSuggestion(prodName);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div>
+              {/* Category with YouTube-style suggestions */}
+              <div ref={catInputRef} className="relative">
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-slate-700 dark:text-slate-300">
                     {isMr ? 'कॅटेगरी (Category)' : isHi ? 'कैटेगरी (Category)' : 'Category'}
@@ -854,22 +990,66 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     {isMr ? 'निवडा किंवा नवीन नाव टाईप करा' : isHi ? 'चुनें या नया नाम टाइप करें' : 'Select or type custom'}
                   </span>
                 </div>
-                <input
-                  type="text"
-                  list="category-suggestions"
-                  placeholder={isMr ? "कॅटेगरी (Category)" : isHi ? "कैटेगरी (Category)" : "Category"}
-                  value={category}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
-                    if (formError) setFormError(null);
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
-                />
-                <datalist id="category-suggestions">
-                  {availableCategories.map((catName) => (
-                    <option key={catName} value={catName} />
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={isMr ? "कॅटेगरी नाव" : isHi ? "कैटेगरी नाम" : "Category Name"}
+                    value={category}
+                    onFocus={() => setShowCatSuggestions(true)}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setShowCatSuggestions(true);
+                      if (formError) setFormError(null);
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-8 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
+                  />
+                  {category && (
+                    <button
+                      type="button"
+                      onClick={() => setCategory('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                      title={isMr ? "साफ करा" : "Clear"}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* YouTube Style Autocomplete Dropdown */}
+                {showCatSuggestions && filteredCategories.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-100 dark:divide-slate-800">
+                    <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 text-[10px] font-black uppercase text-slate-400 flex items-center justify-between">
+                      <span>{isMr ? 'सुचवलेल्या कॅटेगरीज (Suggestions)' : 'Category Suggestions'}</span>
+                      <span className="text-[9px] lowercase font-normal">{isMr ? '❌ दाबून सूचीमधून हटवा' : 'click ❌ to remove'}</span>
+                    </div>
+                    {filteredCategories.map((catName) => (
+                      <div
+                        key={catName}
+                        onClick={() => {
+                          setCategory(catName);
+                          setShowCatSuggestions(false);
+                        }}
+                        className="flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 text-xs font-semibold truncate">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 group-hover:text-animex-blue-500 shrink-0" />
+                          <span className="truncate">{catName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          title={isMr ? "सूचीमधून काढून टाका" : "Remove from suggestions"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveCategorySuggestion(catName);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-2">

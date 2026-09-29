@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 import {
   Package,
@@ -51,9 +51,28 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const [inwardLooseUnits, setInwardLooseUnits] = useState<number>(0);
   const [inwardNote, setInwardNote] = useState<string>('');
 
+  // Dynamic list of categories for auto-suggestions
+  const availableCategories = useMemo(() => {
+    const defaultList = [
+      'Calcium Supplements',
+      'Mineral Mixtures',
+      'Liver Tonics',
+      'Rumen & Gut Health',
+      'Uterine & Fertility Boosters',
+      'Herbal Veterinary Products',
+      'Antibiotics',
+      'Dewormers & Bolus',
+      'Injections & Tonics',
+      'Feed Supplements',
+      'Wound & Skin Care',
+    ];
+    const fromProducts = products.map((p) => p.category?.trim()).filter(Boolean) as string[];
+    return Array.from(new Set([...defaultList, ...fromProducts]));
+  }, [products]);
+
   // Product Form states
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Calcium Supplements');
+  const [category, setCategory] = useState('');
   const [defaultUnit, setDefaultUnit] = useState('Ltr');
   const [mrp, setMrp] = useState<number>(350);
   const [defaultPrice, setDefaultPrice] = useState<number>(300);
@@ -65,7 +84,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setName('');
-    setCategory('Calcium Supplements');
+    setCategory('');
     setDefaultUnit('Ltr');
     setMrp(350);
     setDefaultPrice(300);
@@ -80,7 +99,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const handleOpenEditModal = (p: Product) => {
     setEditingProduct(p);
     setName(p.name);
-    setCategory(p.category || 'Calcium Supplements');
+    setCategory(p.category || '');
     setDefaultUnit(p.defaultUnit || 'Ltr');
     setMrp(p.mrp || 0);
     setDefaultPrice(p.defaultPrice || 0);
@@ -166,11 +185,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
     setFormError(null);
 
+    const finalCategory = category.trim() || 'General';
+
     if (editingProduct) {
       const updated: Product = {
         ...editingProduct,
         name: name.trim(),
-        category,
+        category: finalCategory,
         defaultUnit,
         mrp: Number(mrp) || 0,
         defaultPrice: Number(defaultPrice),
@@ -183,7 +204,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       const created: Product = {
         id: `p-${Date.now()}`,
         name: name.trim(),
-        category,
+        category: finalCategory,
         defaultUnit,
         mrp: Number(mrp) || 0,
         defaultPrice: Number(defaultPrice),
@@ -770,11 +791,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               )}
 
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1">Product Title *</label>
+                <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                  {isMr ? 'प्रॉडक्ट नाव (Product Title) *' : isHi ? 'उत्पाद नाम (Product Title) *' : 'Product Title *'}
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Product Name"
+                  placeholder={isMr ? "उदा. Animex Liv 1 Lit" : "e.g. Animex Liv 1 Lit"}
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -785,24 +808,37 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                <select
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300">
+                    {isMr ? 'कॅटेगरी (Category)' : isHi ? 'कैटेगरी (Category)' : 'Category'}
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {isMr ? 'निवडा किंवा नवीन नाव टाईप करा' : isHi ? 'चुनें या नया नाम टाइप करें' : 'Select or type custom'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  list="category-suggestions"
+                  placeholder={isMr ? "उदा. Antibiotics, Tonics, Dewormer, Bolus..." : isHi ? "उदा. Antibiotics, Tonics, Dewormer, Bolus..." : "e.g. Antibiotics, Tonics, Dewormer, Bolus..."}
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white"
-                >
-                  <option value="Calcium Supplements">Calcium Supplements</option>
-                  <option value="Mineral Mixtures">Mineral Mixtures</option>
-                  <option value="Liver Tonics">Liver Tonics</option>
-                  <option value="Rumen & Gut Health">Rumen & Gut Health</option>
-                  <option value="Uterine & Fertility Boosters">Uterine & Fertility Boosters</option>
-                  <option value="Herbal Veterinary Products">Herbal Veterinary Products</option>
-                </select>
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
+                />
+                <datalist id="category-suggestions">
+                  {availableCategories.map((catName) => (
+                    <option key={catName} value={catName} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">Unit</label>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                    {isMr ? 'युनिट (Unit)' : isHi ? 'यूनिट (Unit)' : 'Unit'}
+                  </label>
                   <select
                     value={defaultUnit}
                     onChange={(e) => setDefaultUnit(e.target.value)}
@@ -827,7 +863,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-1">Price (₹) *</label>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1">
+                    {isMr ? 'किंमत (Price ₹) *' : isHi ? 'मूल्य (Price ₹) *' : 'Price (₹) *'}
+                  </label>
                   <input
                     type="number"
                     step="0.01"

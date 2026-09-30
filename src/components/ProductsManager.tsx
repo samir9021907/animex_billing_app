@@ -233,7 +233,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     const isLoose = (target.boxCapacity || 1) <= 1 || (target.defaultUnit === 'Bucket' && (target.boxCapacity || 1) <= 1);
     setInwardMode(isLoose ? 'loose' : 'box');
     setInwardBoxes(0);
-    setInwardUnitsPerBox(target.boxCapacity && target.boxCapacity > 1 ? target.boxCapacity : 0);
+    setInwardUnitsPerBox(0);
     setInwardLooseUnits(0);
     setShowInwardModal(true);
   };
@@ -333,6 +333,10 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   const handleConfirmInward = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inwardProductId) return;
+    if (inwardMode === 'box' && inwardBoxes > 0 && inwardUnitsPerBox <= 0) {
+      alert(isMr ? 'कृपया एका खोक्यात किती नग आहेत (Units per Box) ते टाका.' : isHi ? 'कृपया एक बॉक्स में कितने नग हैं वह दर्ज करें।' : 'Please enter units per box.');
+      return;
+    }
     if (totalInwardAdded <= 0) {
       alert(isMr ? 'कृपया आवक मालाची संख्या टाका.' : isHi ? 'कृपया आवक मात्रा दर्ज करें।' : 'Please enter a valid stock inward quantity.');
       return;
@@ -679,7 +683,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     if (sel) {
                       const isLoose = (sel.boxCapacity || 1) <= 1 || (sel.defaultUnit === 'Bucket' && (sel.boxCapacity || 1) <= 1);
                       setInwardMode(isLoose ? 'loose' : 'box');
-                      setInwardUnitsPerBox(sel.boxCapacity && sel.boxCapacity > 1 ? sel.boxCapacity : 0);
+                      setInwardUnitsPerBox(0);
                       setInwardBoxes(0);
                       setInwardLooseUnits(0);
                     }
@@ -815,9 +819,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     </label>
                     <input
                       type="number"
-                      min="1"
+                      min="0"
                       value={inwardUnitsPerBox || ''}
-                      onChange={(e) => setInwardUnitsPerBox(Math.max(1, Number(e.target.value)))}
+                      onChange={(e) => setInwardUnitsPerBox(Math.max(0, Number(e.target.value)))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-black text-sm"
                       placeholder="0"
                     />

@@ -568,13 +568,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
                     return (
                       <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                        {/* Line 1: In Stock label + Box breakdown on its own full line */}
-                        <div className="text-xs leading-snug">
-                          <span className="text-slate-600 dark:text-slate-400 font-extrabold mr-1">
+                        {/* Line 1: In Stock label on the left, Box breakdown pulled all the way to the right */}
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 font-extrabold shrink-0 whitespace-nowrap">
                             {isMr ? 'शिल्लक गोदामात:' : isHi ? 'उपलब्ध स्टॉक:' : 'In Stock:'}
                           </span>
                           <span
-                            className={`font-black ${
+                            className={`font-black text-right ml-auto ${
                               isOutOfStock
                                 ? 'text-red-600'
                                 : isLowStock
@@ -586,7 +586,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                           </span>
                         </div>
 
-                        {/* Line 2: Status badge on left, and in the corner space on the right: Bottles & Total Litres */}
+                        {/* Line 2: Status badge on left, and on the far right: Bottles & Total Litres (no box) */}
                         <div className="flex items-end justify-between gap-2 pt-0.5">
                           {/* Left: Stock Status Badge */}
                           <div className="shrink-0">
@@ -608,8 +608,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                             )}
                           </div>
 
-                          {/* Right: Clean, spacious details in the corner space */}
-                          <div className="flex flex-col items-end text-right text-[11px] font-black leading-tight bg-white/80 dark:bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/70 shadow-sm">
+                          {/* Right: Clean, spacious details at the right edge without any box */}
+                          <div className="flex flex-col items-end text-right text-[11px] font-black leading-tight ml-auto">
                             {isBox && (
                               <span className="text-animex-blue-700 dark:text-sky-300">
                                 • {details.pieceName} : {stock.toLocaleString('en-IN')}

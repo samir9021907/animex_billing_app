@@ -4,6 +4,7 @@ import { convertNumberToWords } from '../utils/numberToWords';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
 import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check, User, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { parsePackVolume } from '../utils/volumeParser';
 
 // Custom Touch-Friendly Scrollable Unit Selector
 const UNIT_OPTIONS = ['Ltr', 'Ml', 'Bucket', 'Kg', 'Can', 'Pack', 'Box', 'Bottle', 'Nos'];
@@ -677,9 +678,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                     const isOut = st <= 0;
                     const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
                     const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
+                    const vol = parsePackVolume(p.name, st);
+                    const volText = vol && p.defaultUnit.toLowerCase() !== vol.unit.toLowerCase() ? ` • ${vol.totalDisplay}` : '';
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit})`}
+                        {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit}${volText})`}
                       </option>
                     );
                   })}
@@ -693,6 +696,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   const l = stock % cap;
                   const isZero = stock <= 0;
                   const isOver = item.quantity > stock;
+                  const vol = parsePackVolume(sel?.name, stock);
+                  const showVol = !!(vol && item.unit.toLowerCase() !== vol.unit.toLowerCase());
+                  const totalWord = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
 
                   return (
                     <div className="flex items-center justify-between mt-1 text-[11px] px-1">
@@ -702,7 +708,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         </span>
                       ) : (
                         <span className={isOver ? 'text-red-600 dark:text-red-400 font-black' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
-                          📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'In Stock:'} {stock} {item.unit}{cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l} ${isMr ? 'सुटे' : isHi ? 'खुले' : 'loose'}` : ''})` : ''}
+                          📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'In Stock:'} {stock} {item.unit}
+                          {cap > 1
+                            ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l} ${isMr ? 'सुटे' : isHi ? 'खुले' : 'loose'}` : ''}${showVol ? ` • ${totalWord} ${vol.totalDisplay}` : ''})`
+                            : (showVol ? ` (${totalWord} ${vol.totalDisplay})` : '')}
                         </span>
                       )}
                       {isZero ? (
@@ -834,9 +843,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         const isOut = st <= 0;
                         const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
                         const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
+                        const vol = parsePackVolume(p.name, st);
+                        const volText = vol && p.defaultUnit.toLowerCase() !== vol.unit.toLowerCase() ? ` • ${vol.totalDisplay}` : '';
                         return (
                           <option key={p.id} value={p.id}>
-                            {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit})`}
+                            {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit}${volText})`}
                           </option>
                         );
                       })}
@@ -850,6 +861,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       const l = stock % cap;
                       const isZero = stock <= 0;
                       const isOver = item.quantity > stock;
+                      const vol = parsePackVolume(sel?.name, stock);
+                      const showVol = !!(vol && item.unit.toLowerCase() !== vol.unit.toLowerCase());
+                      const totalWord = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
 
                       return (
                         <div className="mt-1 text-[10px] flex items-center justify-between">
@@ -860,7 +874,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                           ) : (
                             <span className={isOver ? 'text-red-600 dark:text-red-400 font-extrabold' : 'text-emerald-700 dark:text-emerald-400 font-bold'}>
                               📦 {isMr ? 'शिल्लक:' : isHi ? 'शेष:' : 'Stock:'} {stock} {item.unit}
-                              {cap > 1 ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l}` : ''})` : ''}
+                              {cap > 1
+                                ? ` (${b} ${isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Boxes'}${l > 0 ? ` + ${l}` : ''}${showVol ? ` • ${totalWord} ${vol.totalDisplay}` : ''})`
+                                : (showVol ? ` (${totalWord} ${vol.totalDisplay})` : '')}
                             </span>
                           )}
                           {isZero ? (

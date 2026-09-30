@@ -853,10 +853,40 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
               {/* Inward Calculation Preview */}
               {(() => {
-                const inwardVol = selectedInwardProduct ? parsePackVolume(selectedInwardProduct.name, totalInwardAdded, selectedInwardProduct.defaultUnit) : null;
-                const projectedVol = selectedInwardProduct ? parsePackVolume(selectedInwardProduct.name, newProjectedStock, selectedInwardProduct.defaultUnit) : null;
-                const showInwardVol = !!inwardVol;
-                const showProjVol = !!projectedVol;
+                const projDetails = selectedInwardProduct
+                  ? formatDetailedStockText(
+                      newProjectedStock,
+                      selectedInwardProduct.boxCapacity || 50,
+                      selectedInwardProduct.defaultUnit,
+                      selectedInwardProduct.name,
+                      language
+                    )
+                  : null;
+
+                const pieceName = projDetails
+                  ? projDetails.pieceName
+                  : (selectedInwardProduct?.defaultUnit || (isMr ? 'नग' : isHi ? 'नग' : 'Units'));
+
+                const incomingVol = selectedInwardProduct
+                  ? parsePackVolume(selectedInwardProduct.name, totalInwardAdded, selectedInwardProduct.defaultUnit)
+                  : null;
+
+                const projectedVol = selectedInwardProduct
+                  ? parsePackVolume(selectedInwardProduct.name, newProjectedStock, selectedInwardProduct.defaultUnit)
+                  : null;
+
+                const boxWord = isMr ? 'खोके' : isHi ? 'बॉक्स' : inwardBoxes === 1 ? 'Box' : 'Boxes';
+                const looseWord = isMr ? 'सुटे' : isHi ? 'खुले' : 'Loose';
+                const totalWord = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
+
+                const showIncomingVol = !!(
+                  incomingVol &&
+                  pieceName.toLowerCase() !== incomingVol.unit.toLowerCase()
+                );
+                const showProjVol = !!(
+                  projectedVol &&
+                  pieceName.toLowerCase() !== projectedVol.unit.toLowerCase()
+                );
 
                 return (
                   <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
@@ -864,15 +894,20 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       <span className="font-bold">{isMr ? '१. नवीन आलेला माल (Incoming Inward):' : '1. Incoming Inward:'}</span>
                       <span className="font-mono font-black">
                         {inwardMode === 'loose'
-                          ? `+${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Bucket'} ${showInwardVol ? `(एकूण +${inwardVol.totalDisplay})` : ''}`
-                          : `+${inwardBoxes} खोके × ${inwardUnitsPerBox} + ${inwardLooseUnits} सुटे = +${totalInwardAdded} ${selectedInwardProduct?.defaultUnit || 'Units'} ${showInwardVol ? `(एकूण +${inwardVol.totalDisplay})` : ''}`}
+                          ? (totalInwardAdded > 0
+                              ? `+${totalInwardAdded} ${pieceName}${showIncomingVol ? ` • ${totalWord}: +${incomingVol.totalDisplay}` : ''}`
+                              : `0 ${pieceName}${showIncomingVol ? ` • ${totalWord}: 0 ${incomingVol.unit}` : ''}`)
+                          : (totalInwardAdded > 0
+                              ? `+${inwardBoxes} ${boxWord} × ${inwardUnitsPerBox} + ${inwardLooseUnits} ${looseWord} = +${totalInwardAdded} ${pieceName}${showIncomingVol ? ` • ${totalWord}: +${incomingVol.totalDisplay}` : ''}`
+                              : `+${inwardBoxes} ${boxWord} × ${inwardUnitsPerBox} + ${inwardLooseUnits} ${looseWord} = 0 ${pieceName}${showIncomingVol ? ` • ${totalWord}: 0 ${incomingVol.unit}` : ''}`)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs font-black text-emerald-900 dark:text-emerald-200 pt-1.5 border-t border-emerald-200/80 dark:border-emerald-800">
                       <span>{isMr ? '२. गोदामातील नवीन एकूण साठा (Projected Total Stock):' : '2. Projected Total Stock:'}</span>
                       <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-                        {newProjectedStock.toLocaleString('en-IN')} {selectedInwardProduct?.defaultUnit} {showProjVol ? `(एकूण ${projectedVol.totalDisplay})` : ''}
+                        {newProjectedStock.toLocaleString('en-IN')} {pieceName}
+                        {showProjVol ? ` • ${totalWord}: ${projectedVol.totalDisplay}` : ''}
                       </span>
                     </div>
                   </div>

@@ -1376,37 +1376,34 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
                   return (
                     <div className="space-y-2 pt-1">
+                      {/* 3 Uniform Fields: Total Bottles, Total Ltr, Min Stock Alert */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {/* Box 1: Total Pieces (Bottles / Cans) */}
-                        <div className="bg-blue-50 dark:bg-blue-950/40 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800 flex flex-col justify-between">
-                          <label className="block text-[10px] text-blue-800 dark:text-blue-300 font-extrabold mb-1">
-                            {isMr ? '१. एकूण बाटल्या / कॅन' : isHi ? '१. कुल बोतलें / कैन' : '1. Total Bottles / Cans'}
+                        <div>
+                          <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
+                            {isMr
+                              ? (pieceLabel === 'बाटल्या' || pieceLabel === 'Bottles' ? 'Total Bottles' : `Total ${pieceLabel}`)
+                              : (pieceLabel === 'Bottles' ? 'Total Bottles' : `Total ${pieceLabel}`)}
                           </label>
-                          <div className="text-base font-black text-blue-900 dark:text-sky-200">
-                            {stockQuantity.toLocaleString('en-IN')} <span className="text-xs font-bold">{pieceLabel}</span>
+                          <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
+                            <span>{stockQuantity.toLocaleString('en-IN')} {pieceLabel}</span>
                           </div>
-                          <span className="text-[9px] text-blue-600 dark:text-blue-400 mt-0.5 block font-medium">
-                            {isBox ? `(${initialBoxes} खोके × ${boxCapacity}) + ${initialLooseUnits}` : `${stockQuantity} सुटे`}
-                          </span>
                         </div>
 
-                        {/* Box 2: Total Volume / Liquid / Weight (The new box user marked '2') */}
-                        <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col justify-between">
-                          <label className="block text-[10px] text-emerald-800 dark:text-emerald-300 font-extrabold mb-1">
-                            {isMr ? '२. एकूण लिटर / वजन' : isHi ? '२. कुल लीटर / वजन' : '2. Total Volume / Weight'}
+                        {/* Box 2: Total Volume (Ltr / Kg / ml) */}
+                        <div>
+                          <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
+                            {vol ? `Total ${vol.unit}` : 'Total Ltr'}
                           </label>
-                          <div className="text-base font-black text-emerald-800 dark:text-emerald-300">
-                            {volumeDisplay}
+                          <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
+                            <span>{volumeDisplay}</span>
                           </div>
-                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5 block font-medium">
-                            {vol ? `(${stockQuantity} × ${vol.size} ${vol.unit})` : 'ऑटोमॅटिक हिशोब'}
-                          </span>
                         </div>
 
-                        {/* Box 3: Min Stock Alert Limit (Marked '3') */}
-                        <div className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
-                          <label className="block text-[10px] text-slate-700 dark:text-slate-300 font-extrabold mb-1">
-                            {isMr ? '३. कमी साठा इशारा' : isHi ? '३. कम स्टॉक अलर्ट' : '3. Min Stock Alert'}
+                        {/* Box 3: Min Stock Alert (Entered by hand) */}
+                        <div>
+                          <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
+                            {isMr ? 'Min Stock Alert' : 'Min Stock Alert'}
                           </label>
                           <div className="relative">
                             <input
@@ -1414,16 +1411,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                               min="0"
                               value={minStockAlert}
                               onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 pr-10 text-slate-900 dark:text-white text-xs font-black"
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-12 text-slate-900 dark:text-white text-xs font-black min-h-[38px]"
                               placeholder="50"
                             />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold pointer-events-none">
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">
                               {pieceLabel}
                             </span>
                           </div>
-                          <span className="text-[9px] text-slate-500 mt-0.5 block">
-                            {isMr ? 'कमी झाल्यावर इशारा' : 'Alert limit'}
-                          </span>
                         </div>
                       </div>
 

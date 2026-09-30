@@ -982,13 +982,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       setShowNameSuggestions(true);
                       if (formError) setFormError(null);
                       const matched = products.find((p) => p.name.trim().toLowerCase() === val.trim().toLowerCase());
-                      if (matched) {
+                      if (matched && matched.id !== editingProduct?.id) {
                         if (matched.category) setCategory(matched.category);
                         if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
                         if (matched.mrp) setMrp(matched.mrp);
                         if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
                         if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
-                      } else if (!editingProduct) {
+                      } else {
                         const lower = val.toLowerCase();
                         if (lower.includes('bucket') || lower.includes('25kg')) {
                           setDefaultUnit('Bucket');
@@ -1047,13 +1047,13 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                           setName(prodName);
                           setShowNameSuggestions(false);
                           const matched = products.find((p) => p.name.trim().toLowerCase() === prodName.trim().toLowerCase());
-                          if (matched) {
+                          if (matched && matched.id !== editingProduct?.id) {
                             if (matched.category) setCategory(matched.category);
                             if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
                             if (matched.mrp) setMrp(matched.mrp);
                             if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
                             if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
-                          } else if (!editingProduct) {
+                          } else {
                             const lower = prodName.toLowerCase();
                             if (lower.includes('bucket') || lower.includes('25kg')) {
                               setDefaultUnit('Bucket');

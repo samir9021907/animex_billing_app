@@ -16,7 +16,7 @@ export function parsePackVolume(
   unitStr?: string
 ): PackVolumeResult | null {
   const combined = `${productName || ''} ${unitStr || ''}`.trim();
-  if (!combined || totalUnits <= 0) return null;
+  if (!combined || totalUnits < 0) return null;
 
   // Match patterns like (5 lit), 5lit, 5 lit, 5 ltr, 5l, 550ml, 300 ml, 25kg, 10 kg, 1lit, 250gm, 300 gm
   const match = combined.match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?|g\b)(?:$|[)\s/])/i);
@@ -128,17 +128,17 @@ export function formatDetailedStockText(
   const lowerName = (productName || '').toLowerCase();
 
   if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
-    pieceName = 'Can';
+    pieceName = isMr ? 'कॅन' : isHi ? 'कैन' : 'Can';
   } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerName.includes('25kg') || lowerName.includes('10kg')) {
-    pieceName = 'Bucket';
+    pieceName = isMr ? 'बकेट' : isHi ? 'बकेट' : 'Bucket';
   } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
     pieceName = isMr ? 'पुडे' : isHi ? 'पुड़े/पैकेट' : 'Pouches';
   } else if (lowerUnit.includes('bottle') || lowerName.includes('bottle') || lowerName.includes('ml') || lowerName.includes('1lit') || lowerName.includes('1 lit') || lowerName.includes('gel')) {
     pieceName = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
   } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
-    pieceName = 'Pack';
+    pieceName = isMr ? 'पॅक' : isHi ? 'पैक' : 'Pack';
   } else if (lowerUnit.includes('box')) {
-    pieceName = 'Box';
+    pieceName = isMr ? 'खोके' : isHi ? 'बॉक्स' : 'Box';
   } else {
     pieceName = isMr ? 'नग' : isHi ? 'नग' : 'Units';
   }
@@ -161,7 +161,9 @@ export function formatDetailedStockText(
 
   // Box packaging
   let boxBreakdown = '';
-  if (boxes > 0 && loose > 0) {
+  if (stock === 0) {
+    boxBreakdown = `0 ${pieceName}`;
+  } else if (boxes > 0 && loose > 0) {
     boxBreakdown = `${boxes} ${boxWord} (${boxes} × ${capacity} = ${boxTotal.toLocaleString('en-IN')}) + ${loose} ${looseWord}`;
   } else if (boxes > 0) {
     boxBreakdown = `${boxes} ${boxWord} (${boxes} × ${capacity} = ${boxTotal.toLocaleString('en-IN')})`;

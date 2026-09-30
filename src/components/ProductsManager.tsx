@@ -561,42 +561,75 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-600 font-extrabold">
-                      {isMr ? 'शिल्लक गोदामात:' : isHi ? 'उपलब्ध स्टॉक:' : 'In Stock:'}
-                    </span>
-                    <span
-                      className={`font-black ${
-                        isOutOfStock
-                          ? 'text-red-600'
-                          : isLowStock
-                          ? 'text-amber-600'
-                          : 'text-emerald-700 dark:text-emerald-400'
-                      }`}
-                    >
-                      {formatStockText(stock, capacity, p.defaultUnit, p.name)}
-                    </span>
-                  </div>
+                  {/* Stock Calculation & Breakdown */}
+                  {(() => {
+                    const details = formatDetailedStockText(stock, capacity, p.defaultUnit, p.name, language);
+                    const isBox = capacity > 1;
 
-                  {/* Stock Status Badge */}
-                  <div className="pt-1 flex items-center">
-                    {isOutOfStock ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
-                        <AlertTriangle className="w-3 h-3" />
-                        {isMr ? 'स्टॉक संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock'}
-                      </span>
-                    ) : isLowStock ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                        <AlertTriangle className="w-3 h-3" />
-                        {isMr ? 'कमी स्टॉक' : isHi ? 'कम स्टॉक' : 'Low Stock'}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3" />
-                        {isMr ? 'उपलब्ध' : isHi ? 'स्टॉक में उपलब्ध' : 'In Stock'}
-                      </span>
-                    )}
-                  </div>
+                    return (
+                      <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                        {/* Line 1: In Stock label + Box breakdown on its own full line */}
+                        <div className="text-xs leading-snug">
+                          <span className="text-slate-600 dark:text-slate-400 font-extrabold mr-1">
+                            {isMr ? 'शिल्लक गोदामात:' : isHi ? 'उपलब्ध स्टॉक:' : 'In Stock:'}
+                          </span>
+                          <span
+                            className={`font-black ${
+                              isOutOfStock
+                                ? 'text-red-600'
+                                : isLowStock
+                                ? 'text-amber-600'
+                                : 'text-emerald-700 dark:text-emerald-400'
+                            }`}
+                          >
+                            {details.boxBreakdown}
+                          </span>
+                        </div>
+
+                        {/* Line 2: Status badge on left, and in the corner space on the right: Bottles & Total Litres */}
+                        <div className="flex items-end justify-between gap-2 pt-0.5">
+                          {/* Left: Stock Status Badge */}
+                          <div className="shrink-0">
+                            {isOutOfStock ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200">
+                                <AlertTriangle className="w-3 h-3" />
+                                {isMr ? 'स्टॉक संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock'}
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                <AlertTriangle className="w-3 h-3" />
+                                {isMr ? 'कमी स्टॉक' : isHi ? 'कम स्टॉक' : 'Low Stock'}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {isMr ? 'उपलब्ध' : isHi ? 'स्टॉक में उपलब्ध' : 'In Stock'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Right: Clean, spacious details in the corner space */}
+                          <div className="flex flex-col items-end text-right text-[11px] font-black leading-tight bg-white/80 dark:bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/70 shadow-sm">
+                            {isBox && (
+                              <span className="text-animex-blue-700 dark:text-sky-300">
+                                • {details.pieceName} : {stock.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                            {details.volumeSummary && (
+                              <span className="text-emerald-700 dark:text-emerald-400">
+                                • {isMr ? 'एकूण' : isHi ? 'कुल' : 'Total'} : {details.volumeSummary.replace(/^(एकूण|कुल|Total)\s*/, '')}
+                              </span>
+                            )}
+                            {!details.volumeSummary && !isBox && (
+                              <span className="text-animex-blue-700 dark:text-sky-300">
+                                • {details.pieceName} : {stock.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );

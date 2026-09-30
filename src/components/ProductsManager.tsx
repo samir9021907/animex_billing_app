@@ -183,6 +183,90 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     );
   }, [availableCategories, category]);
 
+  const applyAutoPackSettings = (
+    str: string,
+    currentBoxes: number = initialBoxes,
+    currentLoose: number = initialLooseUnits,
+    currentStock: number = stockQuantity
+  ) => {
+    const lower = (str || '').toLowerCase();
+    let detected = false;
+    let newCap = boxCapacity;
+    let newLoose = isLoosePackaging;
+    let newUnit = defaultUnit;
+    let newAlert = minStockAlert;
+
+    if (lower.includes('25kg') || lower.includes('25 kg') || lower.includes('bucket')) {
+      detected = true;
+      newUnit = 'Bucket';
+      newLoose = true;
+      newCap = 1;
+      newAlert = 2;
+    } else if (lower.includes('10kg') || lower.includes('10 kg')) {
+      detected = true;
+      newUnit = 'Bucket';
+      newLoose = false;
+      newCap = 2;
+      newAlert = 2;
+    } else if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || lower.includes('5l') || lower.includes('can')) {
+      detected = true;
+      newUnit = 'Can';
+      newLoose = false;
+      newCap = 4;
+      newAlert = 4;
+    } else if (lower.includes('500ml') || lower.includes('500 ml')) {
+      detected = true;
+      newUnit = 'Bottle';
+      newLoose = false;
+      newCap = 24;
+      newAlert = 24;
+    } else if (lower.includes('300ml') || lower.includes('300 ml')) {
+      detected = true;
+      newUnit = 'Bottle';
+      newLoose = false;
+      newCap = 40;
+      newAlert = 40;
+    } else if (lower.includes('250ml') || lower.includes('250 ml') || lower.includes('100ml') || lower.includes('100 ml')) {
+      detected = true;
+      newUnit = 'Bottle';
+      newLoose = false;
+      newCap = 50;
+      newAlert = 50;
+    } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr') || lower.includes('1l')) {
+      detected = true;
+      newUnit = 'Ltr';
+      newLoose = false;
+      newCap = 20;
+      newAlert = 20;
+    } else if (lower.includes('250gm') || lower.includes('250 gm') || lower.includes('300gm') || lower.includes('300 gm') || lower.includes('500gm') || lower.includes('500 gm') || lower.includes('pouch') || lower.includes('powder')) {
+      detected = true;
+      newUnit = 'Pouch';
+      newLoose = false;
+      newCap = 40;
+      newAlert = 40;
+    } else if (lower.includes('bolus') || lower.includes('pack')) {
+      newUnit = 'Pack';
+    }
+
+    if (detected) {
+      setDefaultUnit(newUnit);
+      setIsLoosePackaging(newLoose);
+      setBoxCapacity(newCap);
+      setMinStockAlert(newAlert);
+
+      if (newLoose) {
+        const s = currentStock > 0 ? currentStock : (currentLoose > 0 ? currentLoose : (currentBoxes > 0 ? currentBoxes : 10));
+        setStockQuantity(s);
+        setInitialBoxes(0);
+        setInitialLooseUnits(s);
+      } else {
+        const boxes = currentBoxes > 0 ? currentBoxes : 10;
+        setInitialBoxes(boxes);
+        setStockQuantity((boxes * newCap) + currentLoose);
+      }
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setName('');
@@ -989,34 +1073,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
                         if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
                       } else {
-                        const lower = val.toLowerCase();
-                        if (lower.includes('bucket') || lower.includes('25kg')) {
-                          setDefaultUnit('Bucket');
-                          setIsLoosePackaging(true);
-                          setBoxCapacity(1);
-                        } else if (lower.includes('10kg')) {
-                          setDefaultUnit('Bucket');
-                          setIsLoosePackaging(false);
-                          setBoxCapacity(2);
-                        } else if (lower.includes('can') || lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || lower.includes('5l')) {
-                          setDefaultUnit('Can');
-                          setIsLoosePackaging(false);
-                          setBoxCapacity(4);
-                        } else if (lower.includes('500ml') || lower.includes('500 ml')) {
-                          setDefaultUnit('Bottle');
-                          setIsLoosePackaging(false);
-                          setBoxCapacity(24);
-                        } else if (lower.includes('300ml') || lower.includes('300 ml')) {
-                          setDefaultUnit('Bottle');
-                          setIsLoosePackaging(false);
-                          setBoxCapacity(40);
-                        } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr')) {
-                          setDefaultUnit('Ltr');
-                          setIsLoosePackaging(false);
-                          setBoxCapacity(20);
-                        } else if (lower.includes('bolus') || lower.includes('pack')) {
-                          setDefaultUnit('Pack');
-                        }
+                        applyAutoPackSettings(val);
                       }
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-8 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
@@ -1054,34 +1111,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                             if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
                             if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
                           } else {
-                            const lower = prodName.toLowerCase();
-                            if (lower.includes('bucket') || lower.includes('25kg')) {
-                              setDefaultUnit('Bucket');
-                              setIsLoosePackaging(true);
-                              setBoxCapacity(1);
-                            } else if (lower.includes('10kg')) {
-                              setDefaultUnit('Bucket');
-                              setIsLoosePackaging(false);
-                              setBoxCapacity(2);
-                            } else if (lower.includes('can') || lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || lower.includes('5l')) {
-                              setDefaultUnit('Can');
-                              setIsLoosePackaging(false);
-                              setBoxCapacity(4);
-                            } else if (lower.includes('500ml') || lower.includes('500 ml')) {
-                              setDefaultUnit('Bottle');
-                              setIsLoosePackaging(false);
-                              setBoxCapacity(24);
-                            } else if (lower.includes('300ml') || lower.includes('300 ml')) {
-                              setDefaultUnit('Bottle');
-                              setIsLoosePackaging(false);
-                              setBoxCapacity(40);
-                            } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr')) {
-                              setDefaultUnit('Ltr');
-                              setIsLoosePackaging(false);
-                              setBoxCapacity(20);
-                            } else if (lower.includes('bolus') || lower.includes('pack')) {
-                              setDefaultUnit('Pack');
-                            }
+                            applyAutoPackSettings(prodName);
                           }
                         }}
                         className="flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors group"
@@ -1193,19 +1223,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => {
                         const val = e.target.value;
                         setDefaultUnit(val);
-                        const lower = val.toLowerCase();
-                        if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr')) {
-                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(4);
-                        } else if (lower.includes('300ml') || lower.includes('300 ml')) {
-                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(40);
-                        } else if (lower.includes('500ml') || lower.includes('500 ml')) {
-                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(24);
-                        } else if (lower.includes('25kg') || lower.includes('25 kg')) {
-                          setIsLoosePackaging(true);
-                          setBoxCapacity(1);
-                        } else if (lower.includes('10kg') || lower.includes('10 kg')) {
-                          setBoxCapacity(2);
-                        }
+                        applyAutoPackSettings(val);
                       }}
                       placeholder={isMr ? "उदा. 1 Ltr, 5 Ltr, 300 ml" : "e.g. 1 Ltr, 5 Ltr, 300 ml"}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white font-bold"

@@ -15,11 +15,13 @@ export function parsePackVolume(
   totalUnits: number = 0,
   unitStr?: string
 ): PackVolumeResult | null {
-  const combined = `${productName || ''} ${unitStr || ''}`.trim();
-  if (!combined || totalUnits < 0) return null;
+  if (totalUnits < 0) return null;
 
-  // Match patterns like (5 lit), 5lit, 5 lit, 5 ltr, 5l, 550ml, 300 ml, 25kg, 10 kg, 1lit, 250gm, 300 gm
-  const match = combined.match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?|g\b)(?:$|[)\s/])/i);
+  // Check unitStr first if it contains a pack pattern (e.g. user selected or typed '5 Ltr' in Unit)
+  let match = (unitStr || '').trim().match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?|g\b)(?:$|[)\s/])/i);
+  if (!match) {
+    match = (productName || '').trim().match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?|g\b)(?:$|[)\s/])/i);
+  }
   if (!match) return null;
 
   const num = parseFloat(match[1]);
@@ -127,13 +129,13 @@ export function formatDetailedStockText(
   const lowerUnit = (unit || '').toLowerCase();
   const lowerName = (productName || '').toLowerCase();
 
-  if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
+  if (lowerUnit.includes('can') || lowerName.includes('can') || lowerUnit.includes('5 lit') || lowerUnit.includes('5lit') || lowerUnit.includes('5 ltr') || lowerUnit.includes('5l') || lowerName.includes('5 lit') || lowerName.includes('5lit') || lowerName.includes('5 ltr') || lowerName.includes('5l')) {
     pieceName = isMr ? 'कॅन' : isHi ? 'कैन' : 'Can';
   } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerUnit.includes('25kg') || lowerUnit.includes('25 kg') || lowerUnit.includes('10kg') || lowerUnit.includes('10 kg') || lowerName.includes('25kg') || lowerName.includes('25 kg') || lowerName.includes('10kg') || lowerName.includes('10 kg')) {
     pieceName = isMr ? 'बकेट' : isHi ? 'बकेट' : 'Bucket';
   } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
     pieceName = isMr ? 'पुडे' : isHi ? 'पुड़े/पैकेट' : 'Pouches';
-  } else if (lowerUnit.includes('bottle') || lowerName.includes('bottle') || lowerName.includes('ml') || lowerName.includes('1lit') || lowerName.includes('1 lit') || lowerName.includes('gel')) {
+  } else if (lowerUnit.includes('bottle') || lowerName.includes('bottle') || lowerUnit.includes('ml') || lowerName.includes('ml') || lowerUnit.includes('1lit') || lowerUnit.includes('1 lit') || lowerUnit.includes('1 ltr') || lowerUnit.includes('1l') || lowerName.includes('1lit') || lowerName.includes('1 lit') || lowerName.includes('1 ltr') || lowerName.includes('gel')) {
     pieceName = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
   } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
     pieceName = isMr ? 'पॅक' : isHi ? 'पैक' : 'Pack';

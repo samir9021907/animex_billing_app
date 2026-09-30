@@ -129,7 +129,7 @@ export function formatDetailedStockText(
 
   if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
     pieceName = isMr ? 'कॅन' : isHi ? 'कैन' : 'Can';
-  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerName.includes('25kg') || lowerName.includes('10kg')) {
+  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerUnit.includes('25kg') || lowerUnit.includes('25 kg') || lowerUnit.includes('10kg') || lowerUnit.includes('10 kg') || lowerName.includes('25kg') || lowerName.includes('25 kg') || lowerName.includes('10kg') || lowerName.includes('10 kg')) {
     pieceName = isMr ? 'बकेट' : isHi ? 'बकेट' : 'Bucket';
   } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
     pieceName = isMr ? 'पुडे' : isHi ? 'पुड़े/पैकेट' : 'Pouches';

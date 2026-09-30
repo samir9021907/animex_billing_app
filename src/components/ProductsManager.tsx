@@ -1273,13 +1273,26 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => {
                         const loose = e.target.value === 'loose';
                         setIsLoosePackaging(loose);
-                        if (loose) setBoxCapacity(1);
-                        else if (boxCapacity <= 1) setBoxCapacity(50);
+                        if (loose) {
+                          setBoxCapacity(1);
+                          setInitialBoxes(0);
+                          const cur = (stockQuantity > 0 && stockQuantity !== 500) ? stockQuantity : 9;
+                          setInitialLooseUnits(cur);
+                          setStockQuantity(cur);
+                          if (minStockAlert >= 10) setMinStockAlert(2);
+                        } else {
+                          const cap = boxCapacity > 1 ? boxCapacity : 50;
+                          setBoxCapacity(cap);
+                          setInitialBoxes(10);
+                          setInitialLooseUnits(0);
+                          setStockQuantity(10 * cap);
+                          if (minStockAlert === 2) setMinStockAlert(cap);
+                        }
                       }}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
                     >
                       <option value="box">{isMr ? '📦 खोके पॅकिंग' : isHi ? '📦 बॉक्स पैकिंग' : '📦 Box Packaging'}</option>
-                      <option value="loose">{isMr ? '🪣 सुटे नग / बकेट्स' : isHi ? '🪣 खुले नग / बकेट्स' : '🪣 Loose Units / Buckets'}</option>
+                      <option value="loose">{isMr ? '🪣 सुटी बकेट (खोके नाहीत)' : isHi ? '🪣 खुली बकेट' : '🪣 Loose Units / Buckets'}</option>
                     </select>
                   </div>
 
@@ -1308,8 +1321,32 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   )}
                 </div>
 
-                {/* Initial Stock based on Boxes & Loose */}
-                {!isLoosePackaging && (
+                {/* Initial Stock based on Boxes & Loose, or Direct for Loose Packaging */}
+                {isLoosePackaging ? (
+                  <div className="p-2.5 bg-white dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-slate-700/80 space-y-1.5">
+                    <label className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold mb-1">
+                      {isMr ? '📦 सुरुवातीला गोदामात हजर माल (Opening Stock)' : '📦 Initial Warehouse Stock'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={stockQuantity}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value));
+                          setStockQuantity(val);
+                          setInitialBoxes(0);
+                          setInitialLooseUnits(val);
+                        }}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-16 text-slate-900 dark:text-white font-bold text-xs"
+                        placeholder="0"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">
+                        {defaultUnit.toLowerCase().includes('bucket') || defaultUnit.toLowerCase().includes('kg') ? (isMr ? 'बकेट' : 'Bucket') : defaultUnit}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
                   <div className="p-2.5 bg-white dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-slate-700/80 space-y-1.5">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       {isMr ? '📦 सुरुवातीला गोदामात हजर माल (Opening Stock)' : '📦 Initial Warehouse Stock'}
@@ -1364,8 +1401,10 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   const lowerName = name.toLowerCase();
                   if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
                     pieceLabel = 'Can';
-                  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerName.includes('25kg') || lowerName.includes('10kg')) {
-                    pieceLabel = 'Bucket';
+                  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerUnit.includes('25kg') || lowerUnit.includes('25 kg') || lowerUnit.includes('10kg') || lowerUnit.includes('10 kg') || lowerName.includes('25kg') || lowerName.includes('25 kg') || lowerName.includes('10kg') || lowerName.includes('10 kg') || isLoosePackaging) {
+                    pieceLabel = isMr ? 'बकेट' : 'Bucket';
+                  } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
+                    pieceLabel = isMr ? 'पुडे' : 'Pouches';
                   } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
                     pieceLabel = 'Pack';
                   } else if (lowerUnit.includes('box')) {
@@ -1376,14 +1415,12 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
                   return (
                     <div className="space-y-2 pt-1">
-                      {/* 3 Uniform Fields: Total Bottles, Total Ltr, Min Stock Alert */}
+                      {/* 3 Uniform Fields: Total Bottles/Bucket, Total Ltr/Kg, Min Stock Alert */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {/* Box 1: Total Pieces (Bottles / Cans) */}
+                        {/* Box 1: Total Pieces (Bottles / Cans / Buckets) */}
                         <div>
                           <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
-                            {isMr
-                              ? (pieceLabel === 'बाटल्या' || pieceLabel === 'Bottles' ? 'Total Bottles' : `Total ${pieceLabel}`)
-                              : (pieceLabel === 'Bottles' ? 'Total Bottles' : `Total ${pieceLabel}`)}
+                            {`Total ${pieceLabel}`}
                           </label>
                           <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
                             <span>{stockQuantity.toLocaleString('en-IN')} {pieceLabel}</span>
@@ -1393,7 +1430,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         {/* Box 2: Total Volume (Ltr / Kg / ml) */}
                         <div>
                           <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
-                            {vol ? `Total ${vol.unit}` : 'Total Ltr'}
+                            {vol ? `Total ${vol.unit}` : (lowerUnit.includes('kg') ? 'Total Kg' : 'Total Ltr')}
                           </label>
                           <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
                             <span>{volumeDisplay}</span>

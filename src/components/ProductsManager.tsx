@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { validateName } from '../utils/validators';
 import { useLanguage } from '../context/LanguageContext';
-import { parsePackVolume } from '../utils/volumeParser';
+import { parsePackVolume, formatDetailedStockText } from '../utils/volumeParser';
 
 interface ProductsManagerProps {
   products: Product[];
@@ -365,40 +365,15 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     }
   };
 
-  // Format stock display into Boxes and Loose, plus total Volume/Weight calculation
+  // Format stock display into exact breakdown requested by user:
+  // e.g.: "20 खोके (20 × 50 = 1,000) + 3 सुटे = 1,003 बाटल्या • एकूण 1,003 Ltr"
   const formatStockText = (
     stock: number = 0,
     capacity: number = 50,
     unit: string = 'Ltr',
     productName: string = ''
   ) => {
-    const vol = parsePackVolume(productName, stock);
-    const showVol = !!(vol && !(unit.toLowerCase() === vol.unit.toLowerCase() && vol.totalValue === stock));
-    const totalWord = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
-    const volSuffix = showVol ? ` • ${totalWord} ${vol.totalDisplay}` : '';
-
-    if (capacity <= 1) {
-      if (stock === 0) return `0 ${unit}`;
-      return `${stock.toLocaleString('en-IN')} ${unit}${showVol ? ` (${totalWord} ${vol.totalDisplay})` : ''}`;
-    }
-
-    const boxes = Math.floor(stock / capacity);
-    const loose = stock % capacity;
-
-    const boxLabel = isMr ? 'खोके' : isHi ? 'बॉक्स' : boxes === 1 ? 'Box' : 'Boxes';
-    const looseLabel = isMr ? 'सुटे' : isHi ? 'खुला' : 'Loose';
-
-    if (stock === 0) {
-      return `0 ${unit}`;
-    }
-
-    if (boxes === 0) {
-      return `${loose.toLocaleString('en-IN')} ${unit} (${looseLabel}${volSuffix})`;
-    }
-    if (loose === 0) {
-      return `${boxes} ${boxLabel} (${stock.toLocaleString('en-IN')} ${unit}${volSuffix})`;
-    }
-    return `${boxes} ${boxLabel} + ${loose} ${unit} (${totalWord} ${stock.toLocaleString('en-IN')} ${unit}${volSuffix})`;
+    return formatDetailedStockText(stock, capacity, unit, productName, language).fullOneLiner;
   };
 
   const selectedInwardProduct = products.find((p) => p.id === inwardProductId);
@@ -1169,22 +1144,53 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">
-                    {isMr ? 'युनिट (Unit)' : isHi ? 'यूनिट (Unit)' : 'Unit'}
+                    {isMr ? 'युनिट (Unit) *' : isHi ? 'यूनिट (Unit) *' : 'Unit *'}
                   </label>
-                  <select
-                    value={defaultUnit}
-                    onChange={(e) => setDefaultUnit(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white"
-                  >
-                    <option value="Can">{isMr ? 'Can (कॅन)' : isHi ? 'Can (कैन)' : 'Can'}</option>
-                    <option value="Bottle">{isMr ? 'Bottle (बाटली)' : isHi ? 'Bottle (बोतल)' : 'Bottle'}</option>
-                    <option value="Bucket">{isMr ? 'Bucket (बकेट)' : isHi ? 'Bucket (बाल्टी)' : 'Bucket'}</option>
-                    <option value="Box">{isMr ? 'Box (खोका)' : isHi ? 'Box (बॉक्स)' : 'Box'}</option>
-                    <option value="Pack">{isMr ? 'Pack (पॅक)' : isHi ? 'Pack (पैक)' : 'Pack'}</option>
-                    <option value="Ltr">{isMr ? 'Ltr (लिटर)' : isHi ? 'Ltr (लीटर)' : 'Ltr'}</option>
-                    <option value="Kg">{isMr ? 'Kg (किलो)' : isHi ? 'Kg (किलो)' : 'Kg'}</option>
-                    <option value="Ml">{isMr ? 'Ml (मिली)' : isHi ? 'Ml (मिली)' : 'Ml'}</option>
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      list="unit-options-list"
+                      required
+                      value={defaultUnit}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDefaultUnit(val);
+                        const lower = val.toLowerCase();
+                        if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr')) {
+                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(4);
+                        } else if (lower.includes('300ml') || lower.includes('300 ml')) {
+                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(40);
+                        } else if (lower.includes('500ml') || lower.includes('500 ml')) {
+                          if (boxCapacity === 50 || boxCapacity === 20) setBoxCapacity(24);
+                        } else if (lower.includes('25kg') || lower.includes('25 kg')) {
+                          setIsLoosePackaging(true);
+                          setBoxCapacity(1);
+                        } else if (lower.includes('10kg') || lower.includes('10 kg')) {
+                          setBoxCapacity(2);
+                        }
+                      }}
+                      placeholder={isMr ? "उदा. 1 Ltr, 5 Ltr, 300 ml" : "e.g. 1 Ltr, 5 Ltr, 300 ml"}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white font-bold"
+                    />
+                    <datalist id="unit-options-list">
+                      <option value="1 Ltr">{isMr ? '1 Ltr (१ लिटर बाटली)' : '1 Ltr (1 Litre Bottle)'}</option>
+                      <option value="5 Ltr">{isMr ? '5 Ltr (५ लिटर कॅन)' : '5 Ltr (5 Litre Can)'}</option>
+                      <option value="300 ml">{isMr ? '300 ml (३०० मिली बाटली)' : '300 ml Bottle'}</option>
+                      <option value="500 ml">{isMr ? '500 ml (५०० मिली बाटली)' : '500 ml Bottle'}</option>
+                      <option value="250 ml">{isMr ? '250 ml (२५० मिली बाटली)' : '250 ml Bottle'}</option>
+                      <option value="100 ml">{isMr ? '100 ml (१०० मिली बाटली)' : '100 ml Bottle'}</option>
+                      <option value="10 Kg">{isMr ? '10 Kg (१० किलो बकेट)' : '10 Kg Bucket'}</option>
+                      <option value="25 Kg">{isMr ? '25 Kg (२५ किलो बकेट)' : '25 Kg Bucket'}</option>
+                      <option value="Bottle">{isMr ? 'Bottle (बाटली)' : 'Bottle'}</option>
+                      <option value="Can">{isMr ? 'Can (कॅन)' : 'Can'}</option>
+                      <option value="Bucket">{isMr ? 'Bucket (बकेट)' : 'Bucket'}</option>
+                      <option value="Box">{isMr ? 'Box (खोका)' : 'Box'}</option>
+                      <option value="Pack">{isMr ? 'Pack (पॅक)' : 'Pack'}</option>
+                      <option value="Ltr">{isMr ? 'Ltr (लिटर)' : 'Ltr'}</option>
+                      <option value="Kg">{isMr ? 'Kg (किलो)' : 'Kg'}</option>
+                      <option value="Ml">{isMr ? 'Ml (मिली)' : 'Ml'}</option>
+                    </datalist>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 mb-1">MRP (₹)</label>
@@ -1307,74 +1313,94 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   </div>
                 )}
 
-                {/* Auto Calculated Stock & Min Alert */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      {isMr ? 'एकूण सुरुवातीचा साठा (Auto Total)' : 'Total Initial Stock (Units)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={stockQuantity}
-                        onChange={(e) => {
-                          const val = Math.max(0, Number(e.target.value));
-                          setStockQuantity(val);
-                          if (!isLoosePackaging && boxCapacity > 0) {
-                            setInitialBoxes(Math.floor(val / boxCapacity));
-                            setInitialLooseUnits(val % boxCapacity);
-                          }
-                        }}
-                        className="w-full bg-white dark:bg-slate-900 border border-emerald-500/50 rounded-lg p-2 pr-10 text-emerald-700 dark:text-emerald-400 font-black text-xs"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold pointer-events-none">
-                        {defaultUnit}
-                      </span>
-                    </div>
-                    {(() => {
-                      const vol = parsePackVolume(name, stockQuantity);
-                      const showVol = !!(vol && defaultUnit.toLowerCase() !== vol.unit.toLowerCase());
-                      const totalWord = isMr ? 'एकूण' : isHi ? 'कुल' : 'Total';
-                      if (!isLoosePackaging) {
-                        return (
-                          <span className="text-[9px] text-slate-500 mt-0.5 block font-medium">
-                            = {initialBoxes} {isMr ? 'खोके' : 'Boxes'} ({boxCapacity} {defaultUnit}/box) + {initialLooseUnits} {isMr ? 'सुटे' : 'loose'}
-                            {showVol ? ` • ${totalWord} ${vol.totalDisplay}` : ''}
+                {/* 3 Summary Boxes as requested in User's Diagram 1, 2, 3 */}
+                {(() => {
+                  const vol = parsePackVolume(name, stockQuantity, defaultUnit);
+                  const isBox = !isLoosePackaging && boxCapacity > 1;
+                  const boxTotal = initialBoxes * boxCapacity;
+                  
+                  let pieceLabel = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
+                  const lowerUnit = defaultUnit.toLowerCase();
+                  const lowerName = name.toLowerCase();
+                  if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
+                    pieceLabel = 'Can';
+                  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerName.includes('25kg') || lowerName.includes('10kg')) {
+                    pieceLabel = 'Bucket';
+                  } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
+                    pieceLabel = 'Pack';
+                  } else if (lowerUnit.includes('box')) {
+                    pieceLabel = 'Box';
+                  }
+
+                  const volumeDisplay = vol ? vol.totalDisplay : `${stockQuantity} ${defaultUnit}`;
+
+                  return (
+                    <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {/* Box 1: Total Pieces (Bottles / Cans) */}
+                        <div className="bg-blue-50 dark:bg-blue-950/40 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800 flex flex-col justify-between">
+                          <label className="block text-[10px] text-blue-800 dark:text-blue-300 font-extrabold mb-1">
+                            {isMr ? '१. एकूण बाटल्या / कॅन' : isHi ? '१. कुल बोतलें / कैन' : '1. Total Bottles / Cans'}
+                          </label>
+                          <div className="text-base font-black text-blue-900 dark:text-sky-200">
+                            {stockQuantity.toLocaleString('en-IN')} <span className="text-xs font-bold">{pieceLabel}</span>
+                          </div>
+                          <span className="text-[9px] text-blue-600 dark:text-blue-400 mt-0.5 block font-medium">
+                            {isBox ? `(${initialBoxes} खोके × ${boxCapacity}) + ${initialLooseUnits}` : `${stockQuantity} सुटे`}
                           </span>
-                        );
-                      } else {
-                        return (
-                          <span className="text-[9px] text-slate-500 mt-0.5 block font-medium">
-                            = {stockQuantity} {defaultUnit}
-                            {showVol ? ` • ${totalWord} ${vol.totalDisplay}` : ''}
+                        </div>
+
+                        {/* Box 2: Total Volume / Liquid / Weight (The new box user marked '2') */}
+                        <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col justify-between">
+                          <label className="block text-[10px] text-emerald-800 dark:text-emerald-300 font-extrabold mb-1">
+                            {isMr ? '२. एकूण लिटर / वजन' : isHi ? '२. कुल लीटर / वजन' : '2. Total Volume / Weight'}
+                          </label>
+                          <div className="text-base font-black text-emerald-800 dark:text-emerald-300">
+                            {volumeDisplay}
+                          </div>
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5 block font-medium">
+                            {vol ? `(${stockQuantity} × ${vol.size} ${vol.unit})` : 'ऑटोमॅटिक हिशोब'}
                           </span>
-                        );
-                      }
-                    })()}
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                      {isMr ? 'कमी साठा इशारा (Min Alert Limit)' : 'Min Stock Alert Limit'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={minStockAlert}
-                        onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-10 text-slate-900 dark:text-white text-xs font-bold"
-                        placeholder="e.g. 50"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold pointer-events-none">
-                        {defaultUnit}
-                      </span>
+                        </div>
+
+                        {/* Box 3: Min Stock Alert Limit (Marked '3') */}
+                        <div className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
+                          <label className="block text-[10px] text-slate-700 dark:text-slate-300 font-extrabold mb-1">
+                            {isMr ? '३. कमी साठा इशारा' : isHi ? '३. कम स्टॉक अलर्ट' : '3. Min Stock Alert'}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              value={minStockAlert}
+                              onChange={(e) => setMinStockAlert(Number(e.target.value))}
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 pr-10 text-slate-900 dark:text-white text-xs font-black"
+                              placeholder="50"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold pointer-events-none">
+                              {pieceLabel}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-slate-500 mt-0.5 block">
+                            {isMr ? 'कमी झाल्यावर इशारा' : 'Alert limit'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Formula explanation line */}
+                      {isBox ? (
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          👉 {initialBoxes} {isMr ? 'खोके' : 'Boxes'} ({initialBoxes} × {boxCapacity} = {boxTotal.toLocaleString('en-IN')}) + {initialLooseUnits} {isMr ? 'सुटे' : 'loose'} = {stockQuantity} {pieceLabel}
+                          {vol ? ` • एकूण ${vol.totalDisplay}` : ''}
+                        </div>
+                      ) : (
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          👉 {stockQuantity} {pieceLabel} {vol ? `• एकूण ${vol.totalDisplay}` : ''}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[9px] text-slate-500 mt-0.5 block">
-                      {isMr ? 'साठा यापेक्षा कमी झाला की लाल इशारा येतो' : 'Low stock warning triggers'}
-                    </span>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

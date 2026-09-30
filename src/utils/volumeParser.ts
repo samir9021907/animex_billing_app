@@ -18,8 +18,8 @@ export function parsePackVolume(
   const combined = `${productName || ''} ${unitStr || ''}`.trim();
   if (!combined || totalUnits <= 0) return null;
 
-  // Match patterns like (5 lit), 5lit, 5 lit, 5 ltr, 5l, 500ml, 300 ml, 25kg, 10 kg, 1lit, 250ml
-  const match = combined.match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?)(?:$|[)\s/])/i);
+  // Match patterns like (5 lit), 5lit, 5 lit, 5 ltr, 5l, 550ml, 300 ml, 25kg, 10 kg, 1lit, 250gm, 300 gm
+  const match = combined.match(/(?:^|[(\s/])(\d+(?:\.\d+)?)\s*(lit(?:re|er)?s?|ltrs?|l\b|ml\b|m\.l\.|kgs?|k\.g\.|kilos?|gms?|grams?|g\b)(?:$|[)\s/])/i);
   if (!match) return null;
 
   const num = parseFloat(match[1]);
@@ -129,16 +129,18 @@ export function formatDetailedStockText(
 
   if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
     pieceName = 'Can';
-  } else if (lowerUnit.includes('bottle') || lowerName.includes('bottle') || lowerName.includes('ml') || lowerName.includes('1lit') || lowerName.includes('1 lit')) {
-    pieceName = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
   } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerName.includes('25kg') || lowerName.includes('10kg')) {
     pieceName = 'Bucket';
+  } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
+    pieceName = isMr ? 'पुडे' : isHi ? 'पुड़े/पैकेट' : 'Pouches';
+  } else if (lowerUnit.includes('bottle') || lowerName.includes('bottle') || lowerName.includes('ml') || lowerName.includes('1lit') || lowerName.includes('1 lit') || lowerName.includes('gel')) {
+    pieceName = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
   } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
     pieceName = 'Pack';
   } else if (lowerUnit.includes('box')) {
     pieceName = 'Box';
   } else {
-    pieceName = isMr ? 'बाटल्या/कॅन' : isHi ? 'बोतल/कैन' : 'Bottles/Cans';
+    pieceName = isMr ? 'नग' : isHi ? 'नग' : 'Units';
   }
 
   // Loose packaging (e.g. 25kg bucket)

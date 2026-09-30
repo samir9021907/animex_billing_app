@@ -1175,20 +1175,27 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     <datalist id="unit-options-list">
                       <option value="1 Ltr">{isMr ? '1 Ltr (१ लिटर बाटली)' : '1 Ltr (1 Litre Bottle)'}</option>
                       <option value="5 Ltr">{isMr ? '5 Ltr (५ लिटर कॅन)' : '5 Ltr (5 Litre Can)'}</option>
-                      <option value="300 ml">{isMr ? '300 ml (३०० मिली बाटली)' : '300 ml Bottle'}</option>
+                      <option value="550 ml">{isMr ? '550 ml (५५० मिली बाटली)' : '550 ml Bottle'}</option>
                       <option value="500 ml">{isMr ? '500 ml (५०० मिली बाटली)' : '500 ml Bottle'}</option>
+                      <option value="300 ml">{isMr ? '300 ml (३०० मिली बाटली)' : '300 ml Bottle'}</option>
                       <option value="250 ml">{isMr ? '250 ml (२५० मिली बाटली)' : '250 ml Bottle'}</option>
                       <option value="100 ml">{isMr ? '100 ml (१०० मिली बाटली)' : '100 ml Bottle'}</option>
+                      <option value="250 gm">{isMr ? '250 gm (२५० ग्रॅम पावडर पुडा)' : '250 gm Powder Pouch'}</option>
+                      <option value="300 gm">{isMr ? '300 gm (३०० ग्रॅम पावडर पुडा)' : '300 gm Powder Pouch'}</option>
+                      <option value="500 gm">{isMr ? '500 gm (५०० ग्रॅम पावडर पुडा)' : '500 gm Powder Pouch'}</option>
+                      <option value="1 Kg">{isMr ? '1 Kg (१ किलो पॅक)' : '1 Kg Pack'}</option>
                       <option value="10 Kg">{isMr ? '10 Kg (१० किलो बकेट)' : '10 Kg Bucket'}</option>
                       <option value="25 Kg">{isMr ? '25 Kg (२५ किलो बकेट)' : '25 Kg Bucket'}</option>
                       <option value="Bottle">{isMr ? 'Bottle (बाटली)' : 'Bottle'}</option>
                       <option value="Can">{isMr ? 'Can (कॅन)' : 'Can'}</option>
                       <option value="Bucket">{isMr ? 'Bucket (बकेट)' : 'Bucket'}</option>
+                      <option value="Pouch">{isMr ? 'Pouch (पुडा / पाकीट)' : 'Pouch'}</option>
                       <option value="Box">{isMr ? 'Box (खोका)' : 'Box'}</option>
                       <option value="Pack">{isMr ? 'Pack (पॅक)' : 'Pack'}</option>
                       <option value="Ltr">{isMr ? 'Ltr (लिटर)' : 'Ltr'}</option>
                       <option value="Kg">{isMr ? 'Kg (किलो)' : 'Kg'}</option>
                       <option value="Ml">{isMr ? 'Ml (मिली)' : 'Ml'}</option>
+                      <option value="gm">{isMr ? 'gm (ग्रॅम)' : 'gm'}</option>
                     </datalist>
                   </div>
                 </div>

@@ -75,6 +75,37 @@ const addDeletedStoreId = (id: string) => {
   } catch {}
 };
 
+const getDeletedProductIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('animex_deleted_products');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+const addDeletedProductId = (id: string, name?: string) => {
+  try {
+    const set = getDeletedProductIds();
+    set.add(id);
+    if (name) set.add(name.trim().toLowerCase());
+    const arr = Array.from(set).slice(-200);
+    localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
+  } catch {}
+};
+
+const removeDeletedProductId = (id: string, name?: string) => {
+  try {
+    const set = getDeletedProductIds();
+    set.delete(id);
+    if (name) set.delete(name.trim().toLowerCase());
+    const arr = Array.from(set);
+    localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
+  } catch {}
+};
+
 export const App: React.FC = () => {
   const { language } = useLanguage();
   const isMr = language === 'mr';
@@ -111,20 +142,11 @@ export const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('animex_billing_products');
-      if (saved) {
+      const deletedIds = getDeletedProductIds();
+      if (saved !== null) {
         const parsed: Product[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const map = new Map<string, Product>();
-          parsed.forEach((p) => {
-            const k = p.name?.trim().toLowerCase();
-            if (k && k !== 'liver') map.set(k, p);
-          });
-          // Ensure base seed products exist
-          INITIAL_PRODUCTS.forEach((seed) => {
-            const sk = seed.name.trim().toLowerCase();
-            if (!map.has(sk)) map.set(sk, seed);
-          });
-          return Array.from(map.values());
+        if (Array.isArray(parsed)) {
+          return parsed.filter(p => !deletedIds.has(p.id) && !deletedIds.has(p.name?.trim().toLowerCase()));
         }
       }
     } catch {}
@@ -374,10 +396,12 @@ export const App: React.FC = () => {
         }
       }
 
+      const deletedProductIds = getDeletedProductIds();
       const prodMap = new Map<string, Product>();
       for (const p of cloudProducts) {
         const key = p.name?.trim().toLowerCase();
         if (!key) continue;
+        if (deletedProductIds.has(p.id) || deletedProductIds.has(key)) continue;
 
         // Skip ancient test remnant if present
         if (key === 'liver' && (!p.category || p.category.category_name === 'General')) {
@@ -396,9 +420,6 @@ export const App: React.FC = () => {
 
           const pendingDeduction = pendingBilledMap.get(p.id) || pendingBilledMap.get(key) || 0;
           let adjustedStock = Math.max(0, (p.stockQuantity ?? 0) - pendingDeduction);
-          if (key.includes('25kg') && adjustedStock === 0) {
-            adjustedStock = 9;
-          }
 
           let boxCap = p.boxCapacity || 50;
           let defUnit = p.defaultUnit || 'Ltr';
@@ -423,30 +444,12 @@ export const App: React.FC = () => {
         }
       }
 
-      // Ensure all 8 official products are present
-      for (const seed of INITIAL_PRODUCTS) {
-        const sName = seed.name.toLowerCase();
-        let matched = false;
-        for (const [k] of prodMap.entries()) {
-          if (
-            (sName.includes('25kg') && k.includes('25kg')) ||
-            (sName.includes('10kg') && k.includes('10kg')) ||
-            (sName.includes('5 lit') && (k.includes('5 lit') || k.includes('5lit') || k.includes('5'))) ||
-            (sName.includes('gel') && k.includes('gel')) ||
-            (sName.includes('utrimex') && k.includes('utrimex')) ||
-            (sName.includes('rumen') && k.includes('rumen')) ||
-            (sName.includes('animex') && k.includes('animex')) ||
-            (sName.includes('calcimex gold 1') && k.includes('calcimex') && k.includes('gold') && !k.includes('5'))
-          ) {
-            matched = true;
-            break;
-          }
-        }
-        if (!matched) {
+      // Ensure seed products ONLY on first launch (if user has never deleted them)
+      if (deletedProductIds.size === 0 && cloudProducts.length === 0 && prodMap.size === 0) {
+        for (const seed of INITIAL_PRODUCTS) {
+          const sName = seed.name.toLowerCase();
           prodMap.set(sName, seed);
-          if (cloudProducts.length === 0) {
-            syncProductToBackend(seed).catch(() => {});
-          }
+          syncProductToBackend(seed).catch(() => {});
         }
       }
 
@@ -926,6 +929,7 @@ export const App: React.FC = () => {
 
   const handleAddProduct = async (newProduct: Product) => {
     const cleanName = newProduct.name.trim().toLowerCase();
+    removeDeletedProductId(newProduct.id, cleanName);
     const now = Date.now();
     recentProductUpdatesRef.current.set(cleanName, { product: newProduct, timestamp: now });
     if (newProduct.id) {
@@ -1033,6 +1037,8 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteProduct = async (productId: string) => {
+    const prod = products.find(p => p.id === productId);
+    addDeletedProductId(productId, prod?.name);
     setProducts(prev => {
       const next = prev.filter(p => p.id !== productId);
       try {

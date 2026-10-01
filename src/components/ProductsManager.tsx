@@ -185,6 +185,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
 
   const applyAutoPackSettings = (
     str: string,
+    updateUnitField: boolean = true,
     currentBoxes: number = initialBoxes,
     currentLoose: number = initialLooseUnits,
     currentStock: number = stockQuantity
@@ -208,7 +209,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       newLoose = false;
       newCap = 2;
       newAlert = 2;
-    } else if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || lower.includes('5l') || lower.includes('can')) {
+    } else if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || /(?:^|[(\s/])5\s*(?:lit|ltr|l\b)/i.test(str) || lower.includes('can')) {
       detected = true;
       newUnit = 'Can';
       newLoose = false;
@@ -232,7 +233,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
       newLoose = false;
       newCap = 50;
       newAlert = 50;
-    } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr') || lower.includes('1l')) {
+    } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr') || /(?:^|[(\s/])1\s*(?:lit|ltr|l\b)/i.test(str)) {
       detected = true;
       newUnit = 'Ltr';
       newLoose = false;
@@ -249,7 +250,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     }
 
     if (detected) {
-      setDefaultUnit(newUnit);
+      if (updateUnitField) {
+        setDefaultUnit(newUnit);
+      }
       setIsLoosePackaging(newLoose);
       setBoxCapacity(newCap);
       setMinStockAlert(newAlert);
@@ -1223,7 +1226,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       onChange={(e) => {
                         const val = e.target.value;
                         setDefaultUnit(val);
-                        applyAutoPackSettings(val);
+                        applyAutoPackSettings(val, false);
                       }}
                       placeholder={isMr ? "उदा. 1 Ltr, 5 Ltr, 300 ml" : "e.g. 1 Ltr, 5 Ltr, 300 ml"}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white font-bold"

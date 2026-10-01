@@ -617,14 +617,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
 
               {/* 4. Subtotal, Words, Bank Details & Balance Summary (Equal 50/50 split matching signature boxes) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0 sm:divide-x divide-[#cbd5e1]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0">
                 {/* Bank Details For Payment Transfer (50% Width) */}
                 <div className="p-2.5 sm:p-3 flex flex-col justify-between bg-slate-50/50">
                   <div className="space-y-2">
                     <span className="text-[9px] sm:text-[10px] font-black uppercase text-[#0F4C81] block">
                       ✓ Bank Details For Payment Transfer (RTGS / NEFT / UPI):
                     </span>
-                    <div className="text-[10px] sm:text-[11px] font-medium text-slate-700 bg-white p-2.5 rounded border border-slate-200 space-y-1.5 shadow-xs">
+                    <div className="text-[10px] sm:text-[11px] font-medium text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 space-y-1.5 shadow-xs">
                       <div className="text-center font-bold text-slate-900 pb-1 border-b border-slate-100 text-xs sm:text-[12px]">
                         Bank: <span className="font-extrabold text-[#0F4C81]">{companyProfile.bankName}</span>
                       </div>
@@ -665,7 +665,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
 
                     {/* Amount in Words Box */}
-                    <div className="p-2 sm:p-2.5 bg-[#eff6ff] border-l-4 border-l-[#0F4C81]">
+                    <div className="p-2 sm:p-2.5 bg-[#eff6ff] rounded-md border border-blue-100 mx-2 my-1">
                       <div className="text-[9px] uppercase font-black text-[#0F4C81]">
                         Invoice Amount In Words:
                       </div>

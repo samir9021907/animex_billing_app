@@ -21,7 +21,6 @@ import {
   deleteStoreFromBackend,
   syncProductToBackend,
   deleteProductFromBackend,
-  deleteAllProductsFromBackend,
   fetchUnifiedSyncFromBackend,
   warmupBackendConnection,
   mapBackendStore,
@@ -1107,32 +1106,6 @@ export const App: React.FC = () => {
     await syncCloudData();
   };
 
-  const handleDeleteAllProducts = async () => {
-    // 1. Mark every single product as deleted so sync will NEVER resurrect them
-    for (const p of productsRef.current) {
-      addDeletedProductId(p.id, p.name);
-    }
-    recentProductUpdatesRef.current.clear();
-    localStorage.setItem('animex_products_initialized', 'true');
-
-    // 2. Immediately empty local state & localStorage (0ms UI latency!)
-    setProducts([]);
-    try {
-      localStorage.setItem('animex_billing_products', JSON.stringify([]));
-    } catch {}
-
-    // 3. Delete all products from cloud Neon DB
-    await deleteAllProductsFromBackend();
-
-    // 4. Broadcast to other tabs & sync
-    try {
-      const bc = new BroadcastChannel('animex_live_sync');
-      bc.postMessage({ type: 'FORCE_SYNC' });
-      bc.close();
-    } catch {}
-
-    await syncCloudData();
-  };
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to log out of Animex Billing?')) {
@@ -1211,7 +1184,6 @@ export const App: React.FC = () => {
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
-            onDeleteAllProducts={handleDeleteAllProducts}
             onInwardStock={handleInwardStock}
           />
         )}

@@ -24,7 +24,6 @@ interface ProductsManagerProps {
   onAddProduct: (prod: Product) => void;
   onUpdateProduct: (prod: Product) => void;
   onDeleteProduct: (prodId: string, prodName?: string) => void;
-  onDeleteAllProducts?: () => void;
   onInwardStock?: (productId: string, boxes: number, unitsPerBox: number, looseUnits: number) => void;
 }
 
@@ -33,7 +32,6 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
-  onDeleteAllProducts,
   onInwardStock,
 }) => {
   const { language } = useLanguage();
@@ -507,26 +505,6 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {products.length > 0 && onDeleteAllProducts && (
-            <button
-              onClick={() => {
-                const confirmMsg = isMr
-                  ? '⚠️ सावधान!\n\nतुम्हाला गोदामातील सर्व उत्पादने कायमची डिलीट करायची आहेत का?\n(नवीन सुरुवात करण्यासाठी सर्व उत्पादने एकाच वेळी नष्ट केली जातील.)'
-                  : isHi
-                  ? '⚠️ चेतावनी!\n\nक्या आप सभी उत्पादों को हमेशा के लिए हटाना चाहते हैं?\n(नया परीक्षण करने के लिए सभी उत्पाद हटा दिए जाएंगे।)'
-                  : '⚠️ Caution!\n\nAre you sure you want to permanently delete ALL products to start fresh?';
-                if (window.confirm(confirmMsg)) {
-                  onDeleteAllProducts();
-                }
-              }}
-              className="border border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-700 dark:text-rose-400 active:scale-95 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
-              title={isMr ? 'सर्व उत्पादने हटवा' : 'Delete All Products'}
-            >
-              <Trash2 className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-              <span>{isMr ? 'सर्व उत्पादने हटवा' : isHi ? 'सभी उत्पाद हटाएं' : 'Delete All'}</span>
-            </button>
-          )}
-
           <button
             onClick={() => handleOpenInwardModal()}
             className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"

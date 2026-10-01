@@ -607,72 +607,77 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </table>
               </div>
 
-              {/* 4. Subtotal, Words, Bank Details & Balance Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0">
-                {/* Bank Details For Payment Transfer */}
-                <div className="sm:col-span-7 sm:border-r-2 border-[#1e293b] p-2.5 sm:p-3 flex flex-col justify-between bg-slate-50/50">
-                  <div className="space-y-1.5">
+              {/* 4. Subtotal, Words, Bank Details & Balance Summary (Equal 50/50 split matching signature boxes) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0 sm:divide-x-2 divide-[#1e293b]">
+                {/* Bank Details For Payment Transfer (50% Width) */}
+                <div className="p-2.5 sm:p-3 flex flex-col justify-between bg-slate-50/50">
+                  <div className="space-y-2">
                     <span className="text-[9px] sm:text-[10px] font-black uppercase text-[#0F4C81] block">
                       ✓ Bank Details For Payment Transfer (RTGS / NEFT / UPI):
                     </span>
-                    <div className="text-[10px] font-medium text-slate-700 grid grid-cols-2 gap-x-2 gap-y-0.5 bg-white p-2 rounded border border-slate-200">
-                      <div>Bank: <strong>{companyProfile.bankName}</strong></div>
-                      <div>A/C No: <strong className="font-mono">{companyProfile.accountNo}</strong></div>
-                      <div>IFSC: <strong className="font-mono">{companyProfile.ifscCode}</strong></div>
-                      <div>Instant UPI ID: <strong className="font-mono text-[#F97316]">{companyProfile.upiId}</strong></div>
+                    <div className="text-[10px] sm:text-[11px] font-medium text-slate-700 bg-white p-2.5 rounded border border-slate-200 space-y-1.5 shadow-xs">
+                      <div>
+                        Bank: <strong className="font-bold text-slate-900">{companyProfile.bankName}</strong>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                        <div>
+                          IFSC: <strong className="font-mono font-bold text-slate-900">{companyProfile.ifscCode}</strong>
+                        </div>
+                        <div>
+                          A/C No: <strong className="font-mono font-bold text-slate-900">{companyProfile.accountNo}</strong>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="text-[9px] text-slate-600 leading-relaxed font-medium pt-1">
-                      Veterinary formulations manufactured under sterile GMP & ISO 9001:2015 certified plants.
-                    </p>
                   </div>
 
-                  <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 italic border-t border-slate-200 pt-1 mt-2">
+                  <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 italic border-t border-slate-200 pt-2 mt-3">
                     Thank you for your valued partnership with ANIMEX ANIMAL HEALTH CARE PVT LTD.
                   </div>
                 </div>
 
-                {/* Totals Summary Column */}
-                <div className="sm:col-span-5 text-xs font-bold divide-y divide-[#cbd5e1]">
-                  <div className="flex justify-between p-2">
-                    <span className="text-slate-600">Sub Total</span>
-                    <span className="font-extrabold text-slate-900">: ₹ {invoice.subTotal.toFixed(2)}</span>
-                  </div>
-
-                  {invoice.discount !== undefined && invoice.discount > 0 && (
-                    <div className="flex justify-between p-2 text-red-600 bg-red-50/50">
-                      <span>{isMr ? 'सूट' : 'Trade Discount'}</span>
-                      <span className="font-bold">: - ₹ {invoice.discount.toFixed(2)}</span>
+                {/* Totals Summary Column (50% Width) */}
+                <div className="text-xs font-bold divide-y divide-[#cbd5e1] flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between p-2">
+                      <span className="text-slate-600">Sub Total</span>
+                      <span className="font-extrabold text-slate-900">: ₹ {invoice.subTotal.toFixed(2)}</span>
                     </div>
-                  )}
 
-                  <div className="flex justify-between p-2 font-black text-xs sm:text-sm bg-[#f8fafc] text-[#0F4C81]">
-                    <span>Total Net Amount</span>
-                    <span>: ₹ {invoice.totalAmount.toFixed(2)}</span>
-                  </div>
+                    {invoice.discount !== undefined && invoice.discount > 0 && (
+                      <div className="flex justify-between p-2 text-red-600 bg-red-50/50">
+                        <span>{isMr ? 'सूट' : 'Trade Discount'}</span>
+                        <span className="font-bold">: - ₹ {invoice.discount.toFixed(2)}</span>
+                      </div>
+                    )}
 
-                  {/* Amount in Words Box */}
-                  <div className="p-2 sm:p-2.5 bg-[#eff6ff] border-l-4 border-l-[#0F4C81]">
-                    <div className="text-[9px] uppercase font-black text-[#0F4C81]">
-                      Invoice Amount In Words:
+                    <div className="flex justify-between p-2 font-black text-xs sm:text-sm bg-[#f8fafc] text-[#0F4C81]">
+                      <span>Total Net Amount</span>
+                      <span>: ₹ {invoice.totalAmount.toFixed(2)}</span>
                     </div>
-                    <div className="font-black text-[11px] sm:text-xs text-[#F97316] mt-0.5 italic">
-                      "{invoice.amountInWords}"
-                    </div>
-                  </div>
 
-                  <div className="flex justify-between p-2 text-slate-700">
-                    <span>Received Amount ({invoice.paymentType || 'UPI'})</span>
-                    <span>: ₹ {effectiveReceived.toFixed(2)}</span>
+                    {/* Amount in Words Box */}
+                    <div className="p-2 sm:p-2.5 bg-[#eff6ff] border-l-4 border-l-[#0F4C81]">
+                      <div className="text-[9px] uppercase font-black text-[#0F4C81]">
+                        Invoice Amount In Words:
+                      </div>
+                      <div className="font-black text-[11px] sm:text-xs text-[#F97316] mt-0.5 italic">
+                        "{invoice.amountInWords}"
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between p-2 text-slate-700">
+                      <span>Received Amount ({invoice.paymentType || 'UPI'})</span>
+                      <span>: ₹ {effectiveReceived.toFixed(2)}</span>
+                    </div>
                   </div>
 
                   {effectiveBalance > 0 ? (
-                    <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700">
+                    <div className="flex justify-between p-2 font-black text-xs bg-[#fef2f2] text-red-700 border-t border-[#cbd5e1]">
                       <span>{isMr ? 'बाकी रक्कम' : 'Balance Due'}</span>
                       <span>: ₹ {effectiveBalance.toFixed(2)}</span>
                     </div>
                   ) : (
-                    <div className="flex justify-between p-2 font-black text-xs bg-[#ecfdf5] text-emerald-700">
+                    <div className="flex justify-between p-2 font-black text-xs bg-[#ecfdf5] text-emerald-700 border-t border-[#cbd5e1]">
                       <span>{isMr ? 'पेमेंट स्थिती' : 'Payment Status'}</span>
                       <span>: ✓ {isMr ? 'पूर्ण जमा (PAID)' : 'PAID IN FULL'}</span>
                     </div>

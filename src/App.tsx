@@ -21,6 +21,7 @@ import {
   deleteStoreFromBackend,
   syncProductToBackend,
   deleteProductFromBackend,
+  deleteAllProductsFromBackend,
   fetchUnifiedSyncFromBackend,
   warmupBackendConnection,
   mapBackendStore,
@@ -86,21 +87,21 @@ const getDeletedProductIds = (): Set<string> => {
   return new Set();
 };
 
-const addDeletedProductId = (id: string, name?: string) => {
+const addDeletedProductId = (id?: string, name?: string) => {
   try {
     const set = getDeletedProductIds();
-    set.add(id);
-    if (name) set.add(name.trim().toLowerCase());
-    const arr = Array.from(set).slice(-200);
+    if (id && id.trim()) set.add(id.trim());
+    if (name && name.trim()) set.add(name.trim().toLowerCase());
+    const arr = Array.from(set).slice(-500);
     localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
   } catch {}
 };
 
-const removeDeletedProductId = (id: string, name?: string) => {
+const removeDeletedProductId = (id?: string, name?: string) => {
   try {
     const set = getDeletedProductIds();
-    set.delete(id);
-    if (name) set.delete(name.trim().toLowerCase());
+    if (id && id.trim()) set.delete(id.trim());
+    if (name && name.trim()) set.delete(name.trim().toLowerCase());
     const arr = Array.from(set);
     localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
   } catch {}
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
 
   const [products, setProducts] = useState<Product[]>(() => {
     try {
+      const isInitialized = localStorage.getItem('animex_products_initialized') === 'true';
       const saved = localStorage.getItem('animex_billing_products');
       const deletedIds = getDeletedProductIds();
       if (saved !== null) {
@@ -149,7 +151,11 @@ export const App: React.FC = () => {
           return parsed.filter(p => !deletedIds.has(p.id) && !deletedIds.has(p.name?.trim().toLowerCase()));
         }
       }
+      if (isInitialized) {
+        return [];
+      }
     } catch {}
+    localStorage.setItem('animex_products_initialized', 'true');
     return INITIAL_PRODUCTS;
   });
 
@@ -444,22 +450,33 @@ export const App: React.FC = () => {
         }
       }
 
-      // Ensure seed products ONLY on first launch (if user has never deleted them)
-      if (deletedProductIds.size === 0 && cloudProducts.length === 0 && prodMap.size === 0) {
+      // Preserve any products that were recently added or edited locally that cloud might not have returned yet
+      recentProductUpdatesRef.current.forEach((val) => {
+        if (Date.now() - val.timestamp < 45000) {
+          const k = val.product.name?.trim().toLowerCase();
+          if (k && !deletedProductIds.has(val.product.id) && !deletedProductIds.has(k) && !prodMap.has(k)) {
+            prodMap.set(k, val.product);
+          }
+        }
+      });
+
+      // Ensure seed products ONLY on first launch (if user has never initialized or deleted them)
+      const isInitialized = localStorage.getItem('animex_products_initialized') === 'true';
+      if (!isInitialized && deletedProductIds.size === 0 && cloudProducts.length === 0 && prodMap.size === 0) {
         for (const seed of INITIAL_PRODUCTS) {
           const sName = seed.name.toLowerCase();
           prodMap.set(sName, seed);
           syncProductToBackend(seed).catch(() => {});
         }
+        localStorage.setItem('animex_products_initialized', 'true');
       }
 
       const finalProducts = Array.from(prodMap.values());
-      if (finalProducts.length > 0) {
-        setProducts(finalProducts);
-        try {
-          localStorage.setItem('animex_billing_products', JSON.stringify(finalProducts));
-        } catch {}
-      }
+      // Unconditionally update products (allowing 0 products when user deletes everything)
+      setProducts(finalProducts);
+      try {
+        localStorage.setItem('animex_billing_products', JSON.stringify(finalProducts));
+      } catch {}
 
       setLastSyncTime(new Date());
 
@@ -930,6 +947,7 @@ export const App: React.FC = () => {
   const handleAddProduct = async (newProduct: Product) => {
     const cleanName = newProduct.name.trim().toLowerCase();
     removeDeletedProductId(newProduct.id, cleanName);
+    localStorage.setItem('animex_products_initialized', 'true');
     const now = Date.now();
     recentProductUpdatesRef.current.set(cleanName, { product: newProduct, timestamp: now });
     if (newProduct.id) {
@@ -1002,6 +1020,17 @@ export const App: React.FC = () => {
     const key = updatedProduct.name.trim().toLowerCase();
     const idKey = updatedProduct.id;
     const now = Date.now();
+
+    // If product name was changed, clean up old name reference
+    const oldProduct = productsRef.current.find(p => p.id === updatedProduct.id);
+    if (oldProduct && oldProduct.name.trim().toLowerCase() !== key) {
+      const oldKey = oldProduct.name.trim().toLowerCase();
+      recentProductUpdatesRef.current.delete(oldKey);
+      addDeletedProductId(oldKey);
+      deleteProductFromBackend('', oldProduct.name).catch(() => {});
+    }
+
+    removeDeletedProductId(updatedProduct.id, key);
     recentProductUpdatesRef.current.set(key, { product: updatedProduct, timestamp: now });
     if (idKey) recentProductUpdatesRef.current.set(idKey, { product: updatedProduct, timestamp: now });
 
@@ -1009,6 +1038,7 @@ export const App: React.FC = () => {
     setProducts(prev => {
       const next = prev.map(p => (
         p.id === updatedProduct.id ||
+        (oldProduct && p.name.trim().toLowerCase() === oldProduct.name.trim().toLowerCase()) ||
         p.name.trim().toLowerCase() === key
       ) ? updatedProduct : p);
       try {
@@ -1034,23 +1064,74 @@ export const App: React.FC = () => {
     } catch (e) {
       console.warn('Update product backend sync warning:', e);
     }
+
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    const prod = products.find(p => p.id === productId);
-    addDeletedProductId(productId, prod?.name);
+  const handleDeleteProduct = async (productId: string, productName?: string) => {
+    const prod = productsRef.current.find(p => p.id === productId);
+    const name = productName || prod?.name;
+    const key = name?.trim().toLowerCase();
+
+    // 1. Immediately record in persistent deleted set
+    addDeletedProductId(productId, name);
+    if (key) addDeletedProductId(key);
+
+    // 2. Clear from recent updates cache so sync won't restore it
+    if (key) recentProductUpdatesRef.current.delete(key);
+    recentProductUpdatesRef.current.delete(productId);
+
+    // 3. Immediately remove from local state & localStorage (0ms latency!)
     setProducts(prev => {
-      const next = prev.filter(p => p.id !== productId);
+      const next = prev.filter(p => p.id !== productId && (!key || p.name.trim().toLowerCase() !== key));
       try {
         localStorage.setItem('animex_billing_products', JSON.stringify(next));
       } catch {}
       return next;
     });
+
+    // 4. Delete from cloud Neon DB (sends both UUID and title)
+    await deleteProductFromBackend(productId, name);
+
+    // 5. Broadcast to other tabs & devices
     try {
-      await deleteProductFromBackend(productId);
-    } catch (e) {
-      console.warn('Delete product backend sync warning:', e);
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+
+    await syncCloudData();
+  };
+
+  const handleDeleteAllProducts = async () => {
+    // 1. Mark every single product as deleted so sync will NEVER resurrect them
+    for (const p of productsRef.current) {
+      addDeletedProductId(p.id, p.name);
     }
+    recentProductUpdatesRef.current.clear();
+    localStorage.setItem('animex_products_initialized', 'true');
+
+    // 2. Immediately empty local state & localStorage (0ms UI latency!)
+    setProducts([]);
+    try {
+      localStorage.setItem('animex_billing_products', JSON.stringify([]));
+    } catch {}
+
+    // 3. Delete all products from cloud Neon DB
+    await deleteAllProductsFromBackend();
+
+    // 4. Broadcast to other tabs & sync
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+
+    await syncCloudData();
   };
 
   const handleLogout = () => {
@@ -1130,6 +1211,7 @@ export const App: React.FC = () => {
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            onDeleteAllProducts={handleDeleteAllProducts}
             onInwardStock={handleInwardStock}
           />
         )}

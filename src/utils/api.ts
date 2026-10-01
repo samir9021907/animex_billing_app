@@ -506,16 +506,54 @@ export const syncProductToBackend = async (product: any): Promise<any> => {
 };
 
 // ─── Delete Medical Product from Neon DB ──────────────────────────────────────
-export const deleteProductFromBackend = async (id: string) => {
+export const deleteProductFromBackend = async (id: string, name?: string) => {
   try {
     const clientId = getClientId();
-    await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id}`, {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // 1. If valid UUID, delete by ID directly
+    if (id && uuidRegex.test(id)) {
+      await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
+        keepalive: true,
+      });
+      await fetch(`${API_BASE}/medical-product/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
+        keepalive: true,
+      }).catch(() => {});
+    }
+
+    // 2. Also send DELETE with title query to guarantee backend removal
+    if (name) {
+      const encoded = encodeURIComponent(name.trim());
+      await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/${id || 'item'}?title=${encoded}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Product delete failed, saved locally:', e);
+  }
+};
+
+// ─── Delete ALL Medical Products from Neon DB (Clean Slate) ───────────────────
+export const deleteAllProductsFromBackend = async () => {
+  try {
+    const clientId = getClientId();
+    await fetch(`${API_BASE}/medical-product/client/${clientId}/medical-products/all`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
       keepalive: true,
     });
   } catch (e) {
-    console.warn('Product delete failed, saved locally:', e);
+    console.warn('All products delete failed, saved locally:', e);
   }
 };
+

@@ -44,9 +44,9 @@ const DEFAULT_PROFILE: CompanyProfile = {
   city: 'Surat',
   state: 'Gujarat',
   pincode: '395009',
-  bankName: 'State Bank of India',
-  accountNo: '389920194821',
-  ifscCode: 'SBIN0004123',
+  bankName: 'Indian Overseas Bank',
+  accountNo: '083602000001131',
+  ifscCode: 'IOBA0000836',
   upiId: 'animex@sbi',
 };
 
@@ -60,7 +60,16 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   const [profile, setProfile] = useState<CompanyProfile>(() => {
     try {
       const saved = localStorage.getItem('animex_company_profile');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.accountNo === '389920194821' || parsed.bankName === 'State Bank of India') {
+          parsed.bankName = 'Indian Overseas Bank';
+          parsed.accountNo = '083602000001131';
+          parsed.ifscCode = 'IOBA0000836';
+          try { localStorage.setItem('animex_company_profile', JSON.stringify(parsed)); } catch {}
+        }
+        return parsed;
+      }
     } catch {}
     return {
       ...DEFAULT_PROFILE,

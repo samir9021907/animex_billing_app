@@ -57,16 +57,26 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const companyProfile = (() => {
     try {
       const saved = localStorage.getItem('animex_company_profile');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.accountNo === '389920194821' || parsed.bankName === 'State Bank of India') {
+          parsed.bankName = 'Indian Overseas Bank';
+          parsed.accountNo = '083602000001131';
+          parsed.ifscCode = 'IOBA0000836';
+          parsed.branch = 'POHEGAON';
+          try { localStorage.setItem('animex_company_profile', JSON.stringify(parsed)); } catch {}
+        }
+        return parsed;
+      }
     } catch {}
     return {
       companyName: 'ANIMEX ANIMAL HEALTH CARE PVT LTD',
       address: '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
       phone: '8799883858',
       email: 'animexanimalhealthcare@gmail.com',
-      bankName: 'State Bank of India',
-      accountNo: '389920194821',
-      ifscCode: 'SBIN0004123',
+      bankName: 'Indian Overseas Bank',
+      accountNo: '083602000001131',
+      ifscCode: 'IOBA0000836',
       upiId: 'animex@sbi',
     };
   })();
@@ -162,10 +172,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       `📌 *${labelStatus}:* ${balanceStatus}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🏦 *${labelBank}:*\n` +
-      `• ${labelBankName}: ${companyProfile?.bankName || 'State Bank of India'}\n` +
-      `• ${labelAccountNo}: ${companyProfile?.accountNo || '389920194821'}\n` +
-      `• IFSC: ${companyProfile?.ifscCode || 'SBIN0004123'}\n` +
-      `• UPI ID: ${companyProfile?.upiId || 'animex@sbi'}\n` +
+      `• ${labelBankName}: ${companyProfile?.bankName || 'Indian Overseas Bank'}\n` +
+      `• ${labelAccountNo}: ${companyProfile?.accountNo || '083602000001131'}\n` +
+      `• IFSC: ${companyProfile?.ifscCode || 'IOBA0000836'}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📞 Helpline: 8799883858 / 9146133858\n` +
       `🙏 *${thankYou}*`
@@ -608,7 +617,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
 
               {/* 4. Subtotal, Words, Bank Details & Balance Summary (Equal 50/50 split matching signature boxes) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0 sm:divide-x-2 divide-[#1e293b]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0 sm:divide-x divide-[#cbd5e1]">
                 {/* Bank Details For Payment Transfer (50% Width) */}
                 <div className="p-2.5 sm:p-3 flex flex-col justify-between bg-slate-50/50">
                   <div className="space-y-2">
@@ -616,10 +625,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       ✓ Bank Details For Payment Transfer (RTGS / NEFT / UPI):
                     </span>
                     <div className="text-[10px] sm:text-[11px] font-medium text-slate-700 bg-white p-2.5 rounded border border-slate-200 space-y-1.5 shadow-xs">
-                      <div>
-                        Bank: <strong className="font-bold text-slate-900">{companyProfile.bankName}</strong>
+                      <div className="text-center font-bold text-slate-900 pb-1 border-b border-slate-100 text-xs sm:text-[12px]">
+                        Bank: <span className="font-extrabold text-[#0F4C81]">{companyProfile.bankName}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                      <div className="flex items-center justify-between gap-2 pt-0.5 px-1">
                         <div>
                           IFSC: <strong className="font-mono font-bold text-slate-900">{companyProfile.ifscCode}</strong>
                         </div>

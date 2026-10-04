@@ -25,6 +25,7 @@ import {
   warmupBackendConnection,
   mapBackendStore,
   mapBackendInvoice,
+  mapBackendProduct,
 } from './utils/api';
 import { authService, UserSession } from './services/authService';
 import { useLanguage } from './context/LanguageContext';
@@ -80,27 +81,31 @@ const getDeletedProductIds = (): Set<string> => {
     const raw = localStorage.getItem('animex_deleted_products');
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (Array.isArray(arr)) {
+        // Strictly track valid IDs, never blacklist product names!
+        return new Set(arr.filter(id => typeof id === 'string' && (uuidRegex.test(id) || id.startsWith('p-'))));
+      }
     }
   } catch {}
   return new Set();
 };
 
-const addDeletedProductId = (id?: string, name?: string) => {
+const addDeletedProductId = (id: string) => {
   try {
+    if (!id || typeof id !== 'string') return;
     const set = getDeletedProductIds();
-    if (id && id.trim()) set.add(id.trim());
-    if (name && name.trim()) set.add(name.trim().toLowerCase());
-    const arr = Array.from(set).slice(-500);
+    set.add(id.trim());
+    const arr = Array.from(set).slice(-300);
     localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
   } catch {}
 };
 
-const removeDeletedProductId = (id?: string, name?: string) => {
+const removeDeletedProductId = (id?: string) => {
   try {
+    if (!id) return;
     const set = getDeletedProductIds();
-    if (id && id.trim()) set.delete(id.trim());
-    if (name && name.trim()) set.delete(name.trim().toLowerCase());
+    set.delete(id.trim());
     const arr = Array.from(set);
     localStorage.setItem('animex_deleted_products', JSON.stringify(arr));
   } catch {}
@@ -120,6 +125,20 @@ export const App: React.FC = () => {
       localStorage.removeItem('animex_invoices');
       localStorage.removeItem('animex_deleted_invoices');
       localStorage.setItem(CLEAN_SLATE_KEY, 'true');
+    }
+
+    const CLEAN_PROD_KEY = 'animex_clean_prod_v2';
+    if (localStorage.getItem(CLEAN_PROD_KEY) !== 'true') {
+      const raw = localStorage.getItem('animex_deleted_products');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (Array.isArray(arr)) {
+          const cleaned = arr.filter(id => typeof id === 'string' && uuidRegex.test(id));
+          localStorage.setItem('animex_deleted_products', JSON.stringify(cleaned));
+        }
+      }
+      localStorage.setItem(CLEAN_PROD_KEY, 'true');
     }
   } catch (e) {
     console.warn('Storage reset warning:', e);
@@ -147,7 +166,7 @@ export const App: React.FC = () => {
       if (saved !== null) {
         const parsed: Product[] = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter(p => !deletedIds.has(p.id) && !deletedIds.has(p.name?.trim().toLowerCase()));
+          return parsed.filter(p => !deletedIds.has(p.id));
         }
       }
       if (isInitialized) {
@@ -193,6 +212,7 @@ export const App: React.FC = () => {
   const isSyncingRef = useRef(false);
   const uploadingStoreKeys = useRef<Set<string>>(new Set());
   const uploadingInvoiceKeys = useRef<Set<string>>(new Set());
+  const uploadingProductKeys = useRef<Set<string>>(new Set());
   const recentProductUpdatesRef = useRef<Map<string, { product: Product; timestamp: number }>>(new Map());
 
   // ─── ⚡ Ultra-Fast Bidirectional Cloud Neon Database Sync ────────────────────
@@ -402,21 +422,45 @@ export const App: React.FC = () => {
       }
 
       const deletedProductIds = getDeletedProductIds();
-      const prodMap = new Map<string, Product>();
-      for (const p of cloudProducts) {
-        const key = p.name?.trim().toLowerCase();
-        if (!key) continue;
-        if (deletedProductIds.has(p.id) || deletedProductIds.has(key)) continue;
 
-        // Skip ancient test remnant if present
-        if (key === 'liver' && (!p.category || p.category.category_name === 'General')) {
-          continue;
+      // 4a. Upload any unsynced local products from productsRef.current to cloud
+      const unsyncedProducts = productsRef.current.filter(
+        lp => !uuidRegex.test(lp.id) &&
+              !deletedProductIds.has(lp.id) &&
+              !uploadingProductKeys.current.has(lp.id) &&
+              !cloudProducts.some(cp => cp.id === lp.id || cp.name.trim().toLowerCase() === lp.name.trim().toLowerCase())
+      );
+
+      let newlyUploadedProducts: Product[] = [];
+      if (unsyncedProducts.length > 0) {
+        unsyncedProducts.forEach(p => uploadingProductKeys.current.add(p.id));
+        try {
+          const prodUploads = await Promise.allSettled(
+            unsyncedProducts.map(unsynced => syncProductToBackend(unsynced))
+          );
+          prodUploads.forEach((res) => {
+            if (res.status === 'fulfilled' && res.value && res.value.id) {
+              newlyUploadedProducts.push(mapBackendProduct(res.value));
+            }
+          });
+        } finally {
+          unsyncedProducts.forEach(p => uploadingProductKeys.current.delete(p.id));
         }
+      }
 
-        if (!prodMap.has(key)) {
-          // 🛡️ CRITICAL: Check if this product was updated recently by the user locally
+      const prodMap = new Map<string, Product>();
+
+      // 4b. Add cloud products (primary source of truth from Neon DB)
+      for (const p of cloudProducts) {
+        if (!deletedProductIds.has(p.id)) {
+          const key = p.name.trim().toLowerCase();
+          if (key === 'liver' && (!p.category || p.category.category_name === 'General')) {
+            continue;
+          }
+
+          // Check if recently edited locally by the user
           const recentEdit = recentProductUpdatesRef.current.get(key) || (p.id ? recentProductUpdatesRef.current.get(p.id) : undefined);
-          const isRecentlyEditedLocally = Boolean(recentEdit && (Date.now() - recentEdit.timestamp < 45000));
+          const isRecentlyEditedLocally = Boolean(recentEdit && (Date.now() - recentEdit.timestamp < 60000));
 
           if (isRecentlyEditedLocally && recentEdit) {
             prodMap.set(key, recentEdit.product);
@@ -435,7 +479,6 @@ export const App: React.FC = () => {
           else if (key.includes('rumen') || key.includes('gel')) { boxCap = 40; defUnit = 'Bottle'; }
           else if (key.includes('1lit') || key.includes('1 lit') || key.includes('1ltr')) { boxCap = 20; defUnit = 'Ltr'; }
 
-          // Sensible default minStockAlert per product type
           const defaultAlert = boxCap > 1 ? boxCap : (defUnit === 'Bucket' ? 2 : 10);
           const minAlert = (p.minStockAlert !== undefined && p.minStockAlert !== null) ? p.minStockAlert : defaultAlert;
 
@@ -449,11 +492,29 @@ export const App: React.FC = () => {
         }
       }
 
-      // Preserve any products that were recently added or edited locally that cloud might not have returned yet
+      // 4c. Add newly uploaded products
+      for (const np of newlyUploadedProducts) {
+        if (!deletedProductIds.has(np.id)) {
+          const key = np.name.trim().toLowerCase();
+          prodMap.set(key, np);
+        }
+      }
+
+      // 4d. Retain all active local products from productsRef.current so user products NEVER disappear!
+      for (const lp of productsRef.current) {
+        if (!deletedProductIds.has(lp.id)) {
+          const key = lp.name.trim().toLowerCase();
+          if (!prodMap.has(key)) {
+            prodMap.set(key, lp);
+          }
+        }
+      }
+
+      // 4e. Preserve any recent product updates from cache
       recentProductUpdatesRef.current.forEach((val) => {
-        if (Date.now() - val.timestamp < 45000) {
-          const k = val.product.name?.trim().toLowerCase();
-          if (k && !deletedProductIds.has(val.product.id) && !deletedProductIds.has(k) && !prodMap.has(k)) {
+        if (Date.now() - val.timestamp < 60000) {
+          const k = val.product.name.trim().toLowerCase();
+          if (k && !deletedProductIds.has(val.product.id) && !prodMap.has(k)) {
             prodMap.set(k, val.product);
           }
         }
@@ -945,16 +1006,18 @@ export const App: React.FC = () => {
 
   const handleAddProduct = async (newProduct: Product) => {
     const cleanName = newProduct.name.trim().toLowerCase();
-    removeDeletedProductId(newProduct.id, cleanName);
+    removeDeletedProductId(newProduct.id);
     localStorage.setItem('animex_products_initialized', 'true');
     const now = Date.now();
     recentProductUpdatesRef.current.set(cleanName, { product: newProduct, timestamp: now });
     if (newProduct.id) {
       recentProductUpdatesRef.current.set(newProduct.id, { product: newProduct, timestamp: now });
+      uploadingProductKeys.current.add(newProduct.id);
     }
 
+    // 1. Instant zero-latency UI & localStorage update
     setProducts(prev => {
-      if (prev.some(p => p.name.trim().toLowerCase() === cleanName)) {
+      if (prev.some(p => p.id === newProduct.id || p.name.trim().toLowerCase() === cleanName)) {
         return prev;
       }
       const updated = [newProduct, ...prev];
@@ -967,42 +1030,27 @@ export const App: React.FC = () => {
     try {
       const cloudProd = await syncProductToBackend(newProduct);
       if (cloudProd && cloudProd.id) {
+        const mappedCloudProd = mapBackendProduct(cloudProd);
         setProducts(prev => {
-          const seen = new Set<string>();
-          const updatedList: Product[] = [];
-
-          for (const p of prev) {
-            const isMatch = p.id === newProduct.id || p.name.trim().toLowerCase() === cleanName;
-            const item: Product = isMatch ? {
-              ...p,
-              id: cloudProd.id,
-              name: cloudProd.product_title || p.name,
-              category: cloudProd.category?.category_name || p.category || 'General',
-              defaultUnit: cloudProd.unit || p.defaultUnit,
-              defaultPrice: Number(cloudProd.selling_price ?? p.defaultPrice),
-              mrp: Number(cloudProd.mrp ?? p.mrp ?? 0),
-              stockQuantity: Number(cloudProd.quantity ?? p.stockQuantity ?? 0),
-              boxCapacity: Number(cloudProd.box_capacity ?? p.boxCapacity ?? 50),
-              minStockAlert: Number(cloudProd.min_stock_alert ?? p.minStockAlert ?? 50),
-            } : p;
-
-            const key = item.name.trim().toLowerCase();
-            if (!seen.has(key)) {
-              seen.add(key);
-              updatedList.push(item);
+          const updatedList = prev.map(p => {
+            if (p.id === newProduct.id || p.name.trim().toLowerCase() === cleanName) {
+              return {
+                ...p,
+                ...mappedCloudProd,
+                id: mappedCloudProd.id,
+              };
             }
-          }
-          const updateNow = Date.now();
-          const targetProd = updatedList.find(x => x.id === cloudProd.id) || newProduct;
-          recentProductUpdatesRef.current.set(cleanName, { product: targetProd, timestamp: updateNow });
-          if (cloudProd.id) {
-            recentProductUpdatesRef.current.set(cloudProd.id, { product: targetProd, timestamp: updateNow });
-          }
+            return p;
+          });
           try {
             localStorage.setItem('animex_billing_products', JSON.stringify(updatedList));
           } catch {}
           return updatedList;
         });
+
+        const updateNow = Date.now();
+        recentProductUpdatesRef.current.set(cleanName, { product: mappedCloudProd, timestamp: updateNow });
+        recentProductUpdatesRef.current.set(mappedCloudProd.id, { product: mappedCloudProd, timestamp: updateNow });
       }
 
       try {
@@ -1010,8 +1058,11 @@ export const App: React.FC = () => {
         bc.postMessage({ type: 'FORCE_SYNC' });
         bc.close();
       } catch {}
+      await syncCloudData();
     } catch (e) {
       console.error('Failed to sync product to backend:', e);
+    } finally {
+      if (newProduct.id) uploadingProductKeys.current.delete(newProduct.id);
     }
   };
 
@@ -1020,26 +1071,13 @@ export const App: React.FC = () => {
     const idKey = updatedProduct.id;
     const now = Date.now();
 
-    // If product name was changed, clean up old name reference
-    const oldProduct = productsRef.current.find(p => p.id === updatedProduct.id);
-    if (oldProduct && oldProduct.name.trim().toLowerCase() !== key) {
-      const oldKey = oldProduct.name.trim().toLowerCase();
-      recentProductUpdatesRef.current.delete(oldKey);
-      addDeletedProductId(oldKey);
-      deleteProductFromBackend('', oldProduct.name).catch(() => {});
-    }
-
-    removeDeletedProductId(updatedProduct.id, key);
+    removeDeletedProductId(updatedProduct.id);
     recentProductUpdatesRef.current.set(key, { product: updatedProduct, timestamp: now });
     if (idKey) recentProductUpdatesRef.current.set(idKey, { product: updatedProduct, timestamp: now });
 
-    // ⚡ 1. INSTANT ZERO-MILLISECOND UI & LOCAL STORAGE UPDATE
+    // ⚡ 1. INSTANT ZERO-MILLISECOND UI & LOCAL STORAGE UPDATE (Strictly match by ID)
     setProducts(prev => {
-      const next = prev.map(p => (
-        p.id === updatedProduct.id ||
-        (oldProduct && p.name.trim().toLowerCase() === oldProduct.name.trim().toLowerCase()) ||
-        p.name.trim().toLowerCase() === key
-      ) ? updatedProduct : p);
+      const next = prev.map(p => p.id === updatedProduct.id ? updatedProduct : p);
       try {
         localStorage.setItem('animex_billing_products', JSON.stringify(next));
       } catch {}
@@ -1069,6 +1107,7 @@ export const App: React.FC = () => {
       bc.postMessage({ type: 'FORCE_SYNC' });
       bc.close();
     } catch {}
+    await syncCloudData();
   };
 
   const handleDeleteProduct = async (productId: string, productName?: string) => {
@@ -1076,9 +1115,8 @@ export const App: React.FC = () => {
     const name = productName || prod?.name;
     const key = name?.trim().toLowerCase();
 
-    // 1. Immediately record in persistent deleted set
-    addDeletedProductId(productId, name);
-    if (key) addDeletedProductId(key);
+    // 1. Immediately record in persistent deleted set (UUID only!)
+    addDeletedProductId(productId);
 
     // 2. Clear from recent updates cache so sync won't restore it
     if (key) recentProductUpdatesRef.current.delete(key);
@@ -1086,7 +1124,7 @@ export const App: React.FC = () => {
 
     // 3. Immediately remove from local state & localStorage (0ms latency!)
     setProducts(prev => {
-      const next = prev.filter(p => p.id !== productId && (!key || p.name.trim().toLowerCase() !== key));
+      const next = prev.filter(p => p.id !== productId);
       try {
         localStorage.setItem('animex_billing_products', JSON.stringify(next));
       } catch {}

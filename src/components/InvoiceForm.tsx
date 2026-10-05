@@ -4,7 +4,7 @@ import { convertNumberToWords } from '../utils/numberToWords';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
 import { Plus, Trash2, CheckCircle2, Store, Phone, MapPin, RotateCcw, ChevronDown, Check, User, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { parsePackVolume, formatDetailedStockText } from '../utils/volumeParser';
+import { formatDetailedStockText } from '../utils/volumeParser';
 
 // Custom Touch-Friendly Scrollable Unit Selector
 const UNIT_OPTIONS = ['Ltr', 'Ml', 'Bucket', 'Kg', 'Can', 'Pack', 'Box', 'Bottle', 'Nos'];
@@ -673,19 +673,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                   onChange={(e) => handleProductSelect(idx, e.target.value)}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs font-black text-slate-900 dark:text-white"
                 >
-                  {products.map(p => {
-                    const st = p.stockQuantity ?? 0;
-                    const isOut = st <= 0;
-                    const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
-                    const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
-                    const vol = parsePackVolume(p.name, st);
-                    const volText = vol && p.defaultUnit.toLowerCase() !== vol.unit.toLowerCase() ? ` • ${vol.totalDisplay}` : '';
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit}${volText})`}
-                      </option>
-                    );
-                  })}
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
 
                 {(() => {
@@ -831,19 +823,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       onChange={(e) => handleProductSelect(idx, e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs font-bold text-slate-900 dark:text-white"
                     >
-                      {products.map((p) => {
-                        const st = p.stockQuantity ?? 0;
-                        const isOut = st <= 0;
-                        const outText = isMr ? 'साठा संपला' : isHi ? 'स्टॉक समाप्त' : 'Out of Stock';
-                        const inStockText = isMr ? 'शिल्लक' : isHi ? 'स्टॉक' : 'Stock';
-                        const vol = parsePackVolume(p.name, st);
-                        const volText = vol && p.defaultUnit.toLowerCase() !== vol.unit.toLowerCase() ? ` • ${vol.totalDisplay}` : '';
-                        return (
-                          <option key={p.id} value={p.id}>
-                            {p.name} {isOut ? `[❌ ${outText}: 0 ${p.defaultUnit}]` : `(${inStockText}: ${st} ${p.defaultUnit}${volText})`}
-                          </option>
-                        );
-                      })}
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
                     </select>
 
                     {(() => {

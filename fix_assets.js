@@ -16,4 +16,8 @@ function rewrite(dir) {
 }
 
 rewrite('android/app/src/main/assets/public');
+const appleIcon = 'android/app/src/main/assets/public/apple-touch-icon.png';
+if (fs.existsSync(appleIcon)) {
+  try { fs.unlinkSync(appleIcon); } catch {}
+}
 console.log('Assets successfully rewritten as regular files.');

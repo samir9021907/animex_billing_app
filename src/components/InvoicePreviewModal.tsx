@@ -617,7 +617,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
 
               {/* 4. Subtotal, Words, Bank Details & Balance Summary (Equal 50/50 split matching signature boxes) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 border-t-2 border-[#1e293b] bg-white divide-y sm:divide-y-0">
+              <div className="border-t-2 border-[#1e293b] grid grid-cols-2 divide-x-2 divide-[#1e293b] bg-white">
                 {/* Bank Details For Payment Transfer (50% Width) */}
                 <div className="p-2.5 sm:p-3 flex flex-col justify-between bg-slate-50/50">
                   <div className="space-y-2">

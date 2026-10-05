@@ -1,8 +1,15 @@
 apply plugin: 'com.android.application'
 
+def tempAssetsDir = new File(System.getProperty("java.io.tmpdir"), "animex_android_assets")
+
 android {
     namespace = "com.animex.billing"
     compileSdk = rootProject.ext.compileSdkVersion
+    sourceSets {
+        main {
+            assets.srcDirs = [tempAssetsDir]
+        }
+    }
     defaultConfig {
         applicationId "com.animex.billing"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -23,6 +30,7 @@ android {
         }
     }
 }
+
 
 repositories {
     flatDir{
@@ -52,5 +60,6 @@ try {
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
+
 
 

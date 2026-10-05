@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Invoice } from '../types';
-import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink, Copy, Check } from 'lucide-react';
+import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -58,8 +58,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
   const [showDesktopGuideModal, setShowDesktopGuideModal] = useState<boolean>(false);
   const [desktopWebUrl, setDesktopWebUrl] = useState<string>('');
-  const [copiedCaption, setCopiedCaption] = useState<boolean>(false);
-  const [lastCaption, setLastCaption] = useState<string>('');
   const preRenderedDataRef = useRef<PreRenderedData | null>(null);
   const isPreRenderingRef = useRef<boolean>(false);
 
@@ -114,6 +112,83 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       return digits;
     }
     return '';
+  };
+
+  // Generate complete, official, original bill text for WhatsApp
+  const getBillTextMessage = (): string => {
+    const isCust = invoice?.billTo?.customerType === 'customer';
+    const storeName = invoice?.billTo?.firmName || (isCust ? 'Valued Customer' : 'Medical Store');
+    const contact = (!isCust && invoice?.billTo?.contactName) ? ` (${invoice.billTo.contactName})` : '';
+    const location = [invoice?.billTo?.address, invoice?.billTo?.district].filter(Boolean).join(', ');
+
+    let itemsList = '';
+    (invoice?.items || []).forEach((item, index) => {
+      const isScheme = item.isFree || item.isScheme;
+      const freeTag = isScheme ? ' [FREE SCHEME]' : '';
+      const priceVal = safeNum(item.pricePerUnit);
+      const amtVal = safeNum(item.amount);
+      const priceStr = isScheme ? '₹0.00' : `₹${priceVal.toFixed(2)}`;
+      const amountStr = isScheme ? '₹0.00' : `₹${amtVal.toFixed(2)}`;
+      itemsList += `${index + 1}. *${item.itemName || 'Item'}*${freeTag}\n   ${item.quantity || 1} ${item.unit || 'pcs'} x ${priceStr} = *${amountStr}*\n`;
+    });
+
+    const rawBal = safeNum(invoice?.balanceAmount);
+    const isPaidInFull = rawBal <= 1.0 || Math.round(rawBal) === 0;
+    const balanceAmt = isPaidInFull ? 0 : rawBal;
+    const receivedAmt = isPaidInFull ? safeNum(invoice?.totalAmount) : safeNum(invoice?.receivedAmount);
+    const totalAmt = safeNum(invoice?.totalAmount);
+    const subTotalAmt = safeNum(invoice?.subTotal);
+    const discountAmt = safeNum(invoice?.discount);
+
+    const balanceStatus = isPaidInFull
+      ? (isMr ? '🟢 *पूर्ण भरले (PAID)*' : isHi ? '🟢 *पूर्ण भुगतान (PAID)*' : '🟢 *PAID*')
+      : receivedAmt > 0
+        ? (isMr ? `🟠 *अंशतः भरले* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🟠 *आंशिक भुगतान* - शेष: ₹${balanceAmt.toFixed(2)}` : `🟠 *PARTIALLY PAID* - Balance: ₹${balanceAmt.toFixed(2)}`)
+        : (isMr ? `🔴 *बाकी* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🔴 *बकाया* - शेष: ₹${balanceAmt.toFixed(2)}` : `🔴 *PENDING* - Balance: ₹${balanceAmt.toFixed(2)}`);
+
+    const invDate = invoice?.date || new Date().toISOString().split('T')[0];
+
+    const labelDate = isMr ? 'तारीख' : isHi ? 'दिनांक' : 'Date';
+    const labelCustomer = isMr ? 'ग्राहक' : isHi ? 'ग्राहक' : 'Customer';
+    const labelAddress = isMr ? 'पत्ता' : isHi ? 'पता' : 'Address';
+    const labelItems = isMr ? 'वस्तू तपशील' : isHi ? 'सामग्री विवरण' : 'Items';
+    const labelSubTotal = 'Sub Total';
+    const labelDiscount = isMr ? 'सवलत' : isHi ? 'छूट' : 'Discount';
+    const labelTotal = isMr ? 'एकूण बिल रक्कम' : isHi ? 'कुल बिल राशि' : 'Total Amount';
+    const labelPaid = isMr ? 'भरलेली रक्कम' : isHi ? 'भुगतान राशि' : 'Paid Amount';
+    const labelBalance = isMr ? 'बाकी रक्कम' : isHi ? 'बकाया राशि' : 'Balance Due';
+    const labelStatus = isMr ? 'स्थिती' : isHi ? 'स्थिति' : 'Status';
+    const labelBank = isMr ? 'बँक / UPI तपशील' : isHi ? 'बैंक / UPI विवरण' : 'Bank & UPI Details';
+    const labelBankName = isMr ? 'बँक' : isHi ? 'बैंक' : 'Bank';
+    const labelAccountNo = isMr ? 'खाते क्र.' : isHi ? 'खाता सं.' : 'A/C No.';
+    const thankYou = isMr ? 'आपल्या सहकार्याबद्दल धन्यवाद!' : isHi ? 'व्यापार के लिए धन्यवाद!' : 'Thank you for your business!';
+
+    return (
+      `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
+      `📅 *${labelDate}:* ${invDate}\n` +
+      `🏥 *${labelCustomer}:* ${storeName}${contact}\n` +
+      (location ? `📍 *${labelAddress}:* ${location}\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *${labelItems}:*\n` +
+      itemsList +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💵 *${labelSubTotal}:* ₹${subTotalAmt.toFixed(2)}\n` +
+      (discountAmt > 0 ? `🏷️ *${labelDiscount}:* - ₹${discountAmt.toFixed(2)}\n` : '') +
+      `💰 *${labelTotal}:* *₹${totalAmt.toFixed(2)}*\n` +
+      `💳 *${labelPaid}:* ₹${receivedAmt.toFixed(2)} (${invoice?.paymentType || 'UPI'})\n` +
+      `📌 *${labelBalance}:* ₹${balanceAmt.toFixed(2)}\n` +
+      `📌 *${labelStatus}:* ${balanceStatus}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏦 *${labelBank}:*\n` +
+      `• ${labelBankName}: ${companyProfile?.bankName || 'Indian Overseas Bank'}\n` +
+      `• ${labelAccountNo}: ${companyProfile?.accountNo || '083602000001131'}\n` +
+      `• IFSC: ${companyProfile?.ifscCode || 'IOBA0000836'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📞 Helpline: 8799883858 / 9146133858\n` +
+      `🙏 *${thankYou}*`
+    );
   };
 
   // Helper to render the original color bill into a Canvas with Ultra-HD 2.4x resolution
@@ -217,23 +292,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const cleanPhone = getCleanCustomerPhone();
       const cleanStore = (invoice?.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
-      const caption = 
-        `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
-        `📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n` +
-        `🏥 *Customer:* ${invoice?.billTo?.firmName || 'Valued Customer'}\n` +
-        `💰 *Total:* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n` +
-        `📌 *Balance:* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : '✓ PAID'}`;
-
-      setLastCaption(caption);
+      const customerLabel = isMr ? 'ग्राहक:' : isHi ? 'ग्राहक:' : 'Customer:';
+      const totalLabel = isMr ? 'एकूण रक्कम:' : isHi ? 'कुल राशि:' : 'Total:';
+      const balanceLabel = isMr ? 'बाकी रक्कम:' : isHi ? 'बकाया:' : 'Balance:';
+      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : (isMr ? '✓ पूर्ण भरले (PAID)' : '✓ PAID')}`;
 
       // A. On Native Android Mobile App (Capacitor):
       if (isNative) {
         try {
-          // Send strictly the single bill image (which has the receipt details attached directly underneath)
-          // Do NOT pass separate text parameter, so WhatsApp NEVER sends a separate text message first!
           await WhatsAppOpener.openWhatsAppWithImage({
             imageBase64: billData.base64Data,
             fileName: fileName,
+            text: caption,
           });
           return;
         } catch (pluginErr) {
@@ -241,18 +311,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           try {
             await Share.share({
               title: `ANIMEX Bill #${masterInvoiceNo}`,
+              text: caption,
               dialogTitle: isMr ? 'WhatsApp निवडा' : 'Select WhatsApp',
             });
             return;
           } catch (e) {
-            console.error('Share fallback error:', e);
+            const fullText = getBillTextMessage();
+            await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text: fullText });
             return;
           }
         }
       }
 
       // B. On Web / Desktop PC / Laptop Browser:
-      // 1. Immediately copy the real bill image to clipboard
+      // 1. Immediately copy the real bill image to clipboard (works with fresh user gesture!)
       try {
         if (billData.blob && navigator.clipboard && (window as any).ClipboardItem) {
           const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
@@ -262,12 +334,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         console.warn('Clipboard image write error:', clipErr);
       }
 
-      // 2. If Web Share API supports file sharing:
+      // 2. If Web Share API supports file sharing (e.g. mobile Chrome, Windows Share):
       if (typeof navigator !== 'undefined' && (navigator as any).canShare && (navigator as any).canShare({ files: [billData.file] })) {
         try {
           await (navigator as any).share({
             files: [billData.file],
             title: `ANIMEX Bill #${masterInvoiceNo}`,
+            text: caption,
           });
           return;
         } catch (shareErr: any) {
@@ -289,23 +362,23 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
 
       // 4. Desktop PC / Mobile Browser WhatsApp Launch:
+      const encodedCaption = encodeURIComponent(caption);
       const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
       if (isMobileDevice) {
-        // Direct WhatsApp chat without separate text, so both bill + receipt go in the single image!
         const targetUrl = cleanPhone
-          ? `https://api.whatsapp.com/send?phone=${cleanPhone}`
-          : `https://api.whatsapp.com/send`;
+          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `https://api.whatsapp.com/send?text=${encodedCaption}`;
         window.location.href = targetUrl;
       } else {
-        // Desktop PC (Windows): Launch WhatsApp Desktop cleanly
+        // Desktop PC (Windows): Launch WhatsApp Desktop protocol instantly!
         const desktopProtocolUrl = cleanPhone
-          ? `whatsapp://send?phone=${cleanPhone}`
-          : `whatsapp://send`;
+          ? `whatsapp://send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `whatsapp://send?text=${encodedCaption}`;
 
         const webUrl = cleanPhone
-          ? `https://web.whatsapp.com/send?phone=${cleanPhone}`
-          : `https://web.whatsapp.com`;
+          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `https://web.whatsapp.com/send?text=${encodedCaption}`;
         
         setDesktopWebUrl(webUrl);
 
@@ -746,30 +819,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill (Matches WhatsApp Card Format) */}
-            <div className="mt-3 p-3.5 bg-[#d9fdd3] border border-[#86efac] rounded-xl text-left space-y-1 print:mt-1 print:p-2 shadow-xs font-sans">
-              <div className="font-black text-xs sm:text-sm text-slate-950 flex items-center gap-1.5 uppercase tracking-wide">
-                <span>🏢</span>
-                <span>{companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}</span>
-              </div>
-              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>📄</span>
-                <span>Tax Invoice / Bill: <strong>#{masterInvoiceNo}</strong></span>
-              </div>
-              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>🏥</span>
-                <span>Customer: <strong>{invoice?.billTo?.firmName || 'Valued Customer'}</strong></span>
-              </div>
-              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>💰</span>
-                <span>Total: <strong>₹{safeNum(invoice?.totalAmount).toFixed(2)}</strong></span>
-              </div>
-              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>📌</span>
-                <span>Balance: <strong>{effectiveBalance <= 0 ? '✓ PAID' : `₹${effectiveBalance.toFixed(2)}`}</strong></span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -821,35 +870,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </p>
                   </div>
                 </div>
-
-                {lastCaption && (
-                  <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-300">
-                        {isMr ? 'बिलाखालील कॅप्शन (Caption):' : 'Caption below the Bill:'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(lastCaption);
-                            setCopiedCaption(true);
-                            setTimeout(() => setCopiedCaption(false), 2000);
-                          } catch (e) {
-                            console.warn('Copy caption error:', e);
-                          }
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all"
-                      >
-                        {copiedCaption ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3 text-white" />}
-                        <span>{copiedCaption ? (isMr ? 'कॉपी झाले!' : 'Copied!') : (isMr ? 'कॅप्शन कॉपी करा' : 'Copy Caption')}</span>
-                      </button>
-                    </div>
-                    <pre className="text-[10px] text-emerald-300 font-mono whitespace-pre-wrap bg-slate-950 p-2.5 rounded-lg border border-slate-800 leading-relaxed">
-                      {lastCaption}
-                    </pre>
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">

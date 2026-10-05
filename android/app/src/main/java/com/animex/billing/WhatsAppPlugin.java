@@ -50,12 +50,14 @@ public class WhatsAppPlugin extends Plugin {
                 imageFile
             );
 
-            // Create ACTION_SEND Intent strictly for single bill image (with receipt attached underneath)
-            // DO NOT put EXTRA_TEXT, which causes WhatsApp to send a separate text message first!
+            // Create ACTION_SEND Intent for image
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("image/png");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
             shareIntent.setClipData(ClipData.newRawUri(null, contentUri));
+            if (text != null && !text.isEmpty()) {
+                shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+            }
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
@@ -68,7 +70,6 @@ public class WhatsAppPlugin extends Plugin {
                     shareIntent.setPackage("com.whatsapp.w4b");
                     getContext().startActivity(shareIntent);
                 } catch (Exception e2) {
-                    shareIntent.setPackage(null);
                     Intent chooser = Intent.createChooser(shareIntent, "WhatsApp निवडा");
                     chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

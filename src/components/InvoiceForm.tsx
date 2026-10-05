@@ -215,7 +215,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     const firstProd = products[0];
     return firstProd?.defaultPrice || 300;
   });
-  const [termsAndConditions, setTermsAndConditions] = useState<string>('Goods once sold will not be taken back.');
+  const DEFAULT_TERMS = 'Goods once sold will not be taken back. Kindly make the payment within 35 days from the invoice date.';
+  const [termsAndConditions, setTermsAndConditions] = useState<string>(DEFAULT_TERMS);
+
 
   // Complete form refresh / reset
   const handleResetForm = () => {
@@ -225,6 +227,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
       setDiscount(0);
       setPaymentType('UPI');
       setIsFullPaid(true);
+      setTermsAndConditions(DEFAULT_TERMS);
+
       const freshTotal = freshItems.reduce((sum, i) => sum + i.amount, 0);
       setReceivedAmount(freshTotal);
       setDate(new Date().toISOString().split('T')[0]);

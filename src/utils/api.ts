@@ -113,7 +113,14 @@ export const mapBackendInvoice = (inv: any) => {
     balanceAmount,
     status,
     notes: inv.notes || '',
-    termsAndConditions: inv.notes || 'Goods once sold will not be taken back.',
+
+    termsAndConditions: (inv.notes && inv.notes.includes('35 days'))
+      ? inv.notes
+      : (inv.notes && inv.notes !== 'Goods once sold will not be taken back.' && inv.notes !== 'Invoice generated via ANIMEX Billing')
+        ? `${inv.notes} Kindly make the payment within 35 days from the invoice date.`
+        : 'Goods once sold will not be taken back. Kindly make the payment within 35 days from the invoice date.',
+
+
     createdAt: inv.created_at || new Date().toISOString(),
   };
 };

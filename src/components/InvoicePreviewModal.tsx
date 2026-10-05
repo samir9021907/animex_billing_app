@@ -786,9 +786,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   Terms And Conditions:
                 </span>
                 <p className="text-[10px] sm:text-[11px] font-semibold text-slate-700 mt-0.5">
-                  {invoice.termsAndConditions}
+                  {(() => {
+                    const terms = (invoice.termsAndConditions || '').trim();
+                    if (!terms || terms === 'Goods once sold will not be taken back.') {
+                      return 'Goods once sold will not be taken back. Kindly make the payment within 35 days from the invoice date.';
+                    }
+                    if (terms.includes('35 days')) {
+                      return terms;
+                    }
+                    return `${terms} Kindly make the payment within 35 days from the invoice date.`;
+                  })()}
                 </p>
               </div>
+
 
               {/* 6. Dual Signatory Footer: Left = Receiver's Signature, Right = Authorized Signatory */}
               <div className="border-t-2 border-[#1e293b] grid grid-cols-2 divide-x-2 divide-[#1e293b] bg-white">

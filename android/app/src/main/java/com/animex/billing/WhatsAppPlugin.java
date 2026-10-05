@@ -50,21 +50,10 @@ public class WhatsAppPlugin extends Plugin {
                 imageFile
             );
 
-            // Copy caption text to Android Clipboard as automatic backup
-            if (text != null && !text.isEmpty()) {
-                try {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    if (cm != null) {
-                        cm.setPrimaryClip(ClipData.newPlainText("ANIMEX Invoice Caption", text));
-                    }
-                } catch (Exception ignored) {}
-            }
-
-            // Create ACTION_SEND Intent for image FIRST, caption UNDER it
+            // Create ACTION_SEND Intent for single message (Image 1 format: image with attached caption)
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("image/*");
+            shareIntent.setType("image/png");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-            shareIntent.setClipData(ClipData.newRawUri(null, contentUri));
             if (text != null && !text.isEmpty()) {
                 shareIntent.putExtra(Intent.EXTRA_TEXT, text);
             }

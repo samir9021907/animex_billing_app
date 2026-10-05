@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Invoice } from '../types';
-import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download } from 'lucide-react';
+import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { useLanguage } from '../context/LanguageContext';
+
+interface PreRenderedData {
+  canvas: HTMLCanvasElement;
+  base64Data: string;
+  blob: Blob;
+  file: File;
+}
 
 interface WhatsAppOpenerPlugin {
   openWhatsApp(options: { phone?: string; text: string }): Promise<void>;
@@ -49,9 +56,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
+  const [showDesktopGuideModal, setShowDesktopGuideModal] = useState<boolean>(false);
+  const [desktopWebUrl, setDesktopWebUrl] = useState<string>('');
+  const preRenderedDataRef = useRef<PreRenderedData | null>(null);
+  const isPreRenderingRef = useRef<boolean>(false);
 
   const isNative = Capacitor.isNativePlatform();
-  const isMobile = isNative || (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent));
 
   // Fetch company profile for bank details
   const companyProfile = (() => {
@@ -181,12 +191,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     );
   };
 
-  // Helper to render the original color bill into a Canvas
+  // Helper to render the original color bill into a Canvas with Ultra-HD 2.4x resolution
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
     const billElement = document.getElementById('printable-bill-area');
     if (!billElement) return null;
 
-    const renderScale = isMobile ? 1.3 : 1.6;
+    // 2.4x Scale ensures high-density ~300 DPI Ultra-HD resolution
+    // Text, tables, borders, and numbers appear razor-sharp and NEVER blurry ("bhurka")!
+    const renderScale = 2.4;
 
     return await html2canvas(billElement, {
       scale: renderScale,
@@ -197,15 +209,85 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       scrollX: 0,
       scrollY: 0,
       windowWidth: 850,
-      imageTimeout: 3000,
+      imageTimeout: 5000,
+      onclone: (clonedDoc) => {
+        const clonedBill = clonedDoc.getElementById('printable-bill-area');
+        if (clonedBill) {
+          // Lock cloned element to full standard printable width so it never wraps or shrinks on mobile
+          clonedBill.style.width = '850px';
+          clonedBill.style.maxWidth = '850px';
+          clonedBill.style.minWidth = '850px';
+          clonedBill.style.margin = '0 auto';
+          clonedBill.style.transform = 'none';
+        }
+      },
     });
   };
+
+  // Background Pre-Rendering to ensure 0ms instantaneous WhatsApp sharing!
+  const doPreRender = async (): Promise<PreRenderedData | null> => {
+    if (preRenderedDataRef.current) return preRenderedDataRef.current;
+    if (isPreRenderingRef.current) {
+      let waited = 0;
+      while (isPreRenderingRef.current && waited < 4000) {
+        await new Promise((r) => setTimeout(r, 100));
+        waited += 100;
+        if (preRenderedDataRef.current) return preRenderedDataRef.current;
+      }
+    }
+    isPreRenderingRef.current = true;
+    try {
+      const canvas = await generateBillCanvas();
+      if (!canvas) return null;
+
+      const base64Data = canvas.toDataURL('image/png', 1.0);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) return null;
+
+      const cleanStore = (invoice.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      const data: PreRenderedData = {
+        canvas,
+        base64Data,
+        blob,
+        file,
+      };
+      preRenderedDataRef.current = data;
+      return data;
+    } catch (e) {
+      console.warn('Pre-render bill image error:', e);
+      return null;
+    } finally {
+      isPreRenderingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    preRenderedDataRef.current = null;
+    // 350ms delay lets fonts, styles, and logos render fully in the DOM
+    const timer = setTimeout(() => {
+      doPreRender();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [invoice.id, invoice.invoiceNo, masterInvoiceNo]);
 
   // 1. DIRECT INSTANT ORIGINAL BILL SHARE TO WHATSAPP (Sends the actual colorful Bill Image!)
   const handleDirectWhatsApp = async () => {
     try {
-      setIsGeneratingImage(true);
-      setGeneratingMsg(isMr ? 'मूळ रंगीत बिल WhatsApp साठी तयार होत आहे...' : isHi ? 'WhatsApp के लिए बिल तैयार हो रहा है...' : 'Preparing bill image for WhatsApp...');
+      let billData = preRenderedDataRef.current;
+      if (!billData) {
+        setIsGeneratingImage(true);
+        setGeneratingMsg(isMr ? 'मूळ रंगीत बिल WhatsApp साठी तयार होत आहे...' : isHi ? 'WhatsApp के लिए बिल तैयार हो रहा है...' : 'Preparing bill image for WhatsApp...');
+        billData = await doPreRender();
+        setIsGeneratingImage(false);
+      }
+
+      if (!billData) {
+        alert(isMr ? 'बिल फोटो तयार करण्यात त्रुटी आली.' : 'Failed to prepare bill image.');
+        return;
+      }
 
       const cleanPhone = getCleanCustomerPhone();
       const cleanStore = (invoice?.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
@@ -215,24 +297,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const balanceLabel = isMr ? 'बाकी रक्कम:' : isHi ? 'बकाया:' : 'Balance:';
       const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : (isMr ? '✓ पूर्ण भरले (PAID)' : '✓ PAID')}`;
 
-      // Generate the REAL COLORFUL ORIGINAL BILL canvas image
-      const canvas = await generateBillCanvas();
-      if (!canvas) {
-        setIsGeneratingImage(false);
-        return;
-      }
-
-      const base64Data = canvas.toDataURL('image/png', 0.95);
-
       // A. On Native Android Mobile App (Capacitor):
       if (isNative) {
         try {
           await WhatsAppOpener.openWhatsAppWithImage({
-            imageBase64: base64Data,
+            imageBase64: billData.base64Data,
             fileName: fileName,
             text: caption,
           });
-          setIsGeneratingImage(false);
           return;
         } catch (pluginErr) {
           console.warn('Native openWhatsAppWithImage failed, fallback to Share:', pluginErr);
@@ -242,76 +314,82 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               text: caption,
               dialogTitle: isMr ? 'WhatsApp निवडा' : 'Select WhatsApp',
             });
-            setIsGeneratingImage(false);
             return;
           } catch (e) {
             const fullText = getBillTextMessage();
             await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text: fullText });
-            setIsGeneratingImage(false);
             return;
           }
         }
       }
 
       // B. On Web / Desktop PC / Laptop Browser:
-      // 1. Automatically copy the real bill image to clipboard
+      // 1. Immediately copy the real bill image to clipboard (works with fresh user gesture!)
       try {
-        canvas.toBlob(async (blob) => {
-          if (blob && navigator.clipboard && (window as any).ClipboardItem) {
-            const item = new (window as any).ClipboardItem({ 'image/png': blob });
-            await navigator.clipboard.write([item]);
-          }
-        }, 'image/png');
+        if (billData.blob && navigator.clipboard && (window as any).ClipboardItem) {
+          const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
+          await navigator.clipboard.write([item]);
+        }
       } catch (clipErr) {
-        console.warn('Clipboard image write:', clipErr);
+        console.warn('Clipboard image write error:', clipErr);
       }
 
-      // 2. If Web Share API supports file sharing (e.g. mobile Chrome):
-      if (typeof navigator !== 'undefined' && (navigator as any).canShare) {
+      // 2. If Web Share API supports file sharing (e.g. mobile Chrome, Windows Share):
+      if (typeof navigator !== 'undefined' && (navigator as any).canShare && (navigator as any).canShare({ files: [billData.file] })) {
         try {
-          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-          if (blob) {
-            const file = new File([blob], fileName, { type: 'image/png' });
-            if ((navigator as any).canShare({ files: [file] })) {
-              await (navigator as any).share({
-                files: [file],
-                title: `ANIMEX Bill #${masterInvoiceNo}`,
-                text: caption,
-              });
-              setIsGeneratingImage(false);
-              return;
-            }
-          }
-        } catch (shareErr) {
+          await (navigator as any).share({
+            files: [billData.file],
+            title: `ANIMEX Bill #${masterInvoiceNo}`,
+            text: caption,
+          });
+          return;
+        } catch (shareErr: any) {
+          if (shareErr.name === 'AbortError') return;
           console.warn('Web file share error:', shareErr);
         }
       }
 
-      // 3. Desktop PC WhatsApp Web Launch:
+      // 3. Auto-download the HD Bill PNG so the file is ready on PC
+      try {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = billData.base64Data;
+        downloadLink.download = fileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      } catch (dlErr) {
+        console.warn('Auto download error:', dlErr);
+      }
+
+      // 4. Desktop PC / Mobile Browser WhatsApp Launch:
       const encodedCaption = encodeURIComponent(caption);
       const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-      let targetUrl = '';
       if (isMobileDevice) {
-        targetUrl = cleanPhone
+        const targetUrl = cleanPhone
           ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
           : `https://api.whatsapp.com/send?text=${encodedCaption}`;
+        window.location.href = targetUrl;
       } else {
-        // Desktop PC (Windows / Edge / Chrome): Open WhatsApp Web directly!
-        targetUrl = cleanPhone
+        // Desktop PC (Windows): Launch WhatsApp Desktop protocol instantly!
+        const desktopProtocolUrl = cleanPhone
+          ? `whatsapp://send?phone=${cleanPhone}&text=${encodedCaption}`
+          : `whatsapp://send?text=${encodedCaption}`;
+
+        const webUrl = cleanPhone
           ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
           : `https://web.whatsapp.com/send?text=${encodedCaption}`;
-      }
+        
+        setDesktopWebUrl(webUrl);
 
-      let win: Window | null = null;
-      try {
-        win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      } catch (e) {
-        win = null;
-      }
+        try {
+          window.location.href = desktopProtocolUrl;
+        } catch (e) {
+          console.warn('Desktop protocol launch error:', e);
+        }
 
-      if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = targetUrl;
+        // Show guide popup with Ctrl+V instruction
+        setShowDesktopGuideModal(true);
       }
     } catch (err: any) {
       console.error('Direct WhatsApp error:', err);
@@ -326,18 +404,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     try {
       setIsGeneratingImage(true);
       setGeneratingMsg(isMr ? 'रंगीत फोटो सेव्ह होत आहे...' : isHi ? 'बिल फोटो सेव हो रहा है...' : 'Saving HD bill photo...');
-      const canvas = await generateBillCanvas();
-      if (!canvas) return;
+      
+      let billData = preRenderedDataRef.current;
+      if (!billData) {
+        billData = await doPreRender();
+      }
+      if (!billData) return;
 
       const cleanStore = (invoice.billTo?.firmName || 'Medical_Store').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
 
       // Native Android App: Save to Documents directory
       if (isNative) {
-        const base64Data = canvas.toDataURL('image/png', 0.95).split(',')[1];
+        const base64Raw = billData.base64Data.split(',')[1];
         await Filesystem.writeFile({
           path: fileName,
-          data: base64Data,
+          data: base64Raw,
           directory: Directory.Documents,
         });
         alert(isMr ? `रंगीत बिल फोटो सेव्ह झाला आहे!\nफाईल: ${fileName}\n(Documents फोल्डरमध्ये उपलब्ध)` : `Bill photo saved successfully!\nFile: ${fileName}\n(Saved to Documents folder)`);
@@ -345,9 +427,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
 
       // Web Browser
-      const dataUrl = canvas.toDataURL('image/png', 0.95);
       const a = document.createElement('a');
-      a.href = dataUrl;
+      a.href = billData.base64Data;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
@@ -450,6 +531,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         <div className="overflow-x-auto p-1">
           <div
             id="printable-bill-area"
+            style={{
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              textRendering: 'optimizeLegibility',
+            }}
             className="bg-white text-[#1e293b] p-3 sm:p-8 font-sans max-w-[850px] w-full mx-auto border-2 border-[#1e293b] shadow-2xl text-xs rounded-lg relative overflow-hidden min-w-[700px]"
           >
             {/* Top Brand Accent Bar */}
@@ -736,6 +822,80 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           </div>
         </div>
 
+        {/* Desktop WhatsApp Quick Helper Modal/Toast */}
+        {showDesktopGuideModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4">
+            <div className="bg-slate-800 border-2 border-emerald-500 text-white rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+                <div className="flex items-center gap-2 text-emerald-400 font-black text-base">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <span>{isMr ? 'WhatsApp उघडत आहे!' : 'WhatsApp Opening!'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDesktopGuideModal(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-200">
+                <div className="bg-emerald-950/60 border border-emerald-700/60 rounded-xl p-3 flex items-start gap-2.5">
+                  <span className="text-xl shrink-0">📋</span>
+                  <div>
+                    <p className="font-black text-emerald-300">
+                      {isMr ? 'मूळ Ultra-HD बिल फोटो Clipboard वर कॉपी झाला आहे!' : 'Original Ultra-HD bill image copied to Clipboard!'}
+                    </p>
+                    <p className="text-[11px] text-slate-200 mt-1">
+                      {isMr
+                        ? 'WhatsApp मध्ये ज्या व्यक्तीला बिल पाठवायचे आहे त्यांचे नाव सर्च करा आणि फक्त '
+                        : 'In WhatsApp, search contact name and simply press '}
+                      <kbd className="bg-slate-900 border border-emerald-400 text-emerald-300 px-1.5 py-0.5 rounded font-black text-[11px]">
+                        Ctrl + V
+                      </kbd>
+                      {isMr ? ' (Paste) दाबा व Send करा!' : ' (Paste) and hit Send!'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-3 flex items-start gap-2.5 text-[11px] text-slate-300">
+                  <span className="text-xl shrink-0">📥</span>
+                  <div>
+                    <p className="font-bold text-white">
+                      {isMr ? 'HD बिल फोटो Downloads फोल्डरमध्येही सेव्ह झाला आहे.' : 'HD bill file also saved to Downloads folder.'}
+                    </p>
+                    <p className="text-slate-400 mt-0.5">
+                      {isMr ? 'हवे असल्यास तुम्ही डाऊनलोड झालेला फोटो थेट WhatsApp मध्ये ड्रॅग करू शकता.' : 'You can also drag-drop the downloaded image directly into chat.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">
+                {desktopWebUrl && (
+                  <a
+                    href={desktopWebUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-sky-400 hover:text-sky-300 underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{isMr ? 'WhatsApp Web उघडा' : 'Open WhatsApp Web'}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowDesktopGuideModal(false)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2 rounded-xl text-xs shadow-md transition-all cursor-pointer ml-auto"
+                >
+                  {isMr ? 'समजले (OK)' : 'Got It (OK)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

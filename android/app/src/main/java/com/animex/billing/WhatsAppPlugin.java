@@ -1,5 +1,6 @@
 package com.animex.billing;
 
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
@@ -53,6 +54,7 @@ public class WhatsAppPlugin extends Plugin {
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("image/png");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.setClipData(ClipData.newRawUri(null, contentUri));
             if (text != null && !text.isEmpty()) {
                 shareIntent.putExtra(Intent.EXTRA_TEXT, text);
             }

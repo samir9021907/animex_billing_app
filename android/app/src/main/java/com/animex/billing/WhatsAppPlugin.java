@@ -50,13 +50,29 @@ public class WhatsAppPlugin extends Plugin {
                 imageFile
             );
 
-            // Create ACTION_SEND Intent for image
+            // Copy caption text to Android Clipboard as automatic backup
+            if (text != null && !text.isEmpty()) {
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("ANIMEX Invoice Caption", text));
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // Create ACTION_SEND Intent for image with caption
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("image/png");
+            shareIntent.setType("image/*");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-            shareIntent.setClipData(ClipData.newRawUri(null, contentUri));
             if (text != null && !text.isEmpty()) {
                 shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+                shareIntent.putExtra("sms_body", text);
+                shareIntent.putExtra(Intent.EXTRA_TITLE, text);
+                ClipData.Item clipItem = new ClipData.Item(text, (Intent) null, contentUri);
+                ClipData clipData = new ClipData("ANIMEX Bill", new String[]{"image/*", "text/plain"}, clipItem);
+                shareIntent.setClipData(clipData);
+            } else {
+                shareIntent.setClipData(ClipData.newRawUri(null, contentUri));
             }
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

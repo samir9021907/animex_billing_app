@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Invoice } from '../types';
-import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink } from 'lucide-react';
+import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink, Copy, Check } from 'lucide-react';
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -58,6 +58,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
   const [showDesktopGuideModal, setShowDesktopGuideModal] = useState<boolean>(false);
   const [desktopWebUrl, setDesktopWebUrl] = useState<string>('');
+  const [copiedCaption, setCopiedCaption] = useState<boolean>(false);
+  const [lastCaption, setLastCaption] = useState<string>('');
   const preRenderedDataRef = useRef<PreRenderedData | null>(null);
   const isPreRenderingRef = useRef<boolean>(false);
 
@@ -292,10 +294,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const cleanPhone = getCleanCustomerPhone();
       const cleanStore = (invoice?.billTo?.firmName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ANIMEX_Bill_${masterInvoiceNo}_${cleanStore}.png`;
-      const customerLabel = isMr ? 'ग्राहक:' : isHi ? 'ग्राहक:' : 'Customer:';
-      const totalLabel = isMr ? 'एकूण रक्कम:' : isHi ? 'कुल राशि:' : 'Total:';
-      const balanceLabel = isMr ? 'बाकी रक्कम:' : isHi ? 'बकाया:' : 'Balance:';
-      const caption = `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n🏥 *${customerLabel}* ${invoice?.billTo?.firmName || 'Valued Customer'}\n💰 *${totalLabel}* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n📌 *${balanceLabel}* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : (isMr ? '✓ पूर्ण भरले (PAID)' : '✓ PAID')}`;
+      const caption = 
+        `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
+        `📄 *Tax Invoice / Bill: #${masterInvoiceNo}*\n` +
+        `🏥 *Customer:* ${invoice?.billTo?.firmName || 'Valued Customer'}\n` +
+        `💰 *Total:* ₹${safeNum(invoice?.totalAmount).toFixed(2)}\n` +
+        `📌 *Balance:* ${effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : '✓ PAID'}`;
+
+      setLastCaption(caption);
 
       // A. On Native Android Mobile App (Capacitor):
       if (isNative) {
@@ -324,11 +330,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
 
       // B. On Web / Desktop PC / Laptop Browser:
-      // 1. Immediately copy the real bill image to clipboard (works with fresh user gesture!)
+      // 1. Immediately copy the real bill image & caption to clipboard (works with fresh user gesture!)
       try {
         if (billData.blob && navigator.clipboard && (window as any).ClipboardItem) {
-          const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
-          await navigator.clipboard.write([item]);
+          try {
+            const item = new (window as any).ClipboardItem({
+              'image/png': billData.blob,
+              'text/plain': new Blob([caption], { type: 'text/plain' }),
+            });
+            await navigator.clipboard.write([item]);
+          } catch (multiErr) {
+            const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
+            await navigator.clipboard.write([item]);
+          }
         }
       } catch (clipErr) {
         console.warn('Clipboard image write error:', clipErr);
@@ -870,6 +884,35 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {lastCaption && (
+                  <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-300">
+                        {isMr ? 'बिलाखालील कॅप्शन (Caption):' : 'Caption below the Bill:'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(lastCaption);
+                            setCopiedCaption(true);
+                            setTimeout(() => setCopiedCaption(false), 2000);
+                          } catch (e) {
+                            console.warn('Copy caption error:', e);
+                          }
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all"
+                      >
+                        {copiedCaption ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3 text-white" />}
+                        <span>{copiedCaption ? (isMr ? 'कॉपी झाले!' : 'Copied!') : (isMr ? 'कॅप्शन कॉपी करा' : 'Copy Caption')}</span>
+                      </button>
+                    </div>
+                    <pre className="text-[10px] text-emerald-300 font-mono whitespace-pre-wrap bg-slate-950 p-2.5 rounded-lg border border-slate-800 leading-relaxed">
+                      {lastCaption}
+                    </pre>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">

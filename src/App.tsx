@@ -140,6 +140,31 @@ export const App: React.FC = () => {
       }
       localStorage.setItem(CLEAN_PROD_KEY, 'true');
     }
+
+    const CLEAN_SEED_PROD_KEY = 'animex_clean_seed_v4';
+    if (localStorage.getItem(CLEAN_SEED_PROD_KEY) !== 'true') {
+      const raw = localStorage.getItem('animex_billing_products');
+      if (raw) {
+        try {
+          const seedUuids = new Set([
+            '7e379411-5b6b-450a-bbf8-61de5cdfccc1',
+            '02112ee5-88cd-4c09-a6b0-1b536c5634c0',
+            '3f9a63c4-9680-445d-9ab5-a3cc62ab773b',
+            '16d55069-3598-4514-ab37-3c5bb9136970',
+            '17c925e5-584c-4ee6-8b6d-30d5774ea73a',
+            'cae069ab-64cf-4aae-b6c1-f8dcee3bc99f',
+            'aea1fc91-c997-450f-88cc-7000e046ccf8',
+            '8cf875b1-f7d9-4b36-91e8-0cf2ab35c4f2'
+          ]);
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const cleaned = arr.filter((p: any) => p && !seedUuids.has(p.id));
+            localStorage.setItem('animex_billing_products', JSON.stringify(cleaned));
+          }
+        } catch {}
+      }
+      localStorage.setItem(CLEAN_SEED_PROD_KEY, 'true');
+    }
   } catch (e) {
     console.warn('Storage reset warning:', e);
   }
@@ -500,36 +525,28 @@ export const App: React.FC = () => {
         }
       }
 
-      // 4d. Retain all active local products from productsRef.current so user products NEVER disappear!
+      // 4d. Retain ONLY unsynced local offline products (temporary ID p-* or in-flight upload),
+      // NEVER resurrect products with cloud UUIDs that were deleted from Cloud Neon DB!
       for (const lp of productsRef.current) {
         if (!deletedProductIds.has(lp.id)) {
           const key = lp.name.trim().toLowerCase();
-          if (!prodMap.has(key)) {
+          if (!prodMap.has(key) && (uploadingProductKeys.current.has(lp.id) || !uuidRegex.test(lp.id))) {
             prodMap.set(key, lp);
           }
         }
       }
 
-      // 4e. Preserve any recent product updates from cache
+      // 4e. Preserve any recent product updates from cache (within 60s)
       recentProductUpdatesRef.current.forEach((val) => {
         if (Date.now() - val.timestamp < 60000) {
           const k = val.product.name.trim().toLowerCase();
-          if (k && !deletedProductIds.has(val.product.id) && !prodMap.has(k)) {
+          if (k && !deletedProductIds.has(val.product.id) && !prodMap.has(k) && (uploadingProductKeys.current.has(val.product.id) || !uuidRegex.test(val.product.id))) {
             prodMap.set(k, val.product);
           }
         }
       });
 
-      // Ensure seed products ONLY on first launch (if user has never initialized or deleted them)
-      const isInitialized = localStorage.getItem('animex_products_initialized') === 'true';
-      if (!isInitialized && deletedProductIds.size === 0 && cloudProducts.length === 0 && prodMap.size === 0) {
-        for (const seed of INITIAL_PRODUCTS) {
-          const sName = seed.name.toLowerCase();
-          prodMap.set(sName, seed);
-          syncProductToBackend(seed).catch(() => {});
-        }
-        localStorage.setItem('animex_products_initialized', 'true');
-      }
+      localStorage.setItem('animex_products_initialized', 'true');
 
       const finalProducts = Array.from(prodMap.values());
       // Unconditionally update products (allowing 0 products when user deletes everything)

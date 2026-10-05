@@ -385,14 +385,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           : `https://api.whatsapp.com/send?text=${encodedCaption}`;
         window.location.href = targetUrl;
       } else {
-        // Desktop PC (Windows): Launch WhatsApp Desktop protocol instantly!
+        // Desktop PC (Windows): Launch WhatsApp Desktop cleanly so bill image goes FIRST!
         const desktopProtocolUrl = cleanPhone
-          ? `whatsapp://send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `whatsapp://send?text=${encodedCaption}`;
+          ? `whatsapp://send?phone=${cleanPhone}`
+          : `whatsapp://send`;
 
         const webUrl = cleanPhone
-          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `https://web.whatsapp.com/send?text=${encodedCaption}`;
+          ? `https://web.whatsapp.com/send?phone=${cleanPhone}`
+          : `https://web.whatsapp.com`;
         
         setDesktopWebUrl(webUrl);
 

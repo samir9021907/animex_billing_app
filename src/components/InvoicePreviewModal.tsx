@@ -116,83 +116,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return '';
   };
 
-  // Generate complete, official, original bill text for WhatsApp
-  const getBillTextMessage = (): string => {
-    const isCust = invoice?.billTo?.customerType === 'customer';
-    const storeName = invoice?.billTo?.firmName || (isCust ? 'Valued Customer' : 'Medical Store');
-    const contact = (!isCust && invoice?.billTo?.contactName) ? ` (${invoice.billTo.contactName})` : '';
-    const location = [invoice?.billTo?.address, invoice?.billTo?.district].filter(Boolean).join(', ');
-
-    let itemsList = '';
-    (invoice?.items || []).forEach((item, index) => {
-      const isScheme = item.isFree || item.isScheme;
-      const freeTag = isScheme ? ' [FREE SCHEME]' : '';
-      const priceVal = safeNum(item.pricePerUnit);
-      const amtVal = safeNum(item.amount);
-      const priceStr = isScheme ? '₹0.00' : `₹${priceVal.toFixed(2)}`;
-      const amountStr = isScheme ? '₹0.00' : `₹${amtVal.toFixed(2)}`;
-      itemsList += `${index + 1}. *${item.itemName || 'Item'}*${freeTag}\n   ${item.quantity || 1} ${item.unit || 'pcs'} x ${priceStr} = *${amountStr}*\n`;
-    });
-
-    const rawBal = safeNum(invoice?.balanceAmount);
-    const isPaidInFull = rawBal <= 1.0 || Math.round(rawBal) === 0;
-    const balanceAmt = isPaidInFull ? 0 : rawBal;
-    const receivedAmt = isPaidInFull ? safeNum(invoice?.totalAmount) : safeNum(invoice?.receivedAmount);
-    const totalAmt = safeNum(invoice?.totalAmount);
-    const subTotalAmt = safeNum(invoice?.subTotal);
-    const discountAmt = safeNum(invoice?.discount);
-
-    const balanceStatus = isPaidInFull
-      ? (isMr ? '🟢 *पूर्ण भरले (PAID)*' : isHi ? '🟢 *पूर्ण भुगतान (PAID)*' : '🟢 *PAID*')
-      : receivedAmt > 0
-        ? (isMr ? `🟠 *अंशतः भरले* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🟠 *आंशिक भुगतान* - शेष: ₹${balanceAmt.toFixed(2)}` : `🟠 *PARTIALLY PAID* - Balance: ₹${balanceAmt.toFixed(2)}`)
-        : (isMr ? `🔴 *बाकी* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🔴 *बकाया* - शेष: ₹${balanceAmt.toFixed(2)}` : `🔴 *PENDING* - Balance: ₹${balanceAmt.toFixed(2)}`);
-
-    const invDate = invoice?.date || new Date().toISOString().split('T')[0];
-
-    const labelDate = isMr ? 'तारीख' : isHi ? 'दिनांक' : 'Date';
-    const labelCustomer = isMr ? 'ग्राहक' : isHi ? 'ग्राहक' : 'Customer';
-    const labelAddress = isMr ? 'पत्ता' : isHi ? 'पता' : 'Address';
-    const labelItems = isMr ? 'वस्तू तपशील' : isHi ? 'सामग्री विवरण' : 'Items';
-    const labelSubTotal = 'Sub Total';
-    const labelDiscount = isMr ? 'सवलत' : isHi ? 'छूट' : 'Discount';
-    const labelTotal = isMr ? 'एकूण बिल रक्कम' : isHi ? 'कुल बिल राशि' : 'Total Amount';
-    const labelPaid = isMr ? 'भरलेली रक्कम' : isHi ? 'भुगतान राशि' : 'Paid Amount';
-    const labelBalance = isMr ? 'बाकी रक्कम' : isHi ? 'बकाया राशि' : 'Balance Due';
-    const labelStatus = isMr ? 'स्थिती' : isHi ? 'स्थिति' : 'Status';
-    const labelBank = isMr ? 'बँक / UPI तपशील' : isHi ? 'बैंक / UPI विवरण' : 'Bank & UPI Details';
-    const labelBankName = isMr ? 'बँक' : isHi ? 'बैंक' : 'Bank';
-    const labelAccountNo = isMr ? 'खाते क्र.' : isHi ? 'खाता सं.' : 'A/C No.';
-    const thankYou = isMr ? 'आपल्या सहकार्याबद्दल धन्यवाद!' : isHi ? 'व्यापार के लिए धन्यवाद!' : 'Thank you for your business!';
-
-    return (
-      `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
-      `📅 *${labelDate}:* ${invDate}\n` +
-      `🏥 *${labelCustomer}:* ${storeName}${contact}\n` +
-      (location ? `📍 *${labelAddress}:* ${location}\n` : '') +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *${labelItems}:*\n` +
-      itemsList +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 *${labelSubTotal}:* ₹${subTotalAmt.toFixed(2)}\n` +
-      (discountAmt > 0 ? `🏷️ *${labelDiscount}:* - ₹${discountAmt.toFixed(2)}\n` : '') +
-      `💰 *${labelTotal}:* *₹${totalAmt.toFixed(2)}*\n` +
-      `💳 *${labelPaid}:* ₹${receivedAmt.toFixed(2)} (${invoice?.paymentType || 'UPI'})\n` +
-      `📌 *${labelBalance}:* ₹${balanceAmt.toFixed(2)}\n` +
-      `📌 *${labelStatus}:* ${balanceStatus}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🏦 *${labelBank}:*\n` +
-      `• ${labelBankName}: ${companyProfile?.bankName || 'Indian Overseas Bank'}\n` +
-      `• ${labelAccountNo}: ${companyProfile?.accountNo || '083602000001131'}\n` +
-      `• IFSC: ${companyProfile?.ifscCode || 'IOBA0000836'}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📞 Helpline: 8799883858 / 9146133858\n` +
-      `🙏 *${thankYou}*`
-    );
-  };
-
   // Helper to render the original color bill into a Canvas with Ultra-HD 2.4x resolution
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
     const billElement = document.getElementById('printable-bill-area');
@@ -306,10 +229,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       // A. On Native Android Mobile App (Capacitor):
       if (isNative) {
         try {
+          // Send strictly the single bill image (which has the receipt details attached directly underneath)
+          // Do NOT pass separate text parameter, so WhatsApp NEVER sends a separate text message first!
           await WhatsAppOpener.openWhatsAppWithImage({
             imageBase64: billData.base64Data,
             fileName: fileName,
-            text: caption,
           });
           return;
         } catch (pluginErr) {
@@ -317,44 +241,33 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           try {
             await Share.share({
               title: `ANIMEX Bill #${masterInvoiceNo}`,
-              text: caption,
               dialogTitle: isMr ? 'WhatsApp निवडा' : 'Select WhatsApp',
             });
             return;
           } catch (e) {
-            const fullText = getBillTextMessage();
-            await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text: fullText });
+            console.error('Share fallback error:', e);
             return;
           }
         }
       }
 
       // B. On Web / Desktop PC / Laptop Browser:
-      // 1. Immediately copy the real bill image & caption to clipboard (works with fresh user gesture!)
+      // 1. Immediately copy the real bill image to clipboard
       try {
         if (billData.blob && navigator.clipboard && (window as any).ClipboardItem) {
-          try {
-            const item = new (window as any).ClipboardItem({
-              'image/png': billData.blob,
-              'text/plain': new Blob([caption], { type: 'text/plain' }),
-            });
-            await navigator.clipboard.write([item]);
-          } catch (multiErr) {
-            const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
-            await navigator.clipboard.write([item]);
-          }
+          const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
+          await navigator.clipboard.write([item]);
         }
       } catch (clipErr) {
         console.warn('Clipboard image write error:', clipErr);
       }
 
-      // 2. If Web Share API supports file sharing (e.g. mobile Chrome, Windows Share):
+      // 2. If Web Share API supports file sharing:
       if (typeof navigator !== 'undefined' && (navigator as any).canShare && (navigator as any).canShare({ files: [billData.file] })) {
         try {
           await (navigator as any).share({
             files: [billData.file],
             title: `ANIMEX Bill #${masterInvoiceNo}`,
-            text: caption,
           });
           return;
         } catch (shareErr: any) {
@@ -376,16 +289,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
 
       // 4. Desktop PC / Mobile Browser WhatsApp Launch:
-      const encodedCaption = encodeURIComponent(caption);
       const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
       if (isMobileDevice) {
+        // Direct WhatsApp chat without separate text, so both bill + receipt go in the single image!
         const targetUrl = cleanPhone
-          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `https://api.whatsapp.com/send?text=${encodedCaption}`;
+          ? `https://api.whatsapp.com/send?phone=${cleanPhone}`
+          : `https://api.whatsapp.com/send`;
         window.location.href = targetUrl;
       } else {
-        // Desktop PC (Windows): Launch WhatsApp Desktop cleanly so bill image goes FIRST!
+        // Desktop PC (Windows): Launch WhatsApp Desktop cleanly
         const desktopProtocolUrl = cleanPhone
           ? `whatsapp://send?phone=${cleanPhone}`
           : `whatsapp://send`;
@@ -834,29 +747,27 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
             </div>
 
-            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill */}
-            <div className="mt-3.5 p-3.5 bg-emerald-50/90 border-2 border-emerald-600 rounded-xl text-left space-y-1.5 print:mt-1 print:p-2 shadow-xs">
-              <div className="font-black text-sm text-[#0F4C81] flex items-center gap-2">
-                <span className="text-base">🏢</span>
-                <span className="tracking-wide uppercase">{companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}</span>
+            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill (Matches WhatsApp Card Format) */}
+            <div className="mt-3 p-3.5 bg-[#d9fdd3] border border-[#86efac] rounded-xl text-left space-y-1 print:mt-1 print:p-2 shadow-xs font-sans">
+              <div className="font-black text-xs sm:text-sm text-slate-950 flex items-center gap-1.5 uppercase tracking-wide">
+                <span>🏢</span>
+                <span>{companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}</span>
               </div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span>📄</span>
-                <span>Tax Invoice / Bill: <strong className="font-black text-slate-950">#{masterInvoiceNo}</strong></span>
+                <span>Tax Invoice / Bill: <strong>#{masterInvoiceNo}</strong></span>
               </div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span>🏥</span>
-                <span>Customer: <strong className="font-black text-slate-950">{invoice?.billTo?.firmName || 'Valued Customer'}</strong></span>
+                <span>Customer: <strong>{invoice?.billTo?.firmName || 'Valued Customer'}</strong></span>
               </div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span>💰</span>
-                <span>Total: <strong className="font-black text-slate-950">₹{safeNum(invoice?.totalAmount).toFixed(2)}</strong></span>
+                <span>Total: <strong>₹{safeNum(invoice?.totalAmount).toFixed(2)}</strong></span>
               </div>
-              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span>📌</span>
-                <span>Balance: <strong className={`font-black ${effectiveBalance <= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                  {effectiveBalance <= 0 ? '✓ PAID' : `₹${effectiveBalance.toFixed(2)}`}
-                </strong></span>
+                <span>Balance: <strong>{effectiveBalance <= 0 ? '✓ PAID' : `₹${effectiveBalance.toFixed(2)}`}</strong></span>
               </div>
             </div>
           </div>

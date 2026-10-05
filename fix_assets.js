@@ -1,10 +1,23 @@
-import { execSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 
-try {
-  execSync(`powershell -Command "Remove-Item -Recurse -Force 'android/app/src/main/assets/public' -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Force 'android/app/src/main/assets/public' | Out-Null; Copy-Item -Recurse -Force 'dist/*' 'android/app/src/main/assets/public/'"`, { stdio: 'inherit' });
-  console.log('Assets successfully rewritten as regular files.');
-} catch (e) {
-  console.error('fix_assets error:', e);
+function rewrite(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
+    if (fs.statSync(p).isDirectory()) {
+      rewrite(p);
+    } else {
+      try {
+        const buf = fs.readFileSync(p);
+        fs.unlinkSync(p);
+        fs.writeFileSync(p, buf);
+      } catch (e) {
+        console.warn('rewrite error for', p, e.message);
+      }
+    }
+  }
 }
 
+rewrite('android/app/src/main/assets');
+console.log('Assets successfully rewritten as regular files.');

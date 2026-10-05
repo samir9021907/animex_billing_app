@@ -833,6 +833,32 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill */}
+            <div className="mt-3.5 p-3.5 bg-emerald-50/90 border-2 border-emerald-600 rounded-xl text-left space-y-1.5 print:mt-1 print:p-2 shadow-xs">
+              <div className="font-black text-sm text-[#0F4C81] flex items-center gap-2">
+                <span className="text-base">🏢</span>
+                <span className="tracking-wide uppercase">{companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}</span>
+              </div>
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <span>📄</span>
+                <span>Tax Invoice / Bill: <strong className="font-black text-slate-950">#{masterInvoiceNo}</strong></span>
+              </div>
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <span>🏥</span>
+                <span>Customer: <strong className="font-black text-slate-950">{invoice?.billTo?.firmName || 'Valued Customer'}</strong></span>
+              </div>
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <span>💰</span>
+                <span>Total: <strong className="font-black text-slate-950">₹{safeNum(invoice?.totalAmount).toFixed(2)}</strong></span>
+              </div>
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <span>📌</span>
+                <span>Balance: <strong className={`font-black ${effectiveBalance <= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {effectiveBalance <= 0 ? '✓ PAID' : `₹${effectiveBalance.toFixed(2)}`}
+                </strong></span>
+              </div>
+            </div>
           </div>
         </div>
 

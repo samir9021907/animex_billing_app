@@ -50,7 +50,19 @@ public class WhatsAppPlugin extends Plugin {
                 imageFile
             );
 
-            // Create ACTION_SEND Intent for image
+            String phone = call.getString("phone", "");
+
+            // Copy caption text to Android Clipboard as automatic backup
+            if (text != null && !text.isEmpty()) {
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("ANIMEX Invoice Caption", text));
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // Create ACTION_SEND Intent for image with attached caption (single message bubble!)
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("image/png");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
@@ -58,6 +70,7 @@ public class WhatsAppPlugin extends Plugin {
             if (text != null && !text.isEmpty()) {
                 shareIntent.putExtra(Intent.EXTRA_TEXT, text);
             }
+
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
@@ -70,12 +83,14 @@ public class WhatsAppPlugin extends Plugin {
                     shareIntent.setPackage("com.whatsapp.w4b");
                     getContext().startActivity(shareIntent);
                 } catch (Exception e2) {
+                    shareIntent.setPackage(null);
                     Intent chooser = Intent.createChooser(shareIntent, "WhatsApp निवडा");
                     chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     getContext().startActivity(chooser);
                 }
             }
+
 
             call.resolve();
         } catch (Exception ex) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Invoice } from '../types';
-import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink } from 'lucide-react';
+import { Printer, X, CheckCircle2, Loader2, MessageSquare, Download, ExternalLink, Copy, Check } from 'lucide-react';
+
 import { getStatusBadgeConfig } from '../utils/invoiceUtils';
 import html2canvas from 'html2canvas';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -17,8 +18,9 @@ interface PreRenderedData {
 
 interface WhatsAppOpenerPlugin {
   openWhatsApp(options: { phone?: string; text: string }): Promise<void>;
-  openWhatsAppWithImage(options: { imageBase64: string; fileName: string; text?: string }): Promise<void>;
+  openWhatsAppWithImage(options: { imageBase64: string; fileName: string; text?: string; phone?: string }): Promise<void>;
 }
+
 
 const WhatsAppOpener = registerPlugin<WhatsAppOpenerPlugin>('WhatsAppOpener');
 
@@ -58,7 +60,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [generatingMsg, setGeneratingMsg] = useState<string>('');
   const [showDesktopGuideModal, setShowDesktopGuideModal] = useState<boolean>(false);
   const [desktopWebUrl, setDesktopWebUrl] = useState<string>('');
+  const [copiedPhoto, setCopiedPhoto] = useState<boolean>(false);
   const preRenderedDataRef = useRef<PreRenderedData | null>(null);
+
   const isPreRenderingRef = useRef<boolean>(false);
 
   const isNative = Capacitor.isNativePlatform();
@@ -114,82 +118,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return '';
   };
 
-  // Generate complete, official, original bill text for WhatsApp
-  const getBillTextMessage = (): string => {
-    const isCust = invoice?.billTo?.customerType === 'customer';
-    const storeName = invoice?.billTo?.firmName || (isCust ? 'Valued Customer' : 'Medical Store');
-    const contact = (!isCust && invoice?.billTo?.contactName) ? ` (${invoice.billTo.contactName})` : '';
-    const location = [invoice?.billTo?.address, invoice?.billTo?.district].filter(Boolean).join(', ');
 
-    let itemsList = '';
-    (invoice?.items || []).forEach((item, index) => {
-      const isScheme = item.isFree || item.isScheme;
-      const freeTag = isScheme ? ' [FREE SCHEME]' : '';
-      const priceVal = safeNum(item.pricePerUnit);
-      const amtVal = safeNum(item.amount);
-      const priceStr = isScheme ? '₹0.00' : `₹${priceVal.toFixed(2)}`;
-      const amountStr = isScheme ? '₹0.00' : `₹${amtVal.toFixed(2)}`;
-      itemsList += `${index + 1}. *${item.itemName || 'Item'}*${freeTag}\n   ${item.quantity || 1} ${item.unit || 'pcs'} x ${priceStr} = *${amountStr}*\n`;
-    });
-
-    const rawBal = safeNum(invoice?.balanceAmount);
-    const isPaidInFull = rawBal <= 1.0 || Math.round(rawBal) === 0;
-    const balanceAmt = isPaidInFull ? 0 : rawBal;
-    const receivedAmt = isPaidInFull ? safeNum(invoice?.totalAmount) : safeNum(invoice?.receivedAmount);
-    const totalAmt = safeNum(invoice?.totalAmount);
-    const subTotalAmt = safeNum(invoice?.subTotal);
-    const discountAmt = safeNum(invoice?.discount);
-
-    const balanceStatus = isPaidInFull
-      ? (isMr ? '🟢 *पूर्ण भरले (PAID)*' : isHi ? '🟢 *पूर्ण भुगतान (PAID)*' : '🟢 *PAID*')
-      : receivedAmt > 0
-        ? (isMr ? `🟠 *अंशतः भरले* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🟠 *आंशिक भुगतान* - शेष: ₹${balanceAmt.toFixed(2)}` : `🟠 *PARTIALLY PAID* - Balance: ₹${balanceAmt.toFixed(2)}`)
-        : (isMr ? `🔴 *बाकी* - बाकी: ₹${balanceAmt.toFixed(2)}` : isHi ? `🔴 *बकाया* - शेष: ₹${balanceAmt.toFixed(2)}` : `🔴 *PENDING* - Balance: ₹${balanceAmt.toFixed(2)}`);
-
-    const invDate = invoice?.date || new Date().toISOString().split('T')[0];
-
-    const labelDate = isMr ? 'तारीख' : isHi ? 'दिनांक' : 'Date';
-    const labelCustomer = isMr ? 'ग्राहक' : isHi ? 'ग्राहक' : 'Customer';
-    const labelAddress = isMr ? 'पत्ता' : isHi ? 'पता' : 'Address';
-    const labelItems = isMr ? 'वस्तू तपशील' : isHi ? 'सामग्री विवरण' : 'Items';
-    const labelSubTotal = 'Sub Total';
-    const labelDiscount = isMr ? 'सवलत' : isHi ? 'छूट' : 'Discount';
-    const labelTotal = isMr ? 'एकूण बिल रक्कम' : isHi ? 'कुल बिल राशि' : 'Total Amount';
-    const labelPaid = isMr ? 'भरलेली रक्कम' : isHi ? 'भुगतान राशि' : 'Paid Amount';
-    const labelBalance = isMr ? 'बाकी रक्कम' : isHi ? 'बकाया राशि' : 'Balance Due';
-    const labelStatus = isMr ? 'स्थिती' : isHi ? 'स्थिति' : 'Status';
-    const labelBank = isMr ? 'बँक / UPI तपशील' : isHi ? 'बैंक / UPI विवरण' : 'Bank & UPI Details';
-    const labelBankName = isMr ? 'बँक' : isHi ? 'बैंक' : 'Bank';
-    const labelAccountNo = isMr ? 'खाते क्र.' : isHi ? 'खाता सं.' : 'A/C No.';
-    const thankYou = isMr ? 'आपल्या सहकार्याबद्दल धन्यवाद!' : isHi ? 'व्यापार के लिए धन्यवाद!' : 'Thank you for your business!';
-
-    return (
-      `🏢 *${companyProfile?.companyName || 'ANIMEX ANIMAL HEALTH CARE PVT LTD'}*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📄 *TAX INVOICE / BILL: #${masterInvoiceNo}*\n` +
-      `📅 *${labelDate}:* ${invDate}\n` +
-      `🏥 *${labelCustomer}:* ${storeName}${contact}\n` +
-      (location ? `📍 *${labelAddress}:* ${location}\n` : '') +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 *${labelItems}:*\n` +
-      itemsList +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 *${labelSubTotal}:* ₹${subTotalAmt.toFixed(2)}\n` +
-      (discountAmt > 0 ? `🏷️ *${labelDiscount}:* - ₹${discountAmt.toFixed(2)}\n` : '') +
-      `💰 *${labelTotal}:* *₹${totalAmt.toFixed(2)}*\n` +
-      `💳 *${labelPaid}:* ₹${receivedAmt.toFixed(2)} (${invoice?.paymentType || 'UPI'})\n` +
-      `📌 *${labelBalance}:* ₹${balanceAmt.toFixed(2)}\n` +
-      `📌 *${labelStatus}:* ${balanceStatus}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🏦 *${labelBank}:*\n` +
-      `• ${labelBankName}: ${companyProfile?.bankName || 'Indian Overseas Bank'}\n` +
-      `• ${labelAccountNo}: ${companyProfile?.accountNo || '083602000001131'}\n` +
-      `• IFSC: ${companyProfile?.ifscCode || 'IOBA0000836'}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📞 Helpline: 8799883858 / 9146133858\n` +
-      `🙏 *${thankYou}*`
-    );
-  };
 
   // Helper to render the original color bill into a Canvas with Ultra-HD 2.4x resolution
   const generateBillCanvas = async (): Promise<HTMLCanvasElement | null> => {
@@ -304,6 +233,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             imageBase64: billData.base64Data,
             fileName: fileName,
             text: caption,
+            phone: cleanPhone,
           });
           return;
         } catch (pluginErr) {
@@ -316,9 +246,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             });
             return;
           } catch (e) {
-            const fullText = getBillTextMessage();
-            await WhatsAppOpener.openWhatsApp({ phone: cleanPhone, text: fullText });
-            return;
+            console.error('Native Share error:', e);
           }
         }
       }
@@ -362,23 +290,23 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
 
       // 4. Desktop PC / Mobile Browser WhatsApp Launch:
-      const encodedCaption = encodeURIComponent(caption);
+      // Open WhatsApp chat directly without separate pre-filled text, so NO separate text message goes first!
       const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
       if (isMobileDevice) {
         const targetUrl = cleanPhone
-          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `https://api.whatsapp.com/send?text=${encodedCaption}`;
+          ? `https://api.whatsapp.com/send?phone=${cleanPhone}`
+          : `https://api.whatsapp.com/send`;
         window.location.href = targetUrl;
       } else {
-        // Desktop PC (Windows): Launch WhatsApp Desktop protocol instantly!
+        // Desktop PC (Windows): Launch WhatsApp Desktop protocol cleanly without prefilled text!
         const desktopProtocolUrl = cleanPhone
-          ? `whatsapp://send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `whatsapp://send?text=${encodedCaption}`;
+          ? `whatsapp://send?phone=${cleanPhone}`
+          : `whatsapp://send`;
 
         const webUrl = cleanPhone
-          ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedCaption}`
-          : `https://web.whatsapp.com/send?text=${encodedCaption}`;
+          ? `https://web.whatsapp.com/send?phone=${cleanPhone}`
+          : `https://web.whatsapp.com`;
         
         setDesktopWebUrl(webUrl);
 
@@ -391,6 +319,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         // Show guide popup with Ctrl+V instruction
         setShowDesktopGuideModal(true);
       }
+
     } catch (err: any) {
       console.error('Direct WhatsApp error:', err);
       alert((isMr ? 'WhatsApp उघडताना त्रुटी आली: ' : 'Error opening WhatsApp: ') + (err.message || 'Error'));
@@ -829,6 +758,36 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill (Guarantees Image 1 format!) */}
+            <div className="mt-3 bg-[#d9fdd3] border-2 border-emerald-500 rounded-xl p-3.5 sm:p-4 text-left shadow-sm print:hidden select-none">
+              <div className="font-black text-sm sm:text-base text-slate-950 flex items-center gap-2">
+                <span className="text-base sm:text-lg">🏢</span>
+                <span className="tracking-wide uppercase">{companyProfile.companyName}</span>
+              </div>
+              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
+                <span>📄</span>
+                <span>Tax Invoice / Bill: #{masterInvoiceNo}</span>
+              </div>
+              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
+                <span>🏥</span>
+                <span>Customer: {invoice?.billTo?.firmName || 'Valued Customer'}</span>
+              </div>
+              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
+                <span>💰</span>
+                <span>Total: ₹{safeNum(invoice?.totalAmount).toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 pt-0.5">
+                <div className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2">
+                  <span>📌</span>
+                  <span>Balance: {effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : '✓ PAID'}</span>
+                </div>
+                <div className="text-[11px] font-bold text-slate-600 flex items-center gap-1 shrink-0">
+                  <span>{new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}</span>
+                  <span className="text-sky-500 font-black text-xs">✓✓</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -850,37 +809,52 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-200">
-                <div className="bg-emerald-950/60 border border-emerald-700/60 rounded-xl p-3 flex items-start gap-2.5">
-                  <span className="text-xl shrink-0">📋</span>
-                  <div>
-                    <p className="font-black text-emerald-300">
-                      {isMr ? 'मूळ Ultra-HD बिल फोटो Clipboard वर कॉपी झाला आहे!' : 'Original Ultra-HD bill image copied to Clipboard!'}
-                    </p>
-                    <p className="text-[11px] text-slate-200 mt-1">
-                      {isMr
-                        ? 'WhatsApp मध्ये ज्या व्यक्तीला बिल पाठवायचे आहे त्यांचे नाव सर्च करा आणि फक्त '
-                        : 'In WhatsApp, search contact name and simply press '}
-                      <kbd className="bg-slate-900 border border-emerald-400 text-emerald-300 px-1.5 py-0.5 rounded font-black text-[11px]">
-                        Ctrl + V
-                      </kbd>
-                      {isMr ? ' (Paste) दाबा व Send करा!' : ' (Paste) and hit Send!'}
-                    </p>
+                <div className="bg-emerald-950/70 border-2 border-emerald-500 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-emerald-300 text-sm flex items-center gap-2">
+                      <span className="text-lg">✅</span>
+                      <span>{isMr ? 'पहिल्या फोटोप्रमाणे एकाच मेसेजमध्ये पाठवा:' : 'Send in 1-Click matching Image 1:'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          let billData = preRenderedDataRef.current;
+                          if (!billData) billData = await doPreRender();
+                          if (billData?.blob && navigator.clipboard && (window as any).ClipboardItem) {
+                            const item = new (window as any).ClipboardItem({ 'image/png': billData.blob });
+                            await navigator.clipboard.write([item]);
+                            setCopiedPhoto(true);
+                            setTimeout(() => setCopiedPhoto(false), 2000);
+                          }
+                        } catch (e) {
+                          console.warn(e);
+                        }
+                      }}
+                      className="bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      {copiedPhoto ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedPhoto ? (isMr ? 'फोटो कॉपी झाला!' : 'Photo Copied!') : (isMr ? 'फोटो पुन्हा कॉपी करा' : 'Re-copy Photo')}</span>
+                    </button>
                   </div>
+                  <p className="text-xs text-slate-100 font-bold leading-relaxed">
+                    {isMr
+                      ? 'WhatsApp चॅटमध्ये फक्त '
+                      : 'In WhatsApp chat, simply press '}
+                    <kbd className="bg-slate-900 border border-emerald-400 text-emerald-300 px-2 py-0.5 rounded font-black text-xs">
+                      Ctrl + V
+                    </kbd>
+                    {isMr
+                      ? ' (Paste) दाबा आणि Send करा!'
+                      : ' (Paste) and hit Send!'}
+                  </p>
+                  <p className="text-[11px] text-emerald-200 font-medium">
+                    {isMr
+                      ? '✨ बिलाच्या फोटोखालीच संपूर्ण माहिती (कंपनी, बिल क्र., ग्राहक, रक्कम, पेड) आधीच जोडलेली आहे. त्यामुळे पहिल्या फोटोप्रमाणे एकाच मेसेजमध्ये (Single Bubble) एकच टिकमार्क जाईल!'
+                      : '✨ The entire invoice summary is already attached directly under the bill. It will send as a single unified message bubble with one tick mark!'}
+                  </p>
                 </div>
 
-                <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-3 flex items-start gap-2.5 text-[11px] text-slate-300">
-                  <span className="text-xl shrink-0">📥</span>
-                  <div>
-                    <p className="font-bold text-white">
-                      {isMr ? 'HD बिल फोटो Downloads फोल्डरमध्येही सेव्ह झाला आहे.' : 'HD bill file also saved to Downloads folder.'}
-                    </p>
-                    <p className="text-slate-400 mt-0.5">
-                      {isMr ? 'हवे असल्यास तुम्ही डाऊनलोड झालेला फोटो थेट WhatsApp मध्ये ड्रॅग करू शकता.' : 'You can also drag-drop the downloaded image directly into chat.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">
                 {desktopWebUrl && (

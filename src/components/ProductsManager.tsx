@@ -159,15 +159,22 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
   // Product Form states
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
-  const [defaultUnit, setDefaultUnit] = useState('Ltr');
-  const [mrp, setMrp] = useState<number>(350);
-  const [defaultPrice, setDefaultPrice] = useState<number>(300);
+  const [defaultUnit, setDefaultUnit] = useState('');
+  const [mrp, setMrp] = useState<number | ''>('');
+  const [defaultPrice, setDefaultPrice] = useState<number | ''>('');
   const [isLoosePackaging, setIsLoosePackaging] = useState<boolean>(false);
-  const [boxCapacity, setBoxCapacity] = useState<number>(100);
-  const [initialBoxes, setInitialBoxes] = useState<number>(10);
-  const [initialLooseUnits, setInitialLooseUnits] = useState<number>(0);
-  const [stockQuantity, setStockQuantity] = useState<number>(1500);
-  const [minStockAlert, setMinStockAlert] = useState<number>(50);
+  const [boxCapacity, setBoxCapacity] = useState<number | ''>('');
+  const [initialBoxes, setInitialBoxes] = useState<number | ''>('');
+  const [initialLooseUnits, setInitialLooseUnits] = useState<number | ''>('');
+  const [minStockAlert, setMinStockAlert] = useState<number | ''>('');
+
+  // Auto-calculated real-time total stock quantity
+  const computedStock = useMemo(() => {
+    const b = initialBoxes === '' ? 0 : Number(initialBoxes);
+    const cap = boxCapacity === '' ? 0 : Number(boxCapacity);
+    const l = initialLooseUnits === '' ? 0 : Number(initialLooseUnits);
+    return isLoosePackaging ? l : ((b * cap) + l);
+  }, [initialBoxes, boxCapacity, initialLooseUnits, isLoosePackaging]);
 
   const filteredProductNames = useMemo(() => {
     if (!name.trim()) return availableProductNames;
@@ -183,106 +190,171 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     );
   }, [availableCategories, category]);
 
-  const applyAutoPackSettings = (
-    str: string,
-    updateUnitField: boolean = true,
-    currentBoxes: number = initialBoxes,
-    currentLoose: number = initialLooseUnits,
-    currentStock: number = stockQuantity
-  ) => {
-    const lower = (str || '').toLowerCase();
-    let detected = false;
-    let newCap = boxCapacity;
-    let newLoose = isLoosePackaging;
-    let newUnit = defaultUnit;
-    let newAlert = minStockAlert;
+  // Dynamic piece, plural and volume derivation from typed unit & name
+  const derivePieceInfo = (unitStr: string, nameStr: string, isLoose: boolean = false) => {
+    const u = (unitStr || '').trim().toLowerCase();
+    const n = (nameStr || '').trim().toLowerCase();
 
-    if (lower.includes('25kg') || lower.includes('25 kg') || lower.includes('bucket')) {
-      detected = true;
-      newUnit = 'Bucket';
-      newLoose = true;
-      newCap = 1;
-      newAlert = 2;
-    } else if (lower.includes('10kg') || lower.includes('10 kg')) {
-      detected = true;
-      newUnit = 'Bucket';
-      newLoose = false;
-      newCap = 2;
-      newAlert = 2;
-    } else if (lower.includes('5 lit') || lower.includes('5lit') || lower.includes('5 ltr') || /(?:^|[(\s/])5\s*(?:lit|ltr|l\b)/i.test(str) || lower.includes('can')) {
-      detected = true;
-      newUnit = 'Can';
-      newLoose = false;
-      newCap = 4;
-      newAlert = 4;
-    } else if (lower.includes('500ml') || lower.includes('500 ml')) {
-      detected = true;
-      newUnit = 'Bottle';
-      newLoose = false;
-      newCap = 24;
-      newAlert = 24;
-    } else if (lower.includes('300ml') || lower.includes('300 ml')) {
-      detected = true;
-      newUnit = 'Bottle';
-      newLoose = false;
-      newCap = 40;
-      newAlert = 40;
-    } else if (lower.includes('250ml') || lower.includes('250 ml') || lower.includes('100ml') || lower.includes('100 ml')) {
-      detected = true;
-      newUnit = 'Bottle';
-      newLoose = false;
-      newCap = 50;
-      newAlert = 50;
-    } else if (lower.includes('1lit') || lower.includes('1 lit') || lower.includes('1 ltr') || /(?:^|[(\s/])1\s*(?:lit|ltr|l\b)/i.test(str)) {
-      detected = true;
-      newUnit = 'Ltr';
-      newLoose = false;
-      newCap = 20;
-      newAlert = 20;
-    } else if (lower.includes('250gm') || lower.includes('250 gm') || lower.includes('300gm') || lower.includes('300 gm') || lower.includes('500gm') || lower.includes('500 gm') || lower.includes('pouch') || lower.includes('powder')) {
-      detected = true;
-      newUnit = 'Pouch';
-      newLoose = false;
-      newCap = 40;
-      newAlert = 40;
-    } else if (lower.includes('bolus') || lower.includes('pack')) {
-      newUnit = 'Pack';
+    // 1. Can / कॅन
+    if (
+      u.includes('can') ||
+      u.includes('कॅन') ||
+      n.includes('can') ||
+      n.includes('कॅन') ||
+      (/(?:^|[(\s/])5\s*(?:lit|ltr|l\b)/i.test(u) && !u.includes('bottle')) ||
+      (/(?:^|[(\s/])5\s*(?:lit|ltr|l\b)/i.test(n) && !u.includes('bottle'))
+    ) {
+      return {
+        singular: 'Can',
+        plural: 'Cans',
+        marathiPlural: 'कॅन',
+        volumeUnit: 'Ltr',
+      };
     }
 
-    if (detected) {
-      if (updateUnitField) {
-        setDefaultUnit(newUnit);
-      }
-      setIsLoosePackaging(newLoose);
-      setBoxCapacity(newCap);
-      setMinStockAlert(newAlert);
-
-      if (newLoose) {
-        const s = currentStock > 0 ? currentStock : (currentLoose > 0 ? currentLoose : (currentBoxes > 0 ? currentBoxes : 10));
-        setStockQuantity(s);
-        setInitialBoxes(0);
-        setInitialLooseUnits(s);
-      } else {
-        const boxes = currentBoxes > 0 ? currentBoxes : 10;
-        setInitialBoxes(boxes);
-        setStockQuantity((boxes * newCap) + currentLoose);
-      }
+    // 2. Bucket / बकेट
+    if (
+      u.includes('bucket') ||
+      u.includes('बकेट') ||
+      u.includes('25kg') ||
+      u.includes('25 kg') ||
+      u.includes('10kg') ||
+      u.includes('10 kg') ||
+      n.includes('bucket') ||
+      n.includes('बकेट') ||
+      n.includes('25kg') ||
+      n.includes('25 kg') ||
+      n.includes('10kg') ||
+      n.includes('10 kg') ||
+      (u.includes('kg') && isLoose)
+    ) {
+      return {
+        singular: 'Bucket',
+        plural: 'Buckets',
+        marathiPlural: 'बकेट',
+        volumeUnit: 'Kg',
+      };
     }
+
+    // 3. Pouch / पुडे / पुड्या / Powder / gm
+    if (
+      u.includes('pouch') ||
+      u.includes('पुडे') ||
+      u.includes('पुडा') ||
+      u.includes('पुड्या') ||
+      u.includes('pude') ||
+      u.includes('pudi') ||
+      u.includes('पाकीट') ||
+      u.includes('powder') ||
+      u.includes('पावडर') ||
+      u.includes('gm') ||
+      u.includes('ग्रॅम') ||
+      n.includes('pouch') ||
+      n.includes('पुडे') ||
+      n.includes('powder') ||
+      n.includes('gm')
+    ) {
+      return {
+        singular: 'Pouch',
+        plural: 'Pouches',
+        marathiPlural: 'पुडे',
+        volumeUnit: u.includes('gm') ? 'gm' : 'Pouches',
+      };
+    }
+
+    // 4. Pack / पॅक / Bolus
+    if (
+      u.includes('pack') ||
+      u.includes('पॅक') ||
+      u.includes('bolus') ||
+      n.includes('pack') ||
+      n.includes('पॅक') ||
+      n.includes('bolus')
+    ) {
+      return {
+        singular: 'Pack',
+        plural: 'Packs',
+        marathiPlural: 'पॅक',
+        volumeUnit: 'Pack',
+      };
+    }
+
+    // 5. Litre / Bottles / Liquid
+    if (
+      u.includes('lit') ||
+      u.includes('ltr') ||
+      u.includes('लीटर') ||
+      u.includes('लिटर') ||
+      u.includes('ली') ||
+      u.includes('bottle') ||
+      u.includes('बाटली') ||
+      u.includes('ml') ||
+      u.includes('मिली') ||
+      n.includes('lit') ||
+      n.includes('ltr') ||
+      n.includes('bottle') ||
+      n.includes('ml')
+    ) {
+      return {
+        singular: 'Bottle',
+        plural: 'Bottles',
+        marathiPlural: 'बाटल्या',
+        volumeUnit: u.includes('ml') ? 'ml' : 'Ltr',
+      };
+    }
+
+    // 6. Box / खोके
+    if (u.includes('box') || u.includes('खोका') || u.includes('खोके')) {
+      return {
+        singular: 'Box',
+        plural: 'Boxes',
+        marathiPlural: 'खोके',
+        volumeUnit: 'Box',
+      };
+    }
+
+    // 7. Loose Packaging fallback
+    if (isLoose) {
+      return {
+        singular: 'Bucket',
+        plural: 'Buckets',
+        marathiPlural: 'बकेट',
+        volumeUnit: 'Bucket',
+      };
+    }
+
+    // 8. Custom user unit if typed
+    if (unitStr && unitStr.trim()) {
+      const trimmed = unitStr.trim();
+      return {
+        singular: trimmed,
+        plural: trimmed.endsWith('s') ? trimmed : `${trimmed}s`,
+        marathiPlural: trimmed,
+        volumeUnit: trimmed,
+      };
+    }
+
+    // Default fallback
+    return {
+      singular: 'Bottle',
+      plural: 'Bottles',
+      marathiPlural: 'बाटल्या',
+      volumeUnit: 'Ltr',
+    };
   };
 
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setName('');
     setCategory('');
-    setDefaultUnit('Ltr');
-    setMrp(350);
-    setDefaultPrice(300);
+    setDefaultUnit('');
+    setMrp('');
+    setDefaultPrice('');
     setIsLoosePackaging(false);
-    setBoxCapacity(50);
-    setInitialBoxes(10);
-    setInitialLooseUnits(0);
-    setStockQuantity(500);
-    setMinStockAlert(50);
+    setBoxCapacity('');
+    setInitialBoxes('');
+    setInitialLooseUnits('');
+    setMinStockAlert('');
     setFormError(null);
     setShowModal(true);
   };
@@ -291,24 +363,22 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     setEditingProduct(p);
     setName(p.name);
     setCategory(p.category || '');
-    setDefaultUnit(p.defaultUnit || 'Ltr');
-    setMrp(p.mrp || 0);
-    setDefaultPrice(p.defaultPrice || 0);
+    setDefaultUnit(p.defaultUnit || '');
+    setMrp(p.mrp !== undefined && p.mrp !== null && p.mrp > 0 ? p.mrp : '');
+    setDefaultPrice(p.defaultPrice !== undefined && p.defaultPrice !== null ? p.defaultPrice : '');
     const isLoose = (p.boxCapacity || 1) <= 1 || (p.defaultUnit === 'Bucket' && (p.boxCapacity || 1) <= 1);
     setIsLoosePackaging(isLoose);
-    const cap = isLoose ? 1 : (p.boxCapacity || 50);
-    setBoxCapacity(cap);
+    const cap = isLoose ? 1 : (p.boxCapacity || 1);
+    setBoxCapacity(isLoose ? '' : (p.boxCapacity && p.boxCapacity > 1 ? p.boxCapacity : ''));
     const totalSt = p.stockQuantity ?? 0;
-    setStockQuantity(totalSt);
     if (!isLoose && cap > 1) {
-      setInitialBoxes(Math.floor(totalSt / cap));
-      setInitialLooseUnits(totalSt % cap);
+      setInitialBoxes(Math.floor(totalSt / cap) || '');
+      setInitialLooseUnits(totalSt % cap || '');
     } else {
-      setInitialBoxes(0);
-      setInitialLooseUnits(totalSt);
+      setInitialBoxes('');
+      setInitialLooseUnits(totalSt || '');
     }
-    const defaultAlert = (p.boxCapacity && p.boxCapacity > 1) ? p.boxCapacity : (p.defaultUnit === 'Bucket' ? 2 : 10);
-    setMinStockAlert(p.minStockAlert !== undefined && p.minStockAlert !== null ? p.minStockAlert : defaultAlert);
+    setMinStockAlert(p.minStockAlert !== undefined && p.minStockAlert !== null ? p.minStockAlert : '');
     setFormError(null);
     setShowModal(true);
   };
@@ -358,29 +428,29 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
     }
 
     // 2. Validate Selling Price
-    if (!defaultPrice || Number(defaultPrice) <= 0) {
+    if (defaultPrice === '' || Number(defaultPrice) <= 0) {
       setFormError(isMr ? 'विक्री किंमत ० पेक्षा जास्त असणे आवश्यक आहे.' : isHi ? 'बिक्री मूल्य 0 से अधिक होना चाहिए।' : 'Selling price must be greater than 0.');
       return;
     }
 
     // 3. Validate MRP vs Selling Price
-    if (mrp && Number(mrp) > 0 && Number(mrp) < Number(defaultPrice)) {
+    if (mrp !== '' && Number(mrp) > 0 && Number(mrp) < Number(defaultPrice)) {
       setFormError(isMr ? 'MRP ही विक्री किंमतीपेक्षा कमी असू शकत नाही.' : isHi ? 'MRP बिक्री मूल्य से कम नहीं हो सकती।' : 'MRP cannot be less than selling price.');
       return;
     }
 
     // 4. Validate Box Capacity
-    const finalBoxCap = isLoosePackaging ? 1 : (Number(boxCapacity) || 1);
-    if (finalBoxCap < 1) {
+    const finalBoxCap = isLoosePackaging ? 1 : (boxCapacity !== '' ? Number(boxCapacity) : 1);
+    if (!isLoosePackaging && (boxCapacity === '' || Number(boxCapacity) < 1)) {
       setFormError(isMr ? 'खोक्यात प्रमाण किमान १ असावे.' : isHi ? 'बॉक्स क्षमता कम से कम 1 होनी चाहिए।' : 'Box capacity must be at least 1.');
       return;
     }
 
     // 5. Validate Stock Quantity
-    if (Number(stockQuantity) < 0) {
-      setFormError(isMr ? 'स्टॉक संख्या निगेटिव्ह असू शकत नाही.' : isHi ? 'स्टॉक मात्रा नकारात्मक नहीं हो सकती।' : 'Stock quantity cannot be negative.');
-      return;
-    }
+    const finalStock = computedStock;
+
+    const finalUnit = defaultUnit.trim() || 'Units';
+    const finalAlert = minStockAlert !== '' ? Number(minStockAlert) : (finalBoxCap > 1 ? finalBoxCap : 5);
 
     setFormError(null);
 
@@ -391,12 +461,12 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         ...editingProduct,
         name: name.trim(),
         category: finalCategory,
-        defaultUnit,
-        mrp: Number(mrp) || 0,
+        defaultUnit: finalUnit,
+        mrp: mrp !== '' ? Number(mrp) : 0,
         defaultPrice: Number(defaultPrice),
         boxCapacity: finalBoxCap,
-        stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-        minStockAlert: Number(minStockAlert) >= 0 ? Number(minStockAlert) : 5,
+        stockQuantity: finalStock,
+        minStockAlert: finalAlert,
       };
       onUpdateProduct(updated);
     } else {
@@ -404,12 +474,12 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
         id: `p-${Date.now()}`,
         name: name.trim(),
         category: finalCategory,
-        defaultUnit,
-        mrp: Number(mrp) || 0,
+        defaultUnit: finalUnit,
+        mrp: mrp !== '' ? Number(mrp) : 0,
         defaultPrice: Number(defaultPrice),
         boxCapacity: finalBoxCap,
-        stockQuantity: Number(stockQuantity) >= 0 ? Number(stockQuantity) : 0,
-        minStockAlert: Number(minStockAlert) >= 0 ? Number(minStockAlert) : 5,
+        stockQuantity: finalStock,
+        minStockAlert: finalAlert,
       };
       onAddProduct(created);
     }
@@ -1093,11 +1163,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       if (matched && matched.id !== editingProduct?.id) {
                         if (matched.category) setCategory(matched.category);
                         if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
-                        if (matched.mrp) setMrp(matched.mrp);
-                        if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
-                        if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
-                      } else {
-                        applyAutoPackSettings(val);
+                        if (matched.mrp !== undefined) setMrp(matched.mrp);
+                        if (matched.defaultPrice !== undefined) setDefaultPrice(matched.defaultPrice);
+                        if (matched.boxCapacity !== undefined) setBoxCapacity(matched.boxCapacity);
                       }
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-8 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
@@ -1131,11 +1199,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                           if (matched && matched.id !== editingProduct?.id) {
                             if (matched.category) setCategory(matched.category);
                             if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
-                            if (matched.mrp) setMrp(matched.mrp);
-                            if (matched.defaultPrice) setDefaultPrice(matched.defaultPrice);
-                            if (matched.boxCapacity) setBoxCapacity(matched.boxCapacity);
-                          } else {
-                            applyAutoPackSettings(prodName);
+                            if (matched.mrp !== undefined) setMrp(matched.mrp);
+                            if (matched.defaultPrice !== undefined) setDefaultPrice(matched.defaultPrice);
+                            if (matched.boxCapacity !== undefined) setBoxCapacity(matched.boxCapacity);
                           }
                         }}
                         className="flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors group"
@@ -1245,11 +1311,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       required
                       value={defaultUnit}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setDefaultUnit(val);
-                        applyAutoPackSettings(val, false);
+                        setDefaultUnit(e.target.value);
                       }}
-                      placeholder={isMr ? "उदा. 1 Ltr, 5 Ltr, 300 ml" : "e.g. 1 Ltr, 5 Ltr, 300 ml"}
+                      placeholder={isMr ? "उदा. Ltr, Can, Bucket, Pack" : "e.g. Ltr, Can, Bucket, Pack"}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white font-bold"
                     />
                     <datalist id="unit-options-list">
@@ -1285,7 +1349,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     type="number"
                     step="0.01"
                     value={mrp}
-                    onChange={(e) => setMrp(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMrp(val === '' ? '' : Number(val));
+                    }}
+                    placeholder="0.00"
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -1298,7 +1366,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     step="0.01"
                     required
                     value={defaultPrice}
-                    onChange={(e) => setDefaultPrice(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDefaultPrice(val === '' ? '' : Number(val));
+                    }}
+                    placeholder="0.00"
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -1321,19 +1393,12 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         const loose = e.target.value === 'loose';
                         setIsLoosePackaging(loose);
                         if (loose) {
-                          setBoxCapacity(1);
-                          setInitialBoxes(0);
-                          const cur = (stockQuantity > 0 && stockQuantity !== 500) ? stockQuantity : 9;
-                          setInitialLooseUnits(cur);
-                          setStockQuantity(cur);
-                          if (minStockAlert >= 10) setMinStockAlert(2);
+                          setBoxCapacity('');
+                          setInitialBoxes('');
                         } else {
-                          const cap = boxCapacity > 1 ? boxCapacity : 50;
-                          setBoxCapacity(cap);
-                          setInitialBoxes(10);
-                          setInitialLooseUnits(0);
-                          setStockQuantity(10 * cap);
-                          if (minStockAlert === 2) setMinStockAlert(cap);
+                          setBoxCapacity('');
+                          setInitialBoxes('');
+                          setInitialLooseUnits('');
                         }
                       }}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
@@ -1353,12 +1418,11 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         min="1"
                         value={boxCapacity}
                         onChange={(e) => {
-                          const cap = Number(e.target.value);
-                          setBoxCapacity(cap);
-                          setStockQuantity((initialBoxes * cap) + initialLooseUnits);
+                          const val = e.target.value;
+                          setBoxCapacity(val === '' ? '' : Number(val));
                         }}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white text-xs"
-                        placeholder={isMr ? 'उदा. 20, 50, 100' : isHi ? 'उदा. 20, 50, 100' : 'e.g. 20, 50, 100'}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white text-xs font-bold"
+                        placeholder={isMr ? 'उदा. 20, 50, 100' : 'e.g. 20, 50, 100'}
                       />
                     </div>
                   ) : (
@@ -1378,18 +1442,16 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                       <input
                         type="number"
                         min="0"
-                        value={stockQuantity}
+                        value={initialLooseUnits}
                         onChange={(e) => {
-                          const val = Math.max(0, Number(e.target.value));
-                          setStockQuantity(val);
-                          setInitialBoxes(0);
-                          setInitialLooseUnits(val);
+                          const val = e.target.value;
+                          setInitialLooseUnits(val === '' ? '' : Number(val));
                         }}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-16 text-slate-900 dark:text-white font-bold text-xs"
                         placeholder="0"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">
-                        {defaultUnit.toLowerCase().includes('bucket') || defaultUnit.toLowerCase().includes('kg') ? (isMr ? 'बकेट' : 'Bucket') : defaultUnit}
+                        {derivePieceInfo(defaultUnit, name, isLoosePackaging).plural}
                       </span>
                     </div>
                   </div>
@@ -1408,9 +1470,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                           min="0"
                           value={initialBoxes}
                           onChange={(e) => {
-                            const b = Math.max(0, Number(e.target.value));
-                            setInitialBoxes(b);
-                            setStockQuantity((b * boxCapacity) + initialLooseUnits);
+                            const val = e.target.value;
+                            setInitialBoxes(val === '' ? '' : Number(val));
                           }}
                           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
                           placeholder="0"
@@ -1425,9 +1486,8 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                           min="0"
                           value={initialLooseUnits}
                           onChange={(e) => {
-                            const l = Math.max(0, Number(e.target.value));
-                            setInitialLooseUnits(l);
-                            setStockQuantity((initialBoxes * boxCapacity) + l);
+                            const val = e.target.value;
+                            setInitialLooseUnits(val === '' ? '' : Number(val));
                           }}
                           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-bold text-xs"
                           placeholder="0"
@@ -1437,47 +1497,73 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                   </div>
                 )}
 
-                {/* 3 Summary Boxes as requested in User's Diagram 1, 2, 3 */}
+                {/* 3 Summary Boxes & Real-Time Auto-Calculation */}
                 {(() => {
-                  const vol = parsePackVolume(name, stockQuantity, defaultUnit);
-                  const isBox = !isLoosePackaging && boxCapacity > 1;
-                  const boxTotal = initialBoxes * boxCapacity;
-                  
-                  let pieceLabel = isMr ? 'बाटल्या' : isHi ? 'बोतलें' : 'Bottles';
-                  const lowerUnit = defaultUnit.toLowerCase();
-                  const lowerName = name.toLowerCase();
-                  if (lowerUnit.includes('can') || lowerName.includes('can') || lowerName.includes('5 lit') || lowerName.includes('5lit')) {
-                    pieceLabel = 'Can';
-                  } else if (lowerUnit.includes('bucket') || lowerName.includes('bucket') || lowerUnit.includes('25kg') || lowerUnit.includes('25 kg') || lowerUnit.includes('10kg') || lowerUnit.includes('10 kg') || lowerName.includes('25kg') || lowerName.includes('25 kg') || lowerName.includes('10kg') || lowerName.includes('10 kg') || isLoosePackaging) {
-                    pieceLabel = isMr ? 'बकेट' : 'Bucket';
-                  } else if (lowerUnit.includes('gm') || lowerName.includes('gm') || lowerUnit.includes('pouch') || lowerUnit.includes('pude') || lowerName.includes('powder') || lowerUnit.includes('powder')) {
-                    pieceLabel = isMr ? 'पुडे' : 'Pouches';
-                  } else if (lowerUnit.includes('pack') || lowerName.includes('bolus')) {
-                    pieceLabel = 'Pack';
-                  } else if (lowerUnit.includes('box')) {
-                    pieceLabel = 'Box';
-                  }
+                  const b = initialBoxes === '' ? 0 : Number(initialBoxes);
+                  const cap = boxCapacity === '' ? 0 : Number(boxCapacity);
+                  const l = initialLooseUnits === '' ? 0 : Number(initialLooseUnits);
+                  const totalUnits = computedStock;
+                  const boxTotal = b * cap;
 
-                  const volumeDisplay = vol ? vol.totalDisplay : `${stockQuantity} ${defaultUnit}`;
+                  const pieceInfo = derivePieceInfo(defaultUnit, name, isLoosePackaging);
+                  const vol = parsePackVolume(name, totalUnits, defaultUnit);
+
+                  let volumeLabel = 'Total Volume';
+                  let volumeDisplay = `${totalUnits.toLocaleString('en-IN')} ${defaultUnit || 'Units'}`;
+
+                  if (vol) {
+                    volumeLabel = `Total ${vol.unit}`;
+                    volumeDisplay = vol.totalDisplay;
+                  } else {
+                    const u = (defaultUnit || '').trim().toLowerCase();
+                    if (u.includes('lit') || u.includes('ltr') || u.includes('लिटर') || u.includes('लीटर')) {
+                      volumeLabel = 'Total Ltr';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Ltr`;
+                    } else if (u.includes('kg') || u.includes('किलो')) {
+                      volumeLabel = 'Total Kg';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Kg`;
+                    } else if (u.includes('ml') || u.includes('मिली')) {
+                      volumeLabel = 'Total ml';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} ml`;
+                    } else if (u.includes('gm') || u.includes('ग्रॅम')) {
+                      volumeLabel = 'Total gm';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} gm`;
+                    } else if (u.includes('can') || u.includes('कॅन')) {
+                      volumeLabel = 'Total Cans';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Cans`;
+                    } else if (u.includes('bucket') || u.includes('बकेट')) {
+                      volumeLabel = 'Total Buckets';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Buckets`;
+                    } else if (u.includes('pack') || u.includes('पॅक')) {
+                      volumeLabel = 'Total Packs';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Packs`;
+                    } else if (u.includes('pouch') || u.includes('पुडे') || u.includes('पुड्या')) {
+                      volumeLabel = 'Total Pouches';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} Pouches`;
+                    } else {
+                      volumeLabel = defaultUnit.trim() ? `Total ${defaultUnit.trim()}` : 'Total Units';
+                      volumeDisplay = `${totalUnits.toLocaleString('en-IN')} ${defaultUnit.trim() || 'Units'}`;
+                    }
+                  }
 
                   return (
                     <div className="space-y-2 pt-1">
-                      {/* 3 Uniform Fields: Total Bottles/Bucket, Total Ltr/Kg, Min Stock Alert */}
+                      {/* 3 Uniform Fields: Total Pieces, Total Volume, Min Stock Alert */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {/* Box 1: Total Pieces (Bottles / Cans / Buckets) */}
+                        {/* Box 1: Total Pieces (Bottles / Cans / Buckets / Packs / Pouches) */}
                         <div>
                           <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
-                            {`Total ${pieceLabel}`}
+                            {`Total ${pieceInfo.plural}`}
                           </label>
                           <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
-                            <span>{stockQuantity.toLocaleString('en-IN')} {pieceLabel}</span>
+                            <span>{totalUnits.toLocaleString('en-IN')} {pieceInfo.plural}</span>
                           </div>
                         </div>
 
-                        {/* Box 2: Total Volume (Ltr / Kg / ml) */}
+                        {/* Box 2: Total Volume (Ltr / Kg / Cans / Buckets / Packs) */}
                         <div>
                           <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
-                            {vol ? `Total ${vol.unit}` : (lowerUnit.includes('kg') ? 'Total Kg' : 'Total Ltr')}
+                            {volumeLabel}
                           </label>
                           <div className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-black text-xs flex items-center min-h-[38px]">
                             <span>{volumeDisplay}</span>
@@ -1487,33 +1573,36 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         {/* Box 3: Min Stock Alert (Entered by hand) */}
                         <div>
                           <label className="block text-[11px] text-slate-800 dark:text-slate-200 font-extrabold mb-1">
-                            {isMr ? 'Min Stock Alert' : 'Min Stock Alert'}
+                            Min Stock Alert
                           </label>
                           <div className="relative">
                             <input
                               type="number"
                               min="0"
                               value={minStockAlert}
-                              onChange={(e) => setMinStockAlert(Number(e.target.value))}
-                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-12 text-slate-900 dark:text-white text-xs font-black min-h-[38px]"
-                              placeholder="50"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setMinStockAlert(val === '' ? '' : Number(val));
+                              }}
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 pr-14 text-slate-900 dark:text-white text-xs font-black min-h-[38px]"
+                              placeholder="0"
                             />
                             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">
-                              {pieceLabel}
+                              {pieceInfo.plural}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* Formula explanation line */}
-                      {isBox ? (
+                      {!isLoosePackaging && cap > 0 ? (
                         <div className="p-2 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          👉 {initialBoxes} {isMr ? 'खोके' : 'Boxes'} ({initialBoxes} × {boxCapacity} = {boxTotal.toLocaleString('en-IN')}) + {initialLooseUnits} {isMr ? 'सुटे' : 'loose'} = {stockQuantity} {pieceLabel}
-                          {vol ? ` • एकूण ${vol.totalDisplay}` : ''}
+                          👉 {b} {isMr ? 'खोके' : 'Boxes'} ({b} × {cap} = {boxTotal.toLocaleString('en-IN')}) + {l} {isMr ? 'सुटे' : 'loose'} = {totalUnits.toLocaleString('en-IN')} {pieceInfo.plural}
+                          {volumeDisplay && volumeLabel !== `Total ${pieceInfo.plural}` ? ` • एकूण ${volumeDisplay}` : ''}
                         </div>
                       ) : (
                         <div className="p-2 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          👉 {stockQuantity} {pieceLabel} {vol ? `• एकूण ${vol.totalDisplay}` : ''}
+                          👉 {totalUnits.toLocaleString('en-IN')} {pieceInfo.plural} {volumeDisplay && volumeLabel !== `Total ${pieceInfo.plural}` ? `• एकूण ${volumeDisplay}` : ''}
                         </div>
                       )}
                     </div>

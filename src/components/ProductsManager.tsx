@@ -1155,18 +1155,9 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                     value={name}
                     onFocus={() => setShowNameSuggestions(true)}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setName(val);
+                      setName(e.target.value);
                       setShowNameSuggestions(true);
                       if (formError) setFormError(null);
-                      const matched = products.find((p) => p.name.trim().toLowerCase() === val.trim().toLowerCase());
-                      if (matched && matched.id !== editingProduct?.id) {
-                        if (matched.category) setCategory(matched.category);
-                        if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
-                        if (matched.mrp !== undefined) setMrp(matched.mrp);
-                        if (matched.defaultPrice !== undefined) setDefaultPrice(matched.defaultPrice);
-                        if (matched.boxCapacity !== undefined) setBoxCapacity(matched.boxCapacity);
-                      }
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-8 text-slate-900 dark:text-white placeholder:text-slate-400 font-medium"
                   />
@@ -1195,14 +1186,7 @@ export const ProductsManager: React.FC<ProductsManagerProps> = ({
                         onClick={() => {
                           setName(prodName);
                           setShowNameSuggestions(false);
-                          const matched = products.find((p) => p.name.trim().toLowerCase() === prodName.trim().toLowerCase());
-                          if (matched && matched.id !== editingProduct?.id) {
-                            if (matched.category) setCategory(matched.category);
-                            if (matched.defaultUnit) setDefaultUnit(matched.defaultUnit);
-                            if (matched.mrp !== undefined) setMrp(matched.mrp);
-                            if (matched.defaultPrice !== undefined) setDefaultPrice(matched.defaultPrice);
-                            if (matched.boxCapacity !== undefined) setBoxCapacity(matched.boxCapacity);
-                          }
+                          if (formError) setFormError(null);
                         }}
                         className="flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors group"
                       >

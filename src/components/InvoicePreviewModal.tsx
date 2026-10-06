@@ -758,36 +758,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Attached WhatsApp Bill Receipt Summary Strip directly under the Bill (Guarantees Image 1 format!) */}
-            <div className="mt-3 bg-[#d9fdd3] border-2 border-emerald-500 rounded-xl p-3.5 sm:p-4 text-left shadow-sm print:hidden select-none">
-              <div className="font-black text-sm sm:text-base text-slate-950 flex items-center gap-2">
-                <span className="text-base sm:text-lg">🏢</span>
-                <span className="tracking-wide uppercase">{companyProfile.companyName}</span>
-              </div>
-              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
-                <span>📄</span>
-                <span>Tax Invoice / Bill: #{masterInvoiceNo}</span>
-              </div>
-              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
-                <span>🏥</span>
-                <span>Customer: {invoice?.billTo?.firmName || 'Valued Customer'}</span>
-              </div>
-              <div className="text-xs sm:text-sm font-black text-slate-900 mt-1 flex items-center gap-2">
-                <span>💰</span>
-                <span>Total: ₹{safeNum(invoice?.totalAmount).toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1 pt-0.5">
-                <div className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2">
-                  <span>📌</span>
-                  <span>Balance: {effectiveBalance > 0 ? `₹${effectiveBalance.toFixed(2)}` : '✓ PAID'}</span>
-                </div>
-                <div className="text-[11px] font-bold text-slate-600 flex items-center gap-1 shrink-0">
-                  <span>{new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}</span>
-                  <span className="text-sky-500 font-black text-xs">✓✓</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Invoice, BillStatus } from '../types';
-import { FileText, Eye, Search, Calendar, Store, Trash2, Printer, Share2, Filter, ChevronDown, RotateCcw, X } from 'lucide-react';
+import { FileText, Eye, Search, Calendar, Store, Trash2, Printer, Share2, Filter, ChevronDown, RotateCcw, X, IndianRupee } from 'lucide-react';
 import { formatInvoiceNumber, getStatusBadgeConfig } from '../utils/invoiceUtils';
 import { useLanguage } from '../context/LanguageContext';
+import { PaymentModal } from './PaymentModal';
 
 interface InvoiceHistoryProps {
   invoices: Invoice[];
   onSelectInvoice: (inv: Invoice) => void;
   onDeleteInvoice?: (id: string) => void;
+  onUpdatePayment?: (invoiceId: string, additionalAmount: number, paymentMode: string, isFullPaid: boolean) => Promise<void> | void;
 }
 
 type FilterStatus = 'ALL' | 'PAID' | 'PENDING' | 'PARTIALLY PAID';
@@ -15,12 +17,14 @@ type FilterStatus = 'ALL' | 'PAID' | 'PENDING' | 'PARTIALLY PAID';
 export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
   invoices,
   onSelectInvoice,
-  onDeleteInvoice
+  onDeleteInvoice,
+  onUpdatePayment,
 }) => {
   const { language } = useLanguage();
   const isMr = language === 'mr';
   const isHi = language === 'hi';
 
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
   const [storeFilter, setStoreFilter] = useState<string>('ALL');
@@ -538,7 +542,15 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       </td>
 
                       <td className="p-3 text-center">
-                        <div className="inline-flex flex-col items-center gap-0.5">
+                        <div
+                          onClick={() => {
+                            if (getResolvedStatus(inv) !== 'PAID') {
+                              setPaymentInvoice(inv);
+                            }
+                          }}
+                          className={`inline-flex flex-col items-center gap-0.5 ${getResolvedStatus(inv) !== 'PAID' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                          title={getResolvedStatus(inv) !== 'PAID' ? (isMr ? 'पेमेंट जमा करण्यासाठी क्लिक करा' : 'Click to collect payment') : undefined}
+                        >
                           <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${statusBadge.badgeClass}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor}`}></span>
                             <span>{statusBadge.label}</span>
@@ -556,9 +568,22 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                         </div>
                       </td>
 
-                  <td className="p-3 text-center whitespace-nowrap min-w-[270px]">
+                  <td className="p-3 text-center whitespace-nowrap min-w-[330px]">
                     <div className="flex items-center justify-center gap-1.5 flex-nowrap whitespace-nowrap">
+                      {getResolvedStatus(inv) !== 'PAID' && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentInvoice(inv)}
+                          className="px-2.5 py-1 rounded-full border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+                          title={isMr ? 'पेमेंट जमा करा / अपडेट करा' : 'Collect / Update Payment'}
+                        >
+                          <IndianRupee className="w-3.5 h-3.5 text-white shrink-0" />
+                          <span>Pay</span>
+                        </button>
+                      )}
+
                       <button
+                        type="button"
                         onClick={() => onSelectInvoice(inv)}
                         className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                         title="View Bill Details"
@@ -568,6 +593,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => {
                           onSelectInvoice(inv);
                           setTimeout(() => window.print(), 350);
@@ -580,6 +606,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => onSelectInvoice(inv)}
                         className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                         title="Share Original Color Bill on WhatsApp"
@@ -590,6 +617,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
 
                       {onDeleteInvoice && (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDeleteInvoice(inv.id);
@@ -613,6 +641,20 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
         </div>
 
       </div>
+
+      {/* Payment Collection Modal */}
+      {paymentInvoice && (
+        <PaymentModal
+          invoice={paymentInvoice}
+          isOpen={Boolean(paymentInvoice)}
+          onClose={() => setPaymentInvoice(null)}
+          onSavePayment={async (invId, amount, mode, isFull) => {
+            if (onUpdatePayment) {
+              await onUpdatePayment(invId, amount, mode, isFull);
+            }
+          }}
+        />
+      )}
 
     </div>
   );

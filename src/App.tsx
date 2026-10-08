@@ -10,7 +10,7 @@ import { ProfileManager } from './components/ProfileManager';
 import { SettingsScreen } from './components/SettingsScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { PurchasesManager } from './components/PurchasesManager';
-import { Invoice, MedicalStore, Product, PurchaseInvoice } from './types';
+import { Invoice, MedicalStore, Product, PurchaseInvoice, BillStatus } from './types';
 import { INITIAL_INVOICES, INITIAL_PRODUCTS, INITIAL_STORES, INITIAL_PURCHASES } from './data/seedData';
 import {
   API_BASE,
@@ -914,6 +914,66 @@ export const App: React.FC = () => {
     await syncCloudData();
   };
 
+  const handleUpdateInvoicePayment = async (
+    invoiceId: string,
+    additionalAmount: number,
+    paymentMode: string,
+    isFullPaid: boolean
+  ) => {
+    const existingInv = invoices.find(i => i.id === invoiceId);
+    if (!existingInv) return;
+
+    const totalAmt = Math.round(Number(existingInv.totalAmount || 0));
+    const currentRec = Number(existingInv.receivedAmount || 0);
+
+    let newReceived = isFullPaid
+      ? totalAmt
+      : Math.min(totalAmt, currentRec + additionalAmount);
+    let newBalance = Math.max(0, totalAmt - newReceived);
+
+    if (newBalance <= 1.0 || Math.round(newBalance) === 0) {
+      newBalance = 0;
+      newReceived = totalAmt;
+    }
+
+    const newStatus: BillStatus = newBalance === 0
+      ? 'PAID'
+      : (newReceived === 0 ? 'PENDING' : 'PARTIALLY PAID');
+
+    const updatedInvoice: Invoice = {
+      ...existingInv,
+      receivedAmount: newReceived,
+      balanceAmount: newBalance,
+      status: newStatus,
+      paymentType: paymentMode || existingInv.paymentType || 'UPI',
+    };
+
+    // 1. Immediate local UI update (0ms latency!)
+    const updatedInvoices = invoices.map(i => i.id === invoiceId ? updatedInvoice : i);
+    setInvoices(updatedInvoices);
+    if (selectedPreviewInvoice?.id === invoiceId) {
+      setSelectedPreviewInvoice(updatedInvoice);
+    }
+
+    try {
+      localStorage.setItem('animex_invoices', JSON.stringify(updatedInvoices));
+    } catch {}
+
+    // 2. Broadcast live sync to other open tabs
+    try {
+      const bc = new BroadcastChannel('animex_live_sync');
+      bc.postMessage({ type: 'FORCE_SYNC' });
+      bc.close();
+    } catch {}
+
+    // 3. Background sync to cloud backend via PUT /client/:clientId/invoices/:id
+    try {
+      await syncInvoiceToBackend(updatedInvoice);
+    } catch (e) {
+      console.warn('Failed to sync updated invoice to cloud backend:', e);
+    }
+  };
+
   // Add inward stock entry (Boxes * UnitsPerBox + LooseUnits)
   const handleInwardStock = (productId: string, boxes: number, unitsPerBox: number, looseUnits: number) => {
     const totalAdded = (boxes * unitsPerBox) + looseUnits;
@@ -1221,6 +1281,7 @@ export const App: React.FC = () => {
             invoices={invoices}
             onSelectInvoice={(inv) => setSelectedPreviewInvoice(inv)}
             onDeleteInvoice={handleDeleteInvoice}
+            onUpdatePayment={handleUpdateInvoicePayment}
           />
         )}
 

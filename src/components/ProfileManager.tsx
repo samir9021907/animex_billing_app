@@ -34,7 +34,7 @@ interface ProfileManagerProps {
 const DEFAULT_PROFILE: CompanyProfile = {
   companyName: 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
   tagline: 'Veterinary Pharmaceuticals & Animal Healthcare Products',
-  contactPerson: 'ANIMEX Animal Health Care',
+  contactPerson: 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
   email: 'animexanimalhealthcare@gmail.com',
   phone: '8799883858',
   gstin: '27AAKCA9988Z1Z5',
@@ -113,12 +113,24 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
         }
 
         // 5. Sync Company Name & Contact Person if legacy
-        if (!parsed.companyName || parsed.companyName === 'ANIMEX BIOTECH' || parsed.companyName === 'Animex') {
+        if (
+          !parsed.companyName ||
+          parsed.companyName === 'ANIMEX BIOTECH' ||
+          parsed.companyName === 'Animex' ||
+          parsed.companyName === 'ANIMEX Animal Health Care' ||
+          parsed.companyName === 'ANIMEX ANIMAL HEALTH CARE'
+        ) {
           parsed.companyName = 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.';
           updated = true;
         }
-        if (!parsed.contactPerson || parsed.contactPerson === 'Admin Officer') {
-          parsed.contactPerson = 'ANIMEX Animal Health Care';
+        if (
+          !parsed.contactPerson ||
+          parsed.contactPerson === 'Admin Officer' ||
+          parsed.contactPerson === 'ANIMEX Animal Health Care' ||
+          parsed.contactPerson === 'ANIMEX ANIMAL HEALTH CARE' ||
+          parsed.contactPerson === 'ANIMEX Animal Health Care Pvt Ltd'
+        ) {
+          parsed.contactPerson = 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.';
           updated = true;
         }
 
@@ -130,7 +142,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     } catch {}
     return {
       ...DEFAULT_PROFILE,
-      contactPerson: user?.name || DEFAULT_PROFILE.contactPerson,
+      contactPerson: (user?.name && user.name !== 'ANIMEX Animal Health Care') ? user.name : DEFAULT_PROFILE.contactPerson,
       email: (user?.email && user.email !== 'admin@animex.com') ? user.email : DEFAULT_PROFILE.email,
       phone: (user?.phone && !user.phone.includes('9021907000')) ? user.phone : DEFAULT_PROFILE.phone,
       city: (user?.city && user.city !== 'Nashik') ? user.city : DEFAULT_PROFILE.city,

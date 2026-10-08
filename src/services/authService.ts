@@ -56,7 +56,7 @@ export const authService = {
 
         const user: UserSession = {
           id: clientMap.id || PERMANENT_CLIENT_ID,
-          name: clientMap.name || 'ANIMEX Animal Health Care',
+          name: clientMap.name || 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
           email: clientMap.email || 'animexanimalhealthcare@gmail.com',
           phone: clientMap.phone || '8799883858',
           address: clientMap.address || '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
@@ -78,7 +78,7 @@ export const authService = {
     ) {
       const animexUser: UserSession = {
         id: PERMANENT_CLIENT_ID,
-        name: 'ANIMEX Animal Health Care',
+        name: 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
         email: 'animexanimalhealthcare@gmail.com',
         phone: '8799883858',
         city: 'Kopargaon',
@@ -223,6 +223,15 @@ export const authService = {
           updated = true;
         }
 
+        if (
+          !user.name ||
+          user.name === 'ANIMEX Animal Health Care' ||
+          user.name === 'ANIMEX ANIMAL HEALTH CARE' ||
+          user.name === 'ANIMEX Animal Health Care Pvt Ltd'
+        ) {
+          user.name = 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.';
+          updated = true;
+        }
         if (user.email === 'admin@animex.com' || user.email === 'contact@animexanimalhealthcare.com') {
           user.email = 'animexanimalhealthcare@gmail.com';
           updated = true;
@@ -246,7 +255,7 @@ export const authService = {
       // Default auto-login for Animex billing app so new install immediately opens Dashboard!
       const defaultUser: UserSession = {
         id: PERMANENT_CLIENT_ID,
-        name: 'ANIMEX Animal Health Care',
+        name: 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
         email: 'animexanimalhealthcare@gmail.com',
         phone: '8799883858',
         city: 'Kopargaon',

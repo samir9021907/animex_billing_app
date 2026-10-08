@@ -10,6 +10,7 @@ import {
   Settings,
   Boxes,
   Factory,
+  CheckCircle2,
 } from 'lucide-react';
 import { Invoice, MedicalStore, Product } from '../types';
 import { useLanguage } from '../context/LanguageContext';
@@ -31,11 +32,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectInvoice,
 }) => {
   const { t, language } = useLanguage();
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
 
   // Financial metrics
-  const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-  const totalReceived = invoices.reduce((sum, inv) => sum + (inv.receivedAmount || 0), 0);
-  const totalDue = Math.max(0, totalRevenue - totalReceived);
+  const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+  const totalReceived = invoices.reduce((sum, inv) => {
+    const rec = inv.receivedAmount !== undefined ? Number(inv.receivedAmount) : Math.max(0, (Number(inv.totalAmount) || 0) - (Number(inv.balanceAmount) || 0));
+    return sum + (isNaN(rec) ? 0 : rec);
+  }, 0);
+  const totalDue = invoices.reduce((sum, inv) => sum + (Number(inv.balanceAmount) || 0), 0);
   const recentInvoices = [...invoices].slice(0, 5);
 
   return (
@@ -78,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {/* Total Invoices */}
         <div
           onClick={() => onNavigateTab('history')}
@@ -100,39 +106,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        {/* Total Revenue */}
+        {/* Total Billed (Gross Revenue) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {t('dash.totalBilled')}
+              {isMr ? 'एकूण बिलिंग' : isHi ? 'कुल बिलिंग' : t('dash.totalBilled')}
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+          <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">
             ₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-            {t('dash.grossVolume')}
+          <p className="text-[11px] text-blue-500/90 font-semibold mt-1">
+            {isMr ? 'एकूण विक्री (Gross)' : isHi ? 'कुल बिक्री (Gross)' : t('dash.grossVolume')}
           </p>
         </div>
 
-        {/* Balance Due */}
+        {/* Total Received (Collected / जमा रक्कम) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-              {t('dash.outstanding')}
+              {isMr ? 'एकूण जमा रक्कम' : isHi ? 'कुल प्राप्त राशि' : 'Total Received'}
             </span>
-            <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
+            ₹{totalReceived.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+            {isMr ? 'प्रत्यक्षात जमा पैसे' : isHi ? 'प्राप्त हुआ भुगतान' : 'Collected revenue'}
+          </p>
+        </div>
+
+        {/* Balance Due (Pending Collection) */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              {isMr ? 'एकूण बाकी उधारी' : isHi ? 'कुल बकाया उधारी' : t('dash.outstanding')}
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
               <AlertCircle className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-red-600 dark:text-red-400">
+          <p className="text-2xl sm:text-3xl font-black text-animex-orange-600 dark:text-amber-400">
             ₹{totalDue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-red-500 dark:text-red-400 font-semibold mt-1">
-            {t('dash.pendingCollection')}
+          <p className="text-[11px] text-amber-500 font-semibold mt-1">
+            {isMr ? 'अजून येणे बाकी' : isHi ? 'शेष बकाया राशि' : t('dash.pendingCollection')}
           </p>
         </div>
 

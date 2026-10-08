@@ -101,42 +101,69 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
       return sortOrder === 'asc' ? idA - idB : idB - idA;
     });
 
-  const totalBilled = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-  const totalBalance = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
-
-
+  const totalBilled = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+  const totalBalance = invoices.reduce((sum, inv) => sum + (Number(inv.balanceAmount) || 0), 0);
+  const totalReceived = invoices.reduce((sum, inv) => {
+    const rec = inv.receivedAmount !== undefined ? Number(inv.receivedAmount) : Math.max(0, (Number(inv.totalAmount) || 0) - (Number(inv.balanceAmount) || 0));
+    return sum + (isNaN(rec) ? 0 : rec);
+  }, 0);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 md:pb-6">
       
       {/* Title & Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
+        {/* Card 1: Total Invoices */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-200 dark:border-slate-800 space-y-1">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-            Total Invoices Generated
+            {isMr ? 'एकूण बिले' : isHi ? 'कुल बिल' : 'Total Invoices Generated'}
           </span>
           <div className="text-3xl font-black text-animex-blue-900 dark:text-sky-300">
-            {invoices.length} Bills
+            {invoices.length} {isMr ? 'बिले' : 'Bills'}
           </div>
+          <p className="text-[10px] text-slate-400 font-semibold">
+            {isMr ? 'तयार केलेली सर्व बिले' : isHi ? 'बनाए गए सभी बिल' : 'All created invoices'}
+          </p>
         </div>
 
+        {/* Card 2: Total Billed Amount (Gross Sales) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-200 dark:border-slate-800 space-y-1">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-            Total Billed Amount (₹)
+            {isMr ? 'एकूण बिलिंग रक्कम (₹)' : isHi ? 'कुल बिल राशि (₹)' : 'Total Billed Amount (₹)'}
           </span>
-          <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+          <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
             ₹ {totalBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
+          <p className="text-[10px] text-blue-500/90 font-semibold">
+            {isMr ? 'सर्व बिलांची एकूण किंमत (Gross)' : isHi ? 'कुल बिक्री मूल्य (Gross)' : 'Gross sales volume'}
+          </p>
         </div>
 
+        {/* Card 3: Total Received / Paid Amount */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-200 dark:border-slate-800 space-y-1">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-            Total Pending Dues (₹)
+            {isMr ? 'एकूण जमा रक्कम (₹)' : isHi ? 'कुल प्राप्त राशि (₹)' : 'Total Received Amount (₹)'}
+          </span>
+          <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+            ₹ {totalReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <p className="text-[10px] text-emerald-600/90 font-semibold">
+            {isMr ? 'प्रत्यक्षात जमा झालेले पैसे (Paid)' : isHi ? 'प्राप्त हुआ भुगतान (Paid)' : 'Cash / UPI collected'}
+          </p>
+        </div>
+
+        {/* Card 4: Total Pending Dues */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-200 dark:border-slate-800 space-y-1">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+            {isMr ? 'एकूण बाकी उधारी (₹)' : isHi ? 'कुल बकाया उधारी (₹)' : 'Total Pending Dues (₹)'}
           </span>
           <div className="text-3xl font-black text-animex-orange-600 dark:text-amber-400">
             ₹ {totalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
+          <p className="text-[10px] text-amber-600/90 font-semibold">
+            {isMr ? 'अजून येणे बाकी (Outstanding)' : isHi ? 'शेष बकाया राशि (Pending)' : 'Remaining to collect'}
+          </p>
         </div>
 
       </div>

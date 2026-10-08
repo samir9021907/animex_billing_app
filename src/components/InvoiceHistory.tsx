@@ -508,7 +508,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 <th className="p-3 text-center whitespace-nowrap">Items Count</th>
                 <th className="p-3 text-right whitespace-nowrap">Total Amount (₹)</th>
                 <th className="p-3 text-center whitespace-nowrap">Payment Status</th>
-                <th className="p-3 text-center whitespace-nowrap min-w-[270px]">Actions</th>
+                <th className="p-3 text-center whitespace-nowrap min-w-[370px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold">
@@ -606,24 +606,26 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                         </div>
                       </td>
 
-                  <td className="p-3 text-center whitespace-nowrap min-w-[330px]">
+                  <td className="p-3 text-center whitespace-nowrap min-w-[370px]">
                     <div className="flex items-center justify-center gap-1.5 flex-nowrap whitespace-nowrap">
-                      {getResolvedStatus(inv) !== 'PAID' && (
+                      {getResolvedStatus(inv) !== 'PAID' ? (
                         <button
                           type="button"
                           onClick={() => setPaymentInvoice(inv)}
-                          className="px-2.5 py-1 rounded-full border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+                          className="w-[66px] h-7 justify-center px-2 py-1 rounded-full border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
                           title={isMr ? 'पेमेंट जमा करा / अपडेट करा' : 'Collect / Update Payment'}
                         >
                           <IndianRupee className="w-3.5 h-3.5 text-white shrink-0" />
                           <span>Pay</span>
                         </button>
+                      ) : (
+                        <div className="w-[66px] h-7 shrink-0 invisible pointer-events-none" aria-hidden="true" />
                       )}
 
                       <button
                         type="button"
                         onClick={() => onSelectInvoice(inv)}
-                        className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
+                        className="w-[70px] h-7 justify-center px-2 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                         title="View Bill Details"
                       >
                         <Eye className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
@@ -636,7 +638,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                           onSelectInvoice(inv);
                           setTimeout(() => window.print(), 350);
                         }}
-                        className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
+                        className="w-[70px] h-7 justify-center px-2 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                         title="Print Bill"
                       >
                         <Printer className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
@@ -646,7 +648,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       <button
                         type="button"
                         onClick={() => onSelectInvoice(inv)}
-                        className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
+                        className="w-[74px] h-7 justify-center px-2 py-1 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                         title="Share Original Color Bill on WhatsApp"
                       >
                         <Share2 className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
@@ -660,7 +662,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                             e.stopPropagation();
                             onDeleteInvoice(inv.id);
                           }}
-                          className="px-2.5 py-1 rounded-full border border-red-200 hover:border-red-300 bg-white dark:bg-slate-800 hover:bg-red-50 text-red-600 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
+                          className="w-[76px] h-7 justify-center px-2 py-1 rounded-full border border-red-200 hover:border-red-300 bg-white dark:bg-slate-800 hover:bg-red-50 text-red-600 font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0 whitespace-nowrap"
                           title="Delete Bill"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />

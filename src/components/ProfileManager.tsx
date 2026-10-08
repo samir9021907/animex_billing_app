@@ -34,16 +34,16 @@ interface ProfileManagerProps {
 const DEFAULT_PROFILE: CompanyProfile = {
   companyName: 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.',
   tagline: 'Veterinary Pharmaceuticals & Animal Healthcare Products',
-  contactPerson: 'Admin Officer',
-  email: 'contact@animexanimalhealthcare.com',
-  phone: '+91 98765 43210',
-  gstin: '24AAKCA9988Z1Z5',
-  drugLicenseNo: 'GJ-SUR-2026-10492',
+  contactPerson: 'ANIMEX Animal Health Care',
+  email: 'animexanimalhealthcare@gmail.com',
+  phone: '8799883858',
+  gstin: '27AAKCA9988Z1Z5',
+  drugLicenseNo: 'MH-KPG-2026-10492',
   panNumber: 'AAKCA9988Z',
-  address: 'Plot No. 12, GIDC Industrial Estate, Adajan',
-  city: 'Surat',
-  state: 'Gujarat',
-  pincode: '395009',
+  address: '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
+  city: 'Kopargaon',
+  state: 'Maharashtra',
+  pincode: '423605',
   bankName: 'Indian Overseas Bank',
   accountNo: '083602000001131',
   ifscCode: 'IOBA0000836',
@@ -62,10 +62,67 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
       const saved = localStorage.getItem('animex_company_profile');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.accountNo === '389920194821' || parsed.bankName === 'State Bank of India') {
+        let updated = false;
+
+        // 1. Sync Bank details with official Invoice bank details
+        if (parsed.accountNo === '389920194821' || parsed.bankName === 'State Bank of India' || !parsed.bankName) {
           parsed.bankName = 'Indian Overseas Bank';
           parsed.accountNo = '083602000001131';
           parsed.ifscCode = 'IOBA0000836';
+          parsed.upiId = 'animex@sbi';
+          updated = true;
+        }
+
+        // 2. Sync Email with official Invoice email
+        if (
+          !parsed.email ||
+          parsed.email === 'admin@animex.com' ||
+          parsed.email === 'contact@animexanimalhealthcare.com' ||
+          parsed.email.includes('example.com')
+        ) {
+          parsed.email = 'animexanimalhealthcare@gmail.com';
+          updated = true;
+        }
+
+        // 3. Sync Phone with official Invoice phone
+        if (
+          !parsed.phone ||
+          parsed.phone === '+91 98765 43210' ||
+          parsed.phone === '+91 9021907000' ||
+          parsed.phone === '9021907000' ||
+          parsed.phone.includes('98765')
+        ) {
+          parsed.phone = '8799883858';
+          updated = true;
+        }
+
+        // 4. Sync Address with official Kopargaon Maharashtra address
+        if (
+          !parsed.address ||
+          parsed.address.includes('GIDC') ||
+          parsed.address.includes('Adajan') ||
+          parsed.state === 'Gujarat' ||
+          parsed.city === 'Surat' ||
+          parsed.pincode === '395009'
+        ) {
+          parsed.address = '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra';
+          parsed.city = 'Kopargaon';
+          parsed.state = 'Maharashtra';
+          parsed.pincode = '423605';
+          updated = true;
+        }
+
+        // 5. Sync Company Name & Contact Person if legacy
+        if (!parsed.companyName || parsed.companyName === 'ANIMEX BIOTECH' || parsed.companyName === 'Animex') {
+          parsed.companyName = 'ANIMEX ANIMAL HEALTH CARE PVT. LTD.';
+          updated = true;
+        }
+        if (!parsed.contactPerson || parsed.contactPerson === 'Admin Officer') {
+          parsed.contactPerson = 'ANIMEX Animal Health Care';
+          updated = true;
+        }
+
+        if (updated) {
           try { localStorage.setItem('animex_company_profile', JSON.stringify(parsed)); } catch {}
         }
         return parsed;
@@ -74,9 +131,9 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     return {
       ...DEFAULT_PROFILE,
       contactPerson: user?.name || DEFAULT_PROFILE.contactPerson,
-      email: user?.email || DEFAULT_PROFILE.email,
-      phone: user?.phone || DEFAULT_PROFILE.phone,
-      city: user?.city || DEFAULT_PROFILE.city,
+      email: (user?.email && user.email !== 'admin@animex.com') ? user.email : DEFAULT_PROFILE.email,
+      phone: (user?.phone && !user.phone.includes('9021907000')) ? user.phone : DEFAULT_PROFILE.phone,
+      city: (user?.city && user.city !== 'Nashik') ? user.city : DEFAULT_PROFILE.city,
       address: user?.address || DEFAULT_PROFILE.address,
     };
   });
@@ -246,8 +303,13 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <div className="flex items-start gap-3">
               <Phone className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
               <div>
-                <span className="text-xs text-slate-400 block">Phone / Mobile</span>
-                <span className="font-semibold text-slate-800">{profile.phone}</span>
+                <span className="text-xs text-slate-400 block">Phone / Helpline</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.phone}
+                  {profile.phone.includes('8799883858') && !profile.phone.includes('9146133858')
+                    ? ' / 9146133858'
+                    : ''}
+                </span>
               </div>
             </div>
 
@@ -256,7 +318,9 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <div>
                 <span className="text-xs text-slate-400 block">Registered Address</span>
                 <span className="font-semibold text-slate-800">
-                  {profile.address}, {profile.city}, {profile.state} - {profile.pincode}
+                  {profile.address.includes('Kopargaon') || profile.address.includes('Maharashtra')
+                    ? profile.address
+                    : `${profile.address}, ${profile.city}, ${profile.state} - ${profile.pincode}`}
                 </span>
               </div>
             </div>

@@ -73,11 +73,46 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const saved = localStorage.getItem('animex_company_profile');
       if (saved) {
         const parsed = JSON.parse(saved);
+        let updated = false;
         if (parsed.accountNo === '389920194821' || parsed.bankName === 'State Bank of India') {
           parsed.bankName = 'Indian Overseas Bank';
           parsed.accountNo = '083602000001131';
           parsed.ifscCode = 'IOBA0000836';
           parsed.branch = 'POHEGAON';
+          parsed.upiId = 'animex@sbi';
+          updated = true;
+        }
+        if (
+          !parsed.email ||
+          parsed.email === 'admin@animex.com' ||
+          parsed.email === 'contact@animexanimalhealthcare.com' ||
+          parsed.email.includes('example.com')
+        ) {
+          parsed.email = 'animexanimalhealthcare@gmail.com';
+          updated = true;
+        }
+        if (
+          !parsed.address ||
+          parsed.address.includes('GIDC') ||
+          parsed.address.includes('Adajan') ||
+          parsed.state === 'Gujarat'
+        ) {
+          parsed.address = '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra';
+          parsed.city = 'Kopargaon';
+          parsed.state = 'Maharashtra';
+          parsed.pincode = '423605';
+          updated = true;
+        }
+        if (
+          !parsed.phone ||
+          parsed.phone === '+91 98765 43210' ||
+          parsed.phone === '+91 9021907000' ||
+          parsed.phone === '9021907000'
+        ) {
+          parsed.phone = '8799883858';
+          updated = true;
+        }
+        if (updated) {
           try { localStorage.setItem('animex_company_profile', JSON.stringify(parsed)); } catch {}
         }
         return parsed;

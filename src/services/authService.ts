@@ -57,10 +57,10 @@ export const authService = {
         const user: UserSession = {
           id: clientMap.id || PERMANENT_CLIENT_ID,
           name: clientMap.name || 'ANIMEX Animal Health Care',
-          email: clientMap.email || trimmedEmail,
-          phone: clientMap.phone || '+91 9021907000',
-          address: clientMap.address || '',
-          city: clientMap.city || 'Nashik',
+          email: clientMap.email || 'animexanimalhealthcare@gmail.com',
+          phone: clientMap.phone || '8799883858',
+          address: clientMap.address || '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
+          city: clientMap.city || 'Kopargaon',
           clientId: clientMap.id || PERMANENT_CLIENT_ID,
         };
 
@@ -79,9 +79,10 @@ export const authService = {
       const animexUser: UserSession = {
         id: PERMANENT_CLIENT_ID,
         name: 'ANIMEX Animal Health Care',
-        email: trimmedEmail,
-        phone: '+91 9021907000',
-        city: 'Nashik',
+        email: 'animexanimalhealthcare@gmail.com',
+        phone: '8799883858',
+        city: 'Kopargaon',
+        address: '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
         clientId: PERMANENT_CLIENT_ID,
       };
       this.saveSession(PERMANENT_JWT_TOKEN, animexUser);
@@ -206,6 +207,7 @@ export const authService = {
       const token = localStorage.getItem(TOKEN_KEY);
       if (savedUser && token) {
         const user = JSON.parse(savedUser);
+        let updated = false;
         if (
           !user.clientId ||
           user.clientId === 'c1111111-1111-1111-1111-111111111111' ||
@@ -218,6 +220,24 @@ export const authService = {
         ) {
           user.id = PERMANENT_CLIENT_ID;
           user.clientId = PERMANENT_CLIENT_ID;
+          updated = true;
+        }
+
+        if (user.email === 'admin@animex.com' || user.email === 'contact@animexanimalhealthcare.com') {
+          user.email = 'animexanimalhealthcare@gmail.com';
+          updated = true;
+        }
+        if (user.phone === '+91 9021907000' || user.phone === '9021907000' || user.phone === '+91 98765 43210') {
+          user.phone = '8799883858';
+          updated = true;
+        }
+        if (user.city === 'Nashik' || user.city === 'Surat') {
+          user.city = 'Kopargaon';
+          user.address = '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra';
+          updated = true;
+        }
+
+        if (updated) {
           this.saveSession(PERMANENT_JWT_TOKEN, user);
         }
         return user;
@@ -227,9 +247,10 @@ export const authService = {
       const defaultUser: UserSession = {
         id: PERMANENT_CLIENT_ID,
         name: 'ANIMEX Animal Health Care',
-        email: 'admin@animex.com',
-        phone: '+91 9021907000',
-        city: 'Nashik',
+        email: 'animexanimalhealthcare@gmail.com',
+        phone: '8799883858',
+        city: 'Kopargaon',
+        address: '0208/RVN Bahadurpur, Kopargaon Dist - A.Nagar 423605 Maharashtra',
         clientId: PERMANENT_CLIENT_ID,
       };
       this.saveSession(PERMANENT_JWT_TOKEN, defaultUser);

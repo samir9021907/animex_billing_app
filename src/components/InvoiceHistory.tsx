@@ -384,10 +384,25 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                       </div>
                     </div>
 
-                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${statusBadge.badgeClass}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor}`}></span>
-                      <span>{statusBadge.label}</span>
-                    </span>
+                    <div
+                      onClick={() => {
+                        if (getResolvedStatus(inv) !== 'PAID') {
+                          setPaymentInvoice(inv);
+                        }
+                      }}
+                      className={`inline-flex flex-col items-end gap-0.5 shrink-0 ${getResolvedStatus(inv) !== 'PAID' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                      title={getResolvedStatus(inv) !== 'PAID' ? (isMr ? 'पेमेंट जमा करण्यासाठी क्लिक करा' : 'Click to collect payment') : undefined}
+                    >
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${statusBadge.badgeClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor}`}></span>
+                        <span>{statusBadge.label}</span>
+                      </span>
+                      {statusBadge.label !== 'PAID' && inv.balanceAmount > 1.0 && Math.round(inv.balanceAmount) > 0 && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold">
+                          Due: ₹{Math.round(inv.balanceAmount)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
               <div>
@@ -401,15 +416,35 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700/60 pt-2 text-xs">
-                <span className="text-slate-500 font-bold">{inv.items.length} Products</span>
+                <div>
+                  <span className="text-slate-500 font-bold">{inv.items.length} Products</span>
+                  {statusBadge.label !== 'PAID' && inv.receivedAmount > 0 && (
+                    <span className="ml-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      Paid: ₹{Math.round(inv.receivedAmount)}
+                    </span>
+                  )}
+                </div>
                 <span className="font-black text-base text-animex-blue-900 dark:text-sky-300">
                   ₹ {inv.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
-              {/* Action Buttons: View, Print, Share, Delete */}
+              {/* Action Buttons: Pay, View, Print, Share, Delete */}
               <div className="flex items-center gap-2 flex-wrap pt-2.5 border-t border-slate-200 dark:border-slate-700/60">
+                {getResolvedStatus(inv) !== 'PAID' && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentInvoice(inv)}
+                    className="px-3.5 py-1.5 rounded-full border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+                    title={isMr ? 'पेमेंट जमा करा' : 'Collect / Update Payment'}
+                  >
+                    <IndianRupee className="w-3.5 h-3.5 text-white" />
+                    <span>{isMr ? 'Pay (जमा करा)' : 'Pay'}</span>
+                  </button>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => onSelectInvoice(inv)}
                   className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                   title="View Bill Details"
@@ -419,6 +454,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => {
                     onSelectInvoice(inv);
                     setTimeout(() => window.print(), 350);
@@ -431,6 +467,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => onSelectInvoice(inv)}
                   className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                   title="Share Original Color Bill on WhatsApp"
@@ -441,6 +478,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
 
                 {onDeleteInvoice && (
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onDeleteInvoice(inv.id);
